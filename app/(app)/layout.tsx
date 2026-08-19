@@ -11,7 +11,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <div className="min-h-screen flex flex-col" style={{ background: 'var(--page-bg)' }}>
       <NavBar userId={user.id} />
-      <main className="flex-1 max-w-2xl w-full mx-auto">
+      <main className="flex-1 w-full mx-auto max-w-2xl" style={{ paddingTop: 52, paddingBottom: 64 }}>
         {children}
       </main>
     </div>
