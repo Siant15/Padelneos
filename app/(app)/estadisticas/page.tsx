@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import type { MatchStat, Profile } from '@/lib/types'
+import Link from 'next/link'
 
 export default async function EstadisticasPage() {
   const supabase = await createClient()
@@ -8,8 +9,6 @@ export default async function EstadisticasPage() {
     .from('match_stats')
     .select('*, player:profiles(id, name), match:matches(id, round:rounds(round_number))')
     .order('created_at', { ascending: false })
-
-  const { data: players } = await supabase.from('profiles').select('id, name')
 
   // Agrupar por jugador
   type Totals = {
@@ -40,25 +39,29 @@ export default async function EstadisticasPage() {
   const rows = Object.entries(totals).map(([id, t]) => ({ id, ...t }))
 
   return (
-    <div className="space-y-6 pb-4">
-      <h1 className="text-xl font-bold">Estadísticas</h1>
+    <div className="px-5 pt-5 pb-6 flex flex-col gap-6">
+      <div>
+        <Link href="/clasificacion" className="text-xs font-bold" style={{ color: 'var(--text-muted)' }}>← Clasificación</Link>
+        <h1 className="font-heading text-[22px] font-extrabold mt-1">📊 Estadísticas</h1>
+        <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
+          Curiosidades acumuladas de cada partido: aces, dobles faltas, bolas por 3 y smash al cristal.
+        </p>
+      </div>
 
       {/* Totales por jugador */}
       <section>
-        <h2 className="font-semibold mb-3">Totales acumulados</h2>
+        <h2 className="font-heading text-sm font-bold mb-2.5">Totales acumulados</h2>
         {!rows.length ? (
-          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Aún no hay estadísticas registradas.</p>
+          <div className="rounded-2xl p-4 text-sm" style={{ background: 'var(--surface)', color: 'var(--text-muted)', boxShadow: '0 3px 10px rgba(0,0,0,0.04)' }}>
+            Aún no hay estadísticas registradas. Se rellenan al meter el resultado de cada jornada.
+          </div>
         ) : (
-          <div className="space-y-3">
+          <div className="flex flex-col gap-3">
             {rows.map(r => (
-              <div
-                key={r.id}
-                className="rounded-xl p-4"
-                style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <p className="font-semibold">{r.name}</p>
-                  <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{r.matches} partidos</span>
+              <div key={r.id} className="rounded-2xl p-3.5" style={{ background: 'var(--surface)', boxShadow: '0 3px 10px rgba(0,0,0,0.04)' }}>
+                <div className="flex items-center justify-between mb-2.5">
+                  <p className="font-bold text-sm">{r.name}</p>
+                  <span className="text-xs" style={{ color: 'var(--text-muted2)' }}>{r.matches} partidos</span>
                 </div>
                 <div className="grid grid-cols-4 gap-2">
                   <StatBox emoji="🎯" label="Aces" value={r.aces} perMatch={r.matches ? +(r.aces / r.matches).toFixed(1) : 0} />
@@ -75,8 +78,8 @@ export default async function EstadisticasPage() {
       {/* Récords */}
       {rows.length > 0 && (
         <section>
-          <h2 className="font-semibold mb-3">Récords 🏅</h2>
-          <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--border)' }}>
+          <h2 className="font-heading text-sm font-bold mb-2.5">Récords 🏅</h2>
+          <div className="rounded-2xl px-3.5" style={{ background: 'var(--surface)', boxShadow: '0 3px 10px rgba(0,0,0,0.04)' }}>
             {[
               { label: '🎯 Más aces', key: 'aces' as const },
               { label: '❌ Más dobles faltas', key: 'double_faults' as const },
@@ -87,16 +90,13 @@ export default async function EstadisticasPage() {
               return (
                 <div
                   key={key}
-                  className="flex items-center justify-between px-4 py-3"
-                  style={{
-                    background: 'var(--surface)',
-                    borderTop: i > 0 ? '1px solid var(--border)' : undefined,
-                  }}
+                  className="flex items-center justify-between py-2.5"
+                  style={{ borderBottom: i < 3 ? '1px solid var(--hairline)' : undefined }}
                 >
                   <span className="text-sm">{label}</span>
                   <div className="text-right">
-                    <span className="font-bold">{leader.name}</span>
-                    <span className="text-sm ml-2" style={{ color: 'var(--text-muted)' }}>({leader[key]})</span>
+                    <span className="font-bold text-sm">{leader.name}</span>
+                    <span className="text-xs ml-2" style={{ color: 'var(--text-muted2)' }}>({leader[key]})</span>
                   </div>
                 </div>
               )
@@ -105,7 +105,7 @@ export default async function EstadisticasPage() {
         </section>
       )}
 
-      <div className="text-xs" style={{ color: 'var(--text-muted)' }}>
+      <div className="text-xs" style={{ color: 'var(--text-muted2)' }}>
         DF = Dobles faltas · B×3 = Bolas por 3 · SC = Smash al cristal
       </div>
     </div>
@@ -114,14 +114,11 @@ export default async function EstadisticasPage() {
 
 function StatBox({ emoji, label, value, perMatch }: { emoji: string; label: string; value: number; perMatch: number }) {
   return (
-    <div
-      className="rounded-lg p-2 text-center"
-      style={{ background: 'var(--surface2)', border: '1px solid var(--border)' }}
-    >
-      <div className="text-lg">{emoji}</div>
-      <div className="font-bold text-lg">{value}</div>
-      <div className="text-xs" style={{ color: 'var(--text-muted)' }}>{label}</div>
-      <div className="text-xs" style={{ color: 'var(--text-muted)' }}>{perMatch}/p</div>
+    <div className="rounded-xl p-2 text-center" style={{ background: 'var(--surface2)' }}>
+      <div className="text-base">{emoji}</div>
+      <div className="font-extrabold text-base">{value}</div>
+      <div className="text-[10px]" style={{ color: 'var(--text-muted2)' }}>{label}</div>
+      <div className="text-[10px]" style={{ color: 'var(--text-muted2)' }}>{perMatch}/p</div>
     </div>
   )
 }

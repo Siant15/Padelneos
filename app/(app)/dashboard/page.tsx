@@ -30,11 +30,20 @@ export default async function DashboardPage() {
     <div className="flex flex-col">
       {/* Header degradado */}
       <div
-        className="px-5 pt-5 pb-3 text-white"
+        className="px-5 pt-5 pb-3 text-white flex items-start justify-between"
         style={{ background: 'linear-gradient(135deg,#2E6FF2,#5B8CFF)', borderRadius: '0 0 24px 24px' }}
       >
-        <div className="font-heading text-[22px] font-extrabold flex items-center gap-2">🎾 Liga Pádel</div>
-        <div className="text-xs opacity-90 mt-0.5">4 jugadores · 9 jornadas · ~4 meses</div>
+        <div>
+          <div className="font-heading text-[22px] font-extrabold flex items-center gap-2">🎾 Liga Pádel</div>
+          <div className="text-xs opacity-90 mt-0.5">4 jugadores · 9 jornadas · ~4 meses</div>
+        </div>
+        <Link
+          href="/perfil"
+          className="w-9 h-9 rounded-full flex items-center justify-center text-sm shrink-0"
+          style={{ background: 'rgba(255,255,255,0.2)' }}
+        >
+          🙋
+        </Link>
       </div>
 
       <div className="px-5 pt-4 pb-6 flex flex-col gap-4">

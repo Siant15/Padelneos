@@ -16,7 +16,12 @@ export default async function AdminPage() {
 
   return (
     <div className="px-5 pt-5 pb-6 flex flex-col gap-6">
-      <h1 className="font-heading text-[22px] font-extrabold">🛠️ Admin</h1>
+      <div>
+        <h1 className="font-heading text-[22px] font-extrabold">🎾 Gestión de la liga</h1>
+        <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
+          Cualquier jugador puede crear la liga, las jornadas y los mercados desde aquí.
+        </p>
+      </div>
 
       {/* Jugadores registrados */}
       <section>

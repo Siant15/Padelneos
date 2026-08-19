@@ -41,28 +41,12 @@ export default function NavBar({ userId }: { userId: string }) {
             style={{ background: 'var(--surface)', border: '1px solid var(--hairline)', minWidth: 140 }}
           >
             <Link
-              href="/perfil"
-              onClick={() => setMenuOpen(false)}
-              className="block px-4 py-2.5 text-sm font-semibold"
-              style={{ color: 'var(--text)', borderBottom: '1px solid var(--hairline)' }}
-            >
-              🙋 Mi perfil
-            </Link>
-            <Link
               href="/admin"
               onClick={() => setMenuOpen(false)}
               className="block px-4 py-2.5 text-sm font-semibold"
               style={{ color: 'var(--text)', borderBottom: '1px solid var(--hairline)' }}
             >
-              🛠️ Admin
-            </Link>
-            <Link
-              href="/estadisticas"
-              onClick={() => setMenuOpen(false)}
-              className="block px-4 py-2.5 text-sm font-semibold"
-              style={{ color: 'var(--text)', borderBottom: '1px solid var(--hairline)' }}
-            >
-              📊 Estadísticas
+              🎾 Gestión de la liga
             </Link>
             <button
               onClick={handleLogout}

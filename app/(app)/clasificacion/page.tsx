@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import type { IndividualStanding, PairStanding, BettingRoundResult, Profile } from '@/lib/types'
 import ClasificacionTabs from '@/components/ClasificacionTabs'
+import Link from 'next/link'
 
 const MEDALS = ['🥇', '🥈', '🥉', '4º']
 
@@ -44,6 +45,18 @@ export default async function ClasificacionPage() {
     <div className="px-5 pt-5 pb-6">
       <h1 className="font-heading text-[22px] font-extrabold mb-4">🏆 Clasificación</h1>
       <ClasificacionTabs individual={individualRows} parejas={pairRows} apuestas={apuestasRows} />
+
+      <Link
+        href="/estadisticas"
+        className="mt-5 flex items-center justify-between rounded-2xl px-4 py-3.5 transition hover:opacity-90"
+        style={{ background: 'var(--surface)', boxShadow: '0 3px 10px rgba(0,0,0,0.04)' }}
+      >
+        <div>
+          <p className="font-heading font-bold text-sm">📊 Estadísticas de juego</p>
+          <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Aces, dobles faltas, bolas por 3 y récords</p>
+        </div>
+        <span style={{ color: 'var(--text-muted2)' }}>→</span>
+      </Link>
     </div>
   )
 }
