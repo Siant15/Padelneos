@@ -23,10 +23,10 @@ export default function ConfirmCourtButton({ roundId }: { roundId: string }) {
     <button
       onClick={confirm}
       disabled={loading}
-      className="text-xs px-3 py-1.5 rounded-lg font-semibold transition hover:opacity-80 disabled:opacity-50"
-      style={{ background: 'var(--green)', color: '#fff' }}
+      className="font-heading w-full text-[14px] py-2.5 rounded-[14px] font-bold transition hover:opacity-90 disabled:opacity-50"
+      style={{ background: 'var(--accent)', color: '#fff' }}
     >
-      {loading ? 'Confirmando...' : 'Confirmar pista ✓'}
+      {loading ? 'Confirmando...' : 'Confirmar reserva'}
     </button>
   )
 }

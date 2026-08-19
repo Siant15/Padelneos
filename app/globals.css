@@ -1,26 +1,45 @@
+@import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Nunito:wght@400;600;700;800&display=swap');
 @import "tailwindcss";
 
 :root {
-  --bg: #0f1117;
-  --surface: #1a1d27;
-  --surface2: #22263a;
-  --border: #2e3347;
-  --text: #e8eaf0;
-  --text-muted: #8890a6;
-  --accent: #6c63ff;
-  --accent-hover: #7c74ff;
-  --green: #22c55e;
-  --red: #ef4444;
-  --yellow: #eab308;
-  --orange: #f97316;
+  --bg: #EDEAE1;
+  --page-bg: #FDF9F0;
+  --surface: #FFFFFF;
+  --surface2: #F5F8FF;
+  --tint: #F0EFEA;
+  --border: #DCE6FF;
+  --hairline: #F0EFEA;
+  --hairline2: #F7F7F4;
+  --text: #2B2B2B;
+  --text-muted: #8A8A8A;
+  --text-muted2: #9A9A9A;
+  --accent: #2E6FF2;
+  --accent-hover: #5B8CFF;
+  --green: #1E9E5A;
+  --green-bg: #DFF6E8;
+  --red: #D64545;
+  --yellow: #FFC93D;
+  --yellow-text: #5A3E00;
+  --orange: #D98A1B;
+  --orange-bg: #FFF1DA;
+  --font-heading: 'Baloo 2', sans-serif;
+  --font-body: 'Nunito', sans-serif;
 }
 
 body {
   background: var(--bg);
   color: var(--text);
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: var(--font-body);
 }
 
 * {
   box-sizing: border-box;
+}
+
+h1, h2, h3, h4, .font-heading {
+  font-family: var(--font-heading);
+}
+
+::-webkit-scrollbar {
+  display: none;
 }

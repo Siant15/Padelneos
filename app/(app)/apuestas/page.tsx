@@ -42,43 +42,40 @@ export default async function ApuestasPage() {
     .limit(10)
 
   return (
-    <div className="space-y-6 pb-4">
-      <h1 className="text-xl font-bold">Apuestas 🎰</h1>
+    <div className="px-5 pt-5 pb-6 flex flex-col gap-6">
+      <h1 className="font-heading text-[22px] font-extrabold">💰 Apuestas</h1>
 
       {/* Clasificación apostadores */}
       <section>
-        <h2 className="font-semibold mb-3">Ranking de apostadores</h2>
-        <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--border)' }}>
+        <h2 className="font-heading text-sm font-bold mb-2.5">Ranking de apostadores</h2>
+        <div className="rounded-2xl px-3.5" style={{ background: 'var(--surface)', boxShadow: '0 3px 10px rgba(0,0,0,0.04)' }}>
           {ranking.length === 0 ? (
-            <div className="px-4 py-8 text-center text-sm" style={{ color: 'var(--text-muted)' }}>
+            <div className="py-8 text-center text-sm" style={{ color: 'var(--text-muted)' }}>
               Aún no hay apuestas resueltas
             </div>
           ) : (
             ranking.map((r, i) => (
               <div
                 key={r.player_id}
-                className="flex items-center justify-between px-4 py-3"
-                style={{
-                  background: r.player_id === user?.id ? 'var(--surface2)' : 'var(--surface)',
-                  borderTop: i > 0 ? '1px solid var(--border)' : undefined,
-                }}
+                className="flex items-center justify-between py-2.5"
+                style={{ borderBottom: i < ranking.length - 1 ? '1px solid var(--hairline)' : undefined }}
               >
-                <div className="flex items-center gap-3">
-                  <span className="font-bold w-6 text-center" style={{
-                    color: i === 0 ? 'var(--yellow)' : 'var(--text-muted)'
+                <div className="flex items-center gap-2.5">
+                  <span className="font-bold w-5 text-center text-sm" style={{
+                    color: i === 0 ? 'var(--yellow)' : 'var(--text-muted2)'
                   }}>
                     {i + 1}
                   </span>
-                  <span className="font-medium">{r.name}</span>
+                  <span className="text-[13px] font-bold">{r.name}</span>
                   {r.player_id === user?.id && (
                     <span className="text-xs" style={{ color: 'var(--accent)' }}>(tú)</span>
                   )}
                 </div>
-                <div className="flex items-center gap-3 text-sm">
+                <div className="flex items-center gap-3 text-xs">
                   <span style={{ color: r.chips_total >= 0 ? 'var(--green)' : 'var(--red)' }}>
                     {r.chips_total >= 0 ? '+' : ''}{r.chips_total}🎰
                   </span>
-                  <span style={{ color: 'var(--accent)' }}>+{r.total_bonus}pt</span>
+                  <span className="font-bold" style={{ color: 'var(--accent)' }}>+{r.total_bonus}pt</span>
                 </div>
               </div>
             ))
@@ -88,21 +85,21 @@ export default async function ApuestasPage() {
 
       {/* Ir a jornada */}
       <section>
-        <h2 className="font-semibold mb-3">Por jornada</h2>
-        <div className="space-y-2">
+        <h2 className="font-heading text-sm font-bold mb-2.5">Por jornada</h2>
+        <div className="flex flex-col gap-2">
           {(rounds ?? []).map(r => (
             <Link
               key={r.id}
               href={`/apuestas/${r.id}`}
-              className="flex items-center justify-between rounded-xl px-4 py-3 transition hover:opacity-90"
-              style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
+              className="flex items-center justify-between rounded-2xl px-4 py-3 transition hover:opacity-90"
+              style={{ background: 'var(--surface)', boxShadow: '0 3px 10px rgba(0,0,0,0.04)' }}
             >
-              <span className="font-medium">Jornada {r.round_number}</span>
-              <div className="flex items-center gap-2 text-sm">
+              <span className="text-[13px] font-bold">Jornada {r.round_number}</span>
+              <div className="flex items-center gap-2 text-xs">
                 <span style={{ color: r.status === 'played' ? 'var(--green)' : 'var(--text-muted)' }}>
                   {r.status === 'played' ? 'Resuelta' : 'Activa'}
                 </span>
-                <span style={{ color: 'var(--text-muted)' }}>→</span>
+                <span style={{ color: 'var(--text-muted2)' }}>→</span>
               </div>
             </Link>
           ))}

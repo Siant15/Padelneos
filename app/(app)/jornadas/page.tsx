@@ -1,100 +1,103 @@
 import { createClient } from '@/lib/supabase/server'
-import type { Round } from '@/lib/types'
 import { formatDate } from '@/lib/types'
-import Link from 'next/link'
+import JornadasAccordion, { type JornadaViewModel } from '@/components/JornadasAccordion'
 
 export default async function JornadasPage() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
 
   const { data: rounds } = await supabase
     .from('rounds')
-    .select('*, court_booker:profiles!court_booker_id(id, name), match:matches(id, winner, set1_t1, set1_t2, set2_t1, set2_t2, set3_t1, set3_t2, team1_p1:profiles!team1_p1_id(id, name), team1_p2:profiles!team1_p2_id(id, name), team2_p1:profiles!team2_p1_id(id, name), team2_p2:profiles!team2_p2_id(id, name))')
+    .select(`
+      *,
+      court_booker:profiles!court_booker_id(id, name),
+      match:matches(
+        id, winner, set1_t1, set1_t2, set2_t1, set2_t2, set3_t1, set3_t2,
+        team1_p1:profiles!team1_p1_id(id, name),
+        team1_p2:profiles!team1_p2_id(id, name),
+        team2_p1:profiles!team2_p1_id(id, name),
+        team2_p2:profiles!team2_p2_id(id, name)
+      )
+    `)
     .order('scheduled_date', { ascending: true })
 
+  const matchIds = (rounds ?? [])
+    .map(r => (r.match as { id: string } | null)?.id)
+    .filter(Boolean) as string[]
+  const roundIds = (rounds ?? []).map(r => r.id)
+
+  const [{ data: allStats }, { data: allBetResults }] = await Promise.all([
+    matchIds.length
+      ? supabase.from('match_stats').select('*, player:profiles(id, name)').in('match_id', matchIds)
+      : Promise.resolve({ data: [] }),
+    roundIds.length
+      ? supabase.from('betting_round_results').select('*, player:profiles(id, name)').in('round_id', roundIds).order('rank')
+      : Promise.resolve({ data: [] }),
+  ])
+
+  const nextRound = (rounds ?? []).find(r => r.status !== 'played')
+
+  const items: JornadaViewModel[] = (rounds ?? []).map(round => {
+    const match = round.match as {
+      id: string; winner: string | null
+      set1_t1: number | null; set1_t2: number | null; set2_t1: number | null; set2_t2: number | null; set3_t1: number | null; set3_t2: number | null
+      team1_p1?: { name: string }; team1_p2?: { name: string }; team2_p1?: { name: string }; team2_p2?: { name: string }
+    } | null
+
+    const stats = (allStats ?? [])
+      .filter((s: { match_id: string }) => s.match_id === match?.id)
+      .map((s: { aces: number; double_faults: number; bolas_por_3: number; smash_al_cristal: number; player?: { name: string } }) => ({
+        name: s.player?.name ?? '',
+        line: `${s.aces} aces · ${s.double_faults} df · ${s.bolas_por_3} bolas3 · ${s.smash_al_cristal} cristal`,
+      }))
+
+    const betResults = (allBetResults ?? []).filter((b: { round_id: string }) => b.round_id === round.id)
+    const betWinner = betResults.find((b: { rank: number }) => b.rank === 1)
+    const betSecond = betResults.find((b: { rank: number }) => b.rank === 2)
+
+    const isNext = nextRound?.id === round.id
+    const played = round.status === 'played'
+
+    let scoreLabel = ''
+    if (match && match.set1_t1 !== null) {
+      const sets = [`${match.set1_t1}-${match.set1_t2}`, `${match.set2_t1}-${match.set2_t2}`]
+      if (match.set3_t1 !== null) sets.push(`${match.set3_t1}-${match.set3_t2}`)
+      scoreLabel = sets.join(', ')
+    }
+
+    return {
+      id: round.id,
+      numLabel: String(round.round_number),
+      dateLabel: formatDate(round.scheduled_date),
+      pairALabel: match ? `${match.team1_p1?.name ?? '?'} / ${match.team1_p2?.name ?? '?'}` : 'Por confirmar',
+      pairBLabel: match ? `${match.team2_p1?.name ?? '?'} / ${match.team2_p2?.name ?? '?'}` : '',
+      responsableName: round.court_booker?.name ?? 'Sin asignar',
+      reservaConfirmed: round.court_confirmed,
+      played,
+      isNext,
+      statusLabel: played ? '✔ Jugada' : (isNext ? '⏳ Próxima' : '📅 Programada'),
+      tagBg: played ? 'var(--green-bg)' : (isNext ? 'var(--orange-bg)' : 'var(--tint)'),
+      tagColor: played ? 'var(--green)' : (isNext ? 'var(--orange)' : 'var(--text-muted2)'),
+      scoreLabel,
+      winnerLabel: match?.winner === 'team1'
+        ? `${match.team1_p1?.name} / ${match.team1_p2?.name}`
+        : match?.winner === 'team2'
+          ? `${match.team2_p1?.name} / ${match.team2_p2?.name}`
+          : '',
+      stats,
+      betWinner: betWinner?.player?.name ?? '',
+      betSecond: betSecond?.player?.name ?? '',
+    }
+  })
+
   return (
-    <div className="space-y-4 pb-4">
-      <h1 className="text-xl font-bold">Jornadas</h1>
+    <div className="px-5 pt-5 pb-6">
+      <h1 className="font-heading text-[22px] font-extrabold mb-4">📅 Calendario</h1>
 
-      {!rounds?.length ? (
-        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-          No hay jornadas creadas todavía.
-        </p>
+      {!items.length ? (
+        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>No hay jornadas creadas todavía.</p>
       ) : (
-        (rounds as Round[]).map(round => (
-          <Link
-            key={round.id}
-            href={`/jornadas/${round.id}`}
-            className="block rounded-xl p-4 transition hover:opacity-90"
-            style={{
-              background: 'var(--surface)',
-              border: `1px solid ${round.status === 'played' ? 'var(--border)' : 'var(--border)'}`,
-            }}
-          >
-            <div className="flex items-start justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <span
-                  className="text-xs font-bold px-2 py-0.5 rounded-full"
-                  style={{ background: 'var(--accent)', color: '#fff' }}
-                >
-                  J{round.round_number}
-                </span>
-                <StatusBadge status={round.status} />
-              </div>
-              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                {formatDate(round.scheduled_date)}
-              </span>
-            </div>
-
-            {round.match ? (
-              <div className="text-sm space-y-1">
-                <div className="flex items-center justify-between">
-                  <span>{(round.match as { team1_p1?: { name: string }; team1_p2?: { name: string } }).team1_p1?.name} & {(round.match as { team1_p1?: { name: string }; team1_p2?: { name: string } }).team1_p2?.name}</span>
-                  {round.status === 'played' && round.match.winner && (
-                    <span className="font-bold" style={{ color: round.match.winner === 'team1' ? 'var(--green)' : 'var(--text-muted)' }}>
-                      {round.match.set1_t1}-{round.match.set1_t2}
-                    </span>
-                  )}
-                </div>
-                <div className="text-xs my-1" style={{ color: 'var(--text-muted)' }}>vs</div>
-                <div className="flex items-center justify-between">
-                  <span>{(round.match as { team2_p1?: { name: string }; team2_p2?: { name: string } }).team2_p1?.name} & {(round.match as { team2_p1?: { name: string }; team2_p2?: { name: string } }).team2_p2?.name}</span>
-                  {round.status === 'played' && round.match.winner && (
-                    <span className="font-bold" style={{ color: round.match.winner === 'team2' ? 'var(--green)' : 'var(--text-muted)' }}>
-                      {round.match.set1_t2}-{round.match.set1_t1}
-                    </span>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Parejas por confirmar</p>
-            )}
-
-            {/* Pista */}
-            <div className="mt-3 pt-3 flex items-center justify-between" style={{ borderTop: '1px solid var(--border)' }}>
-              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                Reserva: <span style={{ color: round.court_booker_id === user?.id ? 'var(--accent)' : 'var(--text)' }}>
-                  {round.court_booker?.name ?? 'Sin asignar'}
-                  {round.court_booker_id === user?.id && ' (tú)'}
-                </span>
-              </span>
-              <span className="text-xs font-medium" style={{ color: round.court_confirmed ? 'var(--green)' : 'var(--orange)' }}>
-                {round.court_confirmed ? '✓ Confirmada' : '⏳ Pendiente'}
-              </span>
-            </div>
-          </Link>
-        ))
+        <JornadasAccordion items={items} />
       )}
     </div>
   )
-}
-
-function StatusBadge({ status }: { status: Round['status'] }) {
-  const map = {
-    scheduled: { label: 'Programada', color: 'var(--text-muted)' },
-    played: { label: 'Jugada', color: 'var(--green)' },
-    cancelled: { label: 'Cancelada', color: 'var(--red)' },
-  }
-  const { label, color } = map[status]
-  return <span className="text-xs font-medium" style={{ color }}>{label}</span>
 }

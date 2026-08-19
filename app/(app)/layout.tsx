@@ -9,9 +9,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (!user) redirect('/login')
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: 'var(--bg)' }}>
+    <div className="min-h-screen flex flex-col" style={{ background: 'var(--page-bg)' }}>
       <NavBar userId={user.id} />
-      <main className="flex-1 max-w-2xl w-full mx-auto px-4 py-6">
+      <main className="flex-1 max-w-2xl w-full mx-auto">
         {children}
       </main>
     </div>

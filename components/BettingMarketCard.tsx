@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
-import type { BettingMarket, BettingOption, Profile } from '@/lib/types'
+import type { BettingMarket, Profile } from '@/lib/types'
 
 interface Props {
   market: BettingMarket
@@ -13,33 +13,35 @@ interface Props {
   players: Profile[]
 }
 
-export default function BettingMarketCard({ market, userId, chipsLeft, roundStatus, players }: Props) {
+const OPTION_COLORS = ['#2E6FF2', '#FF8A3D', '#2BB673', '#FFC93D', '#9AA5B8']
+const TYPE_ICON: Record<string, string> = { yes_no: '🎾', player_choice: '🎯', quantity: '🔢' }
+
+export default function BettingMarketCard({ market, userId, chipsLeft, roundStatus }: Props) {
   const router = useRouter()
   const supabase = createClient()
 
-  // Estado local de apuestas pendientes (antes de guardar)
   const myBets = market.bets?.filter(b => b.player_id === userId) ?? []
   const [chips, setChips] = useState<Record<string, number>>(
     Object.fromEntries(myBets.map(b => [b.option_id, b.chips]))
   )
+  const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
 
   const canBet = roundStatus === 'scheduled' && !market.resolved
   const totalChipsInMarket = Object.values(chips).reduce((s, v) => s + v, 0)
   const originalChipsInMarket = myBets.reduce((s, b) => s + b.chips, 0)
-  const chipsAvailable = chipsLeft + originalChipsInMarket // devuelve las que tenía antes de editar
+  const chipsAvailable = chipsLeft + originalChipsInMarket
 
-  // Calcula odds aproximadas de cada opción (pari-mutuel)
   function getTotalChipsOnOption(optionId: string) {
     return market.bets?.filter(b => b.option_id === optionId).reduce((s, b) => s + b.chips, 0) ?? 0
   }
+
+  const totalMarketChips = (market.options ?? []).reduce((s, o) => s + getTotalChipsOnOption(o.id), 0)
 
   async function saveBets() {
     if (totalChipsInMarket > chipsAvailable) return
     setSaving(true)
 
-    // Upsert bets
     for (const option of market.options ?? []) {
       const c = chips[option.id] ?? 0
       if (c > 0) {
@@ -50,135 +52,100 @@ export default function BettingMarketCard({ market, userId, chipsLeft, roundStat
           chips: c,
         }, { onConflict: 'market_id,option_id,player_id' })
       } else {
-        // borrar si se pone a 0
         await supabase.from('bets')
           .delete()
           .match({ market_id: market.id, option_id: option.id, player_id: userId })
       }
     }
 
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
     setSaving(false)
+    setEditing(false)
     router.refresh()
   }
 
   const isOverBudget = totalChipsInMarket > chipsAvailable
 
   return (
-    <div
-      className="rounded-xl p-4"
-      style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
-    >
-      {/* Header */}
-      <div className="flex items-start justify-between mb-3">
-        <div>
-          <span
-            className="text-xs font-semibold px-2 py-0.5 rounded-full mr-2"
-            style={{ background: 'var(--surface2)', color: 'var(--text-muted)' }}
-          >
-            {market.type === 'yes_no' ? 'Sí/No' : market.type === 'player_choice' ? 'Jugador' : 'Cantidad'}
-          </span>
-          {market.resolved && (
-            <span className="text-xs font-semibold" style={{ color: 'var(--green)' }}>✓ Resuelta</span>
-          )}
+    <div className="rounded-2xl p-3.5" style={{ background: 'var(--surface)', boxShadow: '0 3px 10px rgba(0,0,0,0.04)' }}>
+      <div className="flex items-center justify-between">
+        <div className="font-heading font-bold text-[13px]">
+          {TYPE_ICON[market.type] ?? '🎾'} {market.description}
         </div>
+        {market.resolved && <span className="text-xs font-bold" style={{ color: 'var(--green)' }}>✓</span>}
       </div>
 
-      <p className="font-semibold text-sm mb-3">{market.description}</p>
-
-      {/* Opciones */}
-      <div className="space-y-2">
-        {market.options?.map(option => {
+      <div className="flex flex-col gap-2 mt-2.5">
+        {market.options?.map((option, idx) => {
           const totalOnOption = getTotalChipsOnOption(option.id)
           const isWinner = market.winning_option_id === option.id
           const myChips = chips[option.id] ?? 0
+          const pct = totalMarketChips ? Math.round((totalOnOption / totalMarketChips) * 100) : 0
+          const cuota = totalOnOption ? (totalMarketChips / totalOnOption).toFixed(1) : '—'
+          const color = OPTION_COLORS[idx % OPTION_COLORS.length]
 
-          // Restricción: no apostar contra uno mismo
-          // Si la opción tiene player_id y es el usuario actual, y la descripción implica resultado negativo, bloquear
           const isSelfNegativeBet = option.player_id === userId &&
             (market.description.toLowerCase().includes('doble falta') ||
              market.description.toLowerCase().includes('error') ||
              market.description.toLowerCase().includes('perderá'))
 
           return (
-            <div
-              key={option.id}
-              className="rounded-lg p-3"
-              style={{
-                background: isWinner ? 'rgba(34,197,94,0.1)' : 'var(--surface2)',
-                border: `1px solid ${isWinner ? 'var(--green)' : 'var(--border)'}`,
-              }}
-            >
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-sm font-medium">
+            <div key={option.id}>
+              <div className="flex justify-between text-xs mb-1">
+                <span className="font-bold">
                   {isWinner && '🏆 '}{option.label}
-                  {isSelfNegativeBet && <span className="ml-1 text-xs" style={{ color: 'var(--red)' }}>🚫</span>}
+                  {isSelfNegativeBet && <span className="ml-1" style={{ color: 'var(--red)' }}>🚫</span>}
                 </span>
-                <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                  {totalOnOption} fichas totales
-                </span>
+                <span style={{ color: '#9AA5B8' }}>cuota x{cuota}</span>
               </div>
-
-              {canBet && !isSelfNegativeBet && (
-                <div className="flex items-center gap-2 mt-1">
-                  <button
-                    onClick={() => setChips(c => ({ ...c, [option.id]: Math.max(0, (c[option.id] ?? 0) - 5) }))}
-                    className="w-7 h-7 rounded-lg text-sm font-bold transition hover:opacity-80"
-                    style={{ background: 'var(--border)' }}
-                  >−</button>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 h-2.5 rounded-full overflow-hidden" style={{ background: 'var(--tint)' }}>
+                  <div className="h-full rounded-full" style={{ width: `${pct}%`, background: color }} />
+                </div>
+                {canBet && editing && !isSelfNegativeBet ? (
                   <input
                     type="number"
                     min={0}
                     max={chipsAvailable}
                     value={myChips}
                     onChange={e => setChips(c => ({ ...c, [option.id]: Math.max(0, parseInt(e.target.value) || 0) }))}
-                    className="w-16 text-center text-sm rounded-lg py-1 outline-none"
-                    style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)' }}
+                    className="w-[52px] text-center text-xs rounded-lg py-1 outline-none"
+                    style={{ border: '1px solid var(--hairline)', color: 'var(--text)' }}
                   />
-                  <button
-                    onClick={() => setChips(c => ({ ...c, [option.id]: Math.min(chipsAvailable, (c[option.id] ?? 0) + 5) }))}
-                    className="w-7 h-7 rounded-lg text-sm font-bold transition hover:opacity-80"
-                    style={{ background: 'var(--border)' }}
-                  >+</button>
-                  <span className="text-xs" style={{ color: 'var(--accent)' }}>
-                    {myChips > 0 ? `mis fichas: ${myChips}` : ''}
-                  </span>
-                </div>
-              )}
-
-              {!canBet && myChips > 0 && (
-                <p className="text-xs mt-1" style={{ color: 'var(--accent)' }}>
-                  Mis fichas: {myChips}
-                </p>
-              )}
-
+                ) : (
+                  <span className="text-[11px] w-[38px] text-right" style={{ color: '#9AA5B8' }}>{myChips}f</span>
+                )}
+              </div>
               {isSelfNegativeBet && (
-                <p className="text-xs mt-1" style={{ color: 'var(--red)' }}>
-                  No puedes apostar contra ti mismo
-                </p>
+                <p className="text-[11px] mt-1" style={{ color: 'var(--red)' }}>No puedes apostar contra ti mismo</p>
               )}
             </div>
           )
         })}
       </div>
 
-      {/* Guardar */}
       {canBet && (
         <div className="mt-3 flex items-center justify-between">
-          <span className="text-xs" style={{ color: isOverBudget ? 'var(--red)' : 'var(--text-muted)' }}>
-            {isOverBudget
-              ? `⚠ Te pasas por ${totalChipsInMarket - chipsAvailable} fichas`
-              : `${totalChipsInMarket} fichas en este mercado`}
+          <span className="text-[11px]" style={{ color: isOverBudget ? 'var(--red)' : 'var(--text-muted2)' }}>
+            {isOverBudget ? `⚠ Te pasas por ${totalChipsInMarket - chipsAvailable} fichas` : `${totalChipsInMarket} fichas`}
           </span>
-          <button
-            onClick={saveBets}
-            disabled={saving || isOverBudget}
-            className="text-sm px-4 py-1.5 rounded-lg font-semibold transition hover:opacity-80 disabled:opacity-40"
-            style={{ background: saved ? 'var(--green)' : 'var(--accent)', color: '#fff' }}
-          >
-            {saving ? 'Guardando...' : saved ? '✓ Guardado' : 'Guardar'}
-          </button>
+          {editing ? (
+            <button
+              onClick={saveBets}
+              disabled={saving || isOverBudget}
+              className="font-heading text-xs px-3.5 py-1.5 rounded-xl font-bold transition hover:opacity-90 disabled:opacity-40"
+              style={{ background: 'var(--accent)', color: '#fff' }}
+            >
+              {saving ? 'Guardando...' : 'Listo'}
+            </button>
+          ) : (
+            <button
+              onClick={() => setEditing(true)}
+              className="font-heading text-xs px-3.5 py-1.5 rounded-xl font-bold transition hover:opacity-90"
+              style={{ background: 'var(--tint)', color: '#555' }}
+            >
+              Editar
+            </button>
+          )}
         </div>
       )}
     </div>

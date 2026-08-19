@@ -42,33 +42,38 @@ export default async function ApuestasPage({ params }: { params: Promise<{ round
   const { data: players } = await supabase.from('profiles').select('id, name')
 
   return (
-    <div className="space-y-5 pb-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold">Apuestas J{round.round_number}</h1>
+    <div className="px-5 pt-5 pb-6 flex flex-col gap-3.5">
+      <div
+        className="rounded-2xl px-3.5 py-3 flex justify-between items-center"
+        style={{ background: 'var(--surface)', boxShadow: '0 3px 10px rgba(0,0,0,0.04)' }}
+      >
+        <div>
+          <div className="text-[11px] font-extrabold" style={{ color: 'var(--accent)' }}>MERCADO · JORNADA {round.round_number}</div>
+          <div className="text-xs mt-0.5" style={{ color: 'var(--text-muted2)' }}>100 fichas/jugador</div>
+        </div>
         {round.status === 'scheduled' && (
           <div
-            className="text-sm font-semibold px-3 py-1.5 rounded-xl"
+            className="text-xs font-bold px-3 py-1.5 rounded-xl"
             style={{
-              background: chipsLeft > 0 ? 'var(--surface2)' : 'var(--surface)',
-              border: '1px solid var(--border)',
+              background: 'var(--tint)',
               color: chipsLeft > 20 ? 'var(--green)' : chipsLeft > 0 ? 'var(--orange)' : 'var(--red)',
             }}
           >
-            🎰 {chipsLeft}/{CHIPS_PER_ROUND} fichas
+            🎰 {chipsLeft}/{CHIPS_PER_ROUND}
           </div>
         )}
       </div>
 
       {/* Resultados finales si ya están resueltos */}
       {bettingResults && bettingResults.length > 0 && (
-        <div className="rounded-xl p-4" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
-          <p className="text-xs font-semibold mb-3" style={{ color: 'var(--text-muted)' }}>RESULTADO APUESTAS</p>
+        <div className="rounded-2xl p-4" style={{ background: 'var(--surface)', boxShadow: '0 3px 10px rgba(0,0,0,0.04)' }}>
+          <p className="text-xs font-extrabold mb-3" style={{ color: 'var(--text-muted2)' }}>RESULTADO APUESTAS</p>
           <div className="space-y-2">
             {bettingResults.map((r, i) => (
               <div key={r.id} className="flex items-center justify-between text-sm">
                 <div className="flex items-center gap-2">
                   <span style={{ color: 'var(--text-muted)' }}>{i + 1}.</span>
-                  <span className="font-medium">{(r.player as Profile)?.name}</span>
+                  <span className="font-bold">{(r.player as Profile)?.name}</span>
                   {r.player_id === user?.id && <span className="text-xs" style={{ color: 'var(--accent)' }}>(tú)</span>}
                 </div>
                 <div className="flex items-center gap-3">
@@ -90,14 +95,14 @@ export default async function ApuestasPage({ params }: { params: Promise<{ round
       {/* Mercados */}
       {!markets?.length ? (
         <div
-          className="rounded-xl p-6 text-center text-sm"
-          style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}
+          className="rounded-2xl p-6 text-center text-sm"
+          style={{ background: 'var(--surface)', color: 'var(--text-muted)', boxShadow: '0 3px 10px rgba(0,0,0,0.04)' }}
         >
           Aún no hay mercados de apuestas para esta jornada.
           <br />El administrador los creará antes del partido.
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="flex flex-col gap-3.5">
           {(markets as BettingMarket[]).map(market => (
             <BettingMarketCard
               key={market.id}
@@ -112,16 +117,10 @@ export default async function ApuestasPage({ params }: { params: Promise<{ round
       )}
 
       <div
-        className="rounded-xl p-4 text-sm"
-        style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}
+        className="rounded-2xl px-3.5 py-3 text-xs"
+        style={{ background: 'var(--surface2)', color: '#3A5FC4' }}
       >
-        <p className="font-semibold mb-1" style={{ color: 'var(--text)' }}>Reglas</p>
-        <ul className="space-y-1 text-xs list-disc list-inside">
-          <li>100 fichas por jornada para repartir entre predicciones</li>
-          <li>Premio pari-mutuel: cuantas menos fichas en el resultado ganador, mayor el premio</li>
-          <li>No puedes apostar contra ti mismo (ej: que tú harás doble falta)</li>
-          <li>Top 1 → +1 pt clasificación · Top 2 → +0,5 pts</li>
-        </ul>
+        ⚖️ Menos fichas en el resultado ganador = mayor premio. No puedes apostar en contra de ti mismo.
       </div>
     </div>
   )
