@@ -90,16 +90,18 @@ export default function MercadosPage() {
   const [payoutError, setPayoutError] = useState('')
   const [payoutsCalculated, setPayoutsCalculated] = useState(false)
   const [calculating, setCalculating] = useState(false)
+  const [loadError, setLoadError] = useState('')
 
   const loadData = useCallback(async () => {
-    const [{ data: m }, { data: p }, { data: r }] = await Promise.all([
+    const [{ data: m, error: marketsError }, { data: p }, { data: r }] = await Promise.all([
       supabase.from('betting_markets')
-        .select('*, options:betting_options(*, player:profiles(id, name)), bets(*)')
+        .select('*, options:betting_options!market_id(*, player:profiles(id, name)), bets(*)')
         .eq('round_id', roundId)
         .order('created_at'),
       supabase.from('profiles').select('*').order('name'),
       supabase.from('rounds').select('status').eq('id', roundId).single(),
     ])
+    setLoadError(marketsError ? 'No se pudieron cargar los mercados: ' + marketsError.message : '')
     setMarkets((m as MarketWithAll[]) ?? [])
     setPlayers((p as Profile[]) ?? [])
     setRoundStatus(r?.status ?? '')
@@ -149,6 +151,12 @@ export default function MercadosPage() {
           {showNewForm ? '✕ Cancelar' : '+ Mercado'}
         </button>
       </div>
+
+      {loadError && (
+        <div className="rounded-xl p-3 text-xs" style={{ background: 'var(--orange-bg)', color: '#7A5A1E' }}>
+          ⚠ {loadError}
+        </div>
+      )}
 
       {showNewForm && (
         <NewMarketForm

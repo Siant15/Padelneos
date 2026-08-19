@@ -20,7 +20,7 @@ export default async function ApuestasPage({ params }: { params: Promise<{ round
 
   const { data: markets } = await supabase
     .from('betting_markets')
-    .select('*, options:betting_options(*, player:profiles(id, name)), bets(*)')
+    .select('*, options:betting_options!market_id(*, player:profiles(id, name)), bets(*)')
     .eq('round_id', roundId)
     .order('created_at')
 

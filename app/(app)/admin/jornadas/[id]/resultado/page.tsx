@@ -116,11 +116,14 @@ export default function ResultadoPage() {
     }
   }
 
-  function setStat(playerId: string, field: keyof StatEntry, value: number) {
-    setStats(prev => ({
-      ...prev,
-      [playerId]: { ...prev[playerId] ?? { aces: 0, double_faults: 0, bolas_por_3: 0, smash_al_cristal: 0 }, [field]: Math.max(0, value) }
-    }))
+  function adjustStat(playerId: string, field: keyof StatEntry, delta: number) {
+    setStats(prev => {
+      const current = prev[playerId] ?? { aces: 0, double_faults: 0, bolas_por_3: 0, smash_al_cristal: 0 }
+      return {
+        ...prev,
+        [playerId]: { ...current, [field]: Math.max(0, current[field] + delta) },
+      }
+    })
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -276,12 +279,12 @@ export default function ResultadoPage() {
                           <label className="text-xs" style={{ color: 'var(--text-muted)' }}>{label}</label>
                           <div className="flex items-center gap-1">
                             <button type="button"
-                              onClick={() => setStat(player.id, key, (st[key] ?? 0) - 1)}
+                              onClick={() => adjustStat(player.id, key, -1)}
                               className="w-9 h-9 rounded-lg text-sm font-bold flex items-center justify-center shrink-0"
                               style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>−</button>
                             <span className="w-6 text-center text-sm font-bold">{st[key] ?? 0}</span>
                             <button type="button"
-                              onClick={() => setStat(player.id, key, (st[key] ?? 0) + 1)}
+                              onClick={() => adjustStat(player.id, key, 1)}
                               className="w-9 h-9 rounded-lg text-sm font-bold flex items-center justify-center shrink-0"
                               style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>+</button>
                           </div>
