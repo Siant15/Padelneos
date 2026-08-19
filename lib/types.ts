@@ -90,6 +90,7 @@ export type BettingOption = {
   label: string
   player_id: string | null
   value: string | null
+  is_self_negative: boolean
   created_at: string
   player?: Profile
 }

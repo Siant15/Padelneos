@@ -10,7 +10,7 @@ type MarketWithAll = BettingMarket & {
   bets: { player_id: string; option_id: string; chips: number }[]
 }
 
-// ─── Cálculo pari-mutuel ──────────────────────────────────────
+// ─── Cálculo pari-mutuel (reparto exacto por método del mayor resto) ──
 function calcPayouts(market: MarketWithAll): Record<string, number> {
   if (!market.winning_option_id) return {}
 
@@ -18,38 +18,43 @@ function calcPayouts(market: MarketWithAll): Record<string, number> {
   const winnerBets = market.bets.filter(b => b.option_id === market.winning_option_id)
   const winnerTotal = winnerBets.reduce((s, b) => s + b.chips, 0)
 
-  // chips_net por jugador en este mercado
   const nets: Record<string, number> = {}
-
-  // Todos los que apostaron empiezan con 0
   for (const bet of market.bets) {
-    if (!nets[bet.player_id]) nets[bet.player_id] = 0
-    nets[bet.player_id] -= bet.chips // pérdida inicial
+    nets[bet.player_id] = (nets[bet.player_id] ?? 0) - bet.chips
   }
 
-  // Los ganadores recuperan su parte proporcional del bote
   if (winnerTotal > 0) {
-    for (const bet of winnerBets) {
-      const payout = Math.round((bet.chips / winnerTotal) * totalPot)
-      nets[bet.player_id] = (nets[bet.player_id] ?? 0) + payout
+    const shares = winnerBets.map(bet => {
+      const raw = (bet.chips / winnerTotal) * totalPot
+      const floor = Math.floor(raw)
+      return { playerId: bet.player_id, floor, remainder: raw - floor }
+    })
+    const distributed = shares.reduce((s, x) => s + x.floor, 0)
+    const leftover = totalPot - distributed
+    const byRemainder = [...shares].sort((a, b) => b.remainder - a.remainder)
+    for (let i = 0; i < leftover; i++) {
+      byRemainder[i % byRemainder.length].floor += 1
+    }
+    for (const s of shares) {
+      nets[s.playerId] = (nets[s.playerId] ?? 0) + s.floor
     }
   }
 
   return nets
 }
 
-async function resolveRoundPayouts(supabase: ReturnType<typeof createClient>, roundId: string) {
-  const { data: markets } = await supabase
+async function resolveRoundPayouts(supabase: ReturnType<typeof createClient>, roundId: string): Promise<string | null> {
+  const { data: markets, error: fetchError } = await supabase
     .from('betting_markets')
     .select('*, bets(*)')
     .eq('round_id', roundId)
     .eq('resolved', true)
     .not('winning_option_id', 'is', null)
 
-  if (!markets?.length) return
+  if (fetchError) return 'No se pudieron leer los mercados: ' + fetchError.message
+  if (!markets?.length) return 'No hay mercados resueltos todavía.'
 
   const playerNets: Record<string, number> = {}
-
   for (const m of markets as MarketWithAll[]) {
     const nets = calcPayouts(m)
     for (const [pid, net] of Object.entries(nets)) {
@@ -57,20 +62,18 @@ async function resolveRoundPayouts(supabase: ReturnType<typeof createClient>, ro
     }
   }
 
-  // Ordenar por net chips (mayor primero)
   const ranked = Object.entries(playerNets).sort((a, b) => b[1] - a[1])
   const bonuses = [1, 0.5, 0, 0]
+  const rows = ranked.map(([playerId, chipsNet], i) => ({
+    round_id: roundId,
+    player_id: playerId,
+    chips_net: chipsNet,
+    point_bonus: bonuses[i] ?? 0,
+    rank: i + 1,
+  }))
 
-  for (let i = 0; i < ranked.length; i++) {
-    const [playerId, chipsNet] = ranked[i]
-    await supabase.from('betting_round_results').upsert({
-      round_id: roundId,
-      player_id: playerId,
-      chips_net: chipsNet,
-      point_bonus: bonuses[i] ?? 0,
-      rank: i + 1,
-    }, { onConflict: 'round_id,player_id' })
-  }
+  const { error } = await supabase.from('betting_round_results').upsert(rows, { onConflict: 'round_id,player_id' })
+  return error ? 'No se pudo guardar el resultado: ' + error.message : null
 }
 
 export default function MercadosPage() {
@@ -84,7 +87,9 @@ export default function MercadosPage() {
   const [roundStatus, setRoundStatus] = useState('')
   const [showNewForm, setShowNewForm] = useState(false)
   const [resolving, setResolving] = useState<string | null>(null)
+  const [payoutError, setPayoutError] = useState('')
   const [payoutsCalculated, setPayoutsCalculated] = useState(false)
+  const [calculating, setCalculating] = useState(false)
 
   const loadData = useCallback(async () => {
     const [{ data: m }, { data: p }, { data: r }] = await Promise.all([
@@ -103,17 +108,27 @@ export default function MercadosPage() {
   useEffect(() => { loadData() }, [loadData])
 
   async function resolveMarket(market: MarketWithAll, winningOptionId: string) {
+    if (!confirm('¿Seguro? Una vez resuelto el mercado no se puede deshacer desde aquí.')) return
     setResolving(market.id)
-    await supabase.from('betting_markets').update({
+    const { error } = await supabase.from('betting_markets').update({
       resolved: true,
       winning_option_id: winningOptionId,
     }).eq('id', market.id)
+    if (error) alert('No se pudo resolver el mercado: ' + error.message)
     await loadData()
     setResolving(null)
   }
 
   async function calcAllPayouts() {
-    await resolveRoundPayouts(supabase, roundId)
+    if (!confirm('¿Calcular premios y puntos ahora? Esto reparte las fichas y asigna los puntos de apuestas de la jornada.')) return
+    setCalculating(true)
+    setPayoutError('')
+    const err = await resolveRoundPayouts(supabase, roundId)
+    setCalculating(false)
+    if (err) {
+      setPayoutError(err)
+      return
+    }
     setPayoutsCalculated(true)
     setTimeout(() => setPayoutsCalculated(false), 3000)
   }
@@ -170,11 +185,15 @@ export default function MercadosPage() {
           <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>
             Calcula los premios finales y asigna los puntos de clasificación.
           </p>
+          {payoutError && (
+            <p className="text-xs mb-2" style={{ color: 'var(--red)' }}>⚠ {payoutError}</p>
+          )}
           <button
             onClick={calcAllPayouts}
-            className="w-full py-2.5 rounded-lg font-semibold text-sm transition hover:opacity-90"
+            disabled={calculating}
+            className="w-full py-2.5 rounded-lg font-semibold text-sm transition hover:opacity-90 disabled:opacity-50"
             style={{ background: payoutsCalculated ? 'var(--green)' : 'var(--accent)', color: '#fff' }}>
-            {payoutsCalculated ? '✓ Payouts calculados' : '🏆 Calcular premios y puntos'}
+            {calculating ? 'Calculando...' : payoutsCalculated ? '✓ Payouts calculados' : '🏆 Calcular premios y puntos'}
           </button>
         </div>
       )}
@@ -222,7 +241,10 @@ function MarketCard({ market, resolving, onResolve }: {
                 border: `1px solid ${isWinner ? 'var(--green)' : 'var(--border)'}`,
               }}
             >
-              <span className="text-sm">{isWinner && '🏆 '}{opt.label}</span>
+              <span className="text-sm">
+                {isWinner && '🏆 '}{opt.label}
+                {opt.is_self_negative && <span className="ml-1 text-xs" style={{ color: 'var(--text-muted)' }}>🚫 auto-apuesta</span>}
+              </span>
               <span className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>
                 {chips} fichas ({totalPot > 0 ? Math.round(chips / totalPot * 100) : 0}%)
               </span>
@@ -270,9 +292,10 @@ function NewMarketForm({ roundId, players, onSaved }: {
   const [type, setType] = useState<'yes_no' | 'player_choice' | 'quantity'>('yes_no')
   const [description, setDescription] = useState('')
   const [quantityOptions, setQuantityOptions] = useState(['0', '1', '2', '3+'])
+  const [isNegativeOutcome, setIsNegativeOutcome] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
 
-  // Para mercados de cantidad: opciones editables
   function updateQtyOption(i: number, v: string) {
     setQuantityOptions(prev => prev.map((o, j) => j === i ? v : o))
   }
@@ -280,17 +303,21 @@ function NewMarketForm({ roundId, players, onSaved }: {
   async function handleCreate() {
     if (!description.trim()) return
     setSaving(true)
+    setError('')
 
-    const { data: market, error } = await supabase
+    const { data: market, error: marketError } = await supabase
       .from('betting_markets')
       .insert({ round_id: roundId, type, description: description.trim() })
       .select()
       .single()
 
-    if (error || !market) { setSaving(false); return }
+    if (marketError || !market) {
+      setError('No se pudo crear el mercado: ' + (marketError?.message ?? 'error desconocido'))
+      setSaving(false)
+      return
+    }
 
-    // Crear opciones según tipo
-    let options: { market_id: string; label: string; player_id?: string | null; value?: string | null }[] = []
+    let options: { market_id: string; label: string; player_id?: string | null; value?: string | null; is_self_negative?: boolean }[] = []
 
     if (type === 'yes_no') {
       options = [
@@ -298,12 +325,17 @@ function NewMarketForm({ roundId, players, onSaved }: {
         { market_id: market.id, label: 'No', value: 'no' },
       ]
     } else if (type === 'player_choice') {
-      options = players.map(p => ({ market_id: market.id, label: p.name, player_id: p.id }))
+      options = players.map(p => ({ market_id: market.id, label: p.name, player_id: p.id, is_self_negative: isNegativeOutcome }))
     } else {
       options = quantityOptions.filter(o => o.trim()).map(o => ({ market_id: market.id, label: o, value: o }))
     }
 
-    await supabase.from('betting_options').insert(options)
+    const { error: optionsError } = await supabase.from('betting_options').insert(options)
+    if (optionsError) {
+      setError('El mercado se creó pero las opciones fallaron: ' + optionsError.message)
+      setSaving(false)
+      return
+    }
 
     setSaving(false)
     onSaved()
@@ -351,6 +383,20 @@ function NewMarketForm({ roundId, players, onSaved }: {
           />
         </div>
 
+        {type === 'player_choice' && (
+          <label className="flex items-start gap-2 text-xs cursor-pointer" style={{ color: 'var(--text-muted)' }}>
+            <input
+              type="checkbox"
+              checked={isNegativeOutcome}
+              onChange={e => setIsNegativeOutcome(e.target.checked)}
+              className="mt-0.5"
+            />
+            <span>
+              Es un resultado negativo (ej. dobles faltas, errores). Si lo marcas, ningún jugador podrá apostar por sí mismo en esta pregunta.
+            </span>
+          </label>
+        )}
+
         {/* Vista previa de opciones */}
         <div>
           <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>Opciones que se crearán</label>
@@ -384,6 +430,8 @@ function NewMarketForm({ roundId, players, onSaved }: {
             </div>
           )}
         </div>
+
+        {error && <p className="text-xs" style={{ color: 'var(--red)' }}>⚠ {error}</p>}
 
         <button onClick={handleCreate} disabled={saving || !description.trim()}
           className="w-full py-2.5 rounded-lg font-semibold text-sm transition hover:opacity-90 disabled:opacity-40"

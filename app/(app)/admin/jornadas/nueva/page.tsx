@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
-import type { Profile, Season, Round } from '@/lib/types'
+import type { Profile, Season } from '@/lib/types'
 
 export default function NuevaJornadaPage() {
   const supabase = createClient()
@@ -24,16 +24,47 @@ export default function NuevaJornadaPage() {
   })
 
   useEffect(() => {
-    Promise.all([
-      supabase.from('profiles').select('*').order('name'),
-      supabase.from('seasons').select('*').eq('status', 'active').maybeSingle(),
-      supabase.from('rounds').select('round_number').order('round_number', { ascending: false }).limit(1),
-    ]).then(([{ data: p }, { data: s }, { data: r }]) => {
-      setPlayers((p as Profile[]) ?? [])
-      setSeason(s as Season)
-      const nextNum = ((r as Round[] | null)?.[0]?.round_number ?? 0) + 1
+    async function load() {
+      const [{ data: p }, { data: s }] = await Promise.all([
+        supabase.from('profiles').select('*').order('name'),
+        supabase.from('seasons').select('*').eq('status', 'active').maybeSingle(),
+      ])
+      const playerList = (p as Profile[]) ?? []
+      const activeSeason = s as Season | null
+      setPlayers(playerList)
+      setSeason(activeSeason)
+
+      if (!activeSeason) return
+
+      const { data: r } = await supabase
+        .from('rounds')
+        .select('round_number, scheduled_date')
+        .eq('season_id', activeSeason.id)
+        .order('round_number', { ascending: false })
+        .limit(1)
+
+      const lastRound = (r as { round_number: number; scheduled_date: string }[] | null)?.[0]
+      const nextNum = (lastRound?.round_number ?? 0) + 1
       setLastRoundNum(nextNum)
-    })
+
+      // Sugerir responsable rotando round-robin entre los jugadores
+      if (playerList.length) {
+        const nextBooker = playerList[(nextNum - 1) % playerList.length]
+        setForm(f => ({ ...f, court_booker_id: nextBooker.id }))
+      }
+
+      // Sugerir fecha: siguiente jornada = última fecha + 7 días, o fecha de inicio de temporada si es la primera
+      let suggestedDate = ''
+      if (lastRound) {
+        const d = new Date(lastRound.scheduled_date + 'T12:00:00')
+        d.setDate(d.getDate() + 7)
+        suggestedDate = d.toISOString().slice(0, 10)
+      } else if (activeSeason.start_date) {
+        suggestedDate = activeSeason.start_date
+      }
+      if (suggestedDate) setForm(f => ({ ...f, scheduled_date: suggestedDate }))
+    }
+    load()
   }, [])
 
   // Cuando se eligen jugadores de equipo 1, auto-asignar los restantes al equipo 2

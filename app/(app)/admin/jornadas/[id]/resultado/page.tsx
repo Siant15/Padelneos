@@ -8,16 +8,35 @@ import type { Profile } from '@/lib/types'
 type SetScore = { t1: string; t2: string }
 type StatEntry = { aces: number; double_faults: number; bolas_por_3: number; smash_al_cristal: number }
 
-function calcWinner(sets: SetScore[]): 'team1' | 'team2' | null {
-  let w1 = 0, w2 = 0
-  for (const s of sets) {
-    const n1 = parseInt(s.t1), n2 = parseInt(s.t2)
-    if (isNaN(n1) || isNaN(n2)) continue
-    if (n1 > n2) w1++; else if (n2 > n1) w2++
+type MatchStatus = { winner: 'team1' | 'team2' | null; error: string | null; needsThirdSet: boolean }
+
+function evaluateSets(sets: SetScore[]): MatchStatus {
+  const parsed = sets.map(s => ({
+    t1: s.t1.trim() === '' ? null : parseInt(s.t1, 10),
+    t2: s.t2.trim() === '' ? null : parseInt(s.t2, 10),
+  }))
+  const [s1, s2, s3] = parsed
+
+  if (s1.t1 === null || s1.t2 === null || s2.t1 === null || s2.t2 === null) {
+    return { winner: null, error: null, needsThirdSet: false }
   }
-  if (w1 > w2) return 'team1'
-  if (w2 > w1) return 'team2'
-  return null
+  if (s1.t1 === s1.t2 || s2.t1 === s2.t2) {
+    return { winner: null, error: 'Un set no puede terminar en empate', needsThirdSet: false }
+  }
+
+  const w1 = s1.t1 > s1.t2 ? 'team1' : 'team2'
+  const w2 = s2.t1 > s2.t2 ? 'team1' : 'team2'
+  if (w1 === w2) return { winner: w1, error: null, needsThirdSet: false }
+
+  // 1-1: hace falta un tercer set decisivo
+  if (!s3 || s3.t1 === null || s3.t2 === null) {
+    return { winner: null, error: null, needsThirdSet: true }
+  }
+  if (s3.t1 === s3.t2) {
+    return { winner: null, error: 'El tercer set no puede terminar en empate', needsThirdSet: false }
+  }
+  const w3 = s3.t1 > s3.t2 ? 'team1' : 'team2'
+  return { winner: w3, error: null, needsThirdSet: false }
 }
 
 export default function ResultadoPage() {
@@ -32,6 +51,7 @@ export default function ResultadoPage() {
   const [stats, setStats] = useState<Record<string, StatEntry>>({})
   const [loading, setLoading] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [saveError, setSaveError] = useState('')
 
   useEffect(() => {
     supabase.from('rounds').select(`
@@ -81,7 +101,7 @@ export default function ResultadoPage() {
     })
   }, [roundId])
 
-  const winner = calcWinner(sets)
+  const { winner, error: setsError, needsThirdSet } = evaluateSets(sets)
   const hasThirdSet = sets.length === 3
 
   function setScore(setIdx: number, team: 't1' | 't2', value: string) {
@@ -107,11 +127,11 @@ export default function ResultadoPage() {
     e.preventDefault()
     if (!matchId || !winner) return
     setLoading(true)
+    setSaveError('')
 
     const [s1, s2, s3] = sets
 
-    // Guardar resultado del partido
-    await supabase.from('matches').update({
+    const { error: matchError } = await supabase.from('matches').update({
       set1_t1: parseInt(s1.t1) || 0,
       set1_t2: parseInt(s1.t2) || 0,
       set2_t1: parseInt(s2.t1) || 0,
@@ -122,20 +142,35 @@ export default function ResultadoPage() {
       played_at: new Date().toISOString(),
     }).eq('id', matchId)
 
-    // Marcar jornada como jugada
-    await supabase.from('rounds').update({ status: 'played' }).eq('id', roundId)
+    if (matchError) {
+      setSaveError('No se pudo guardar el resultado: ' + matchError.message)
+      setLoading(false)
+      return
+    }
 
-    // Guardar stats individuales
-    for (const player of players) {
+    const { error: roundError } = await supabase.from('rounds').update({ status: 'played' }).eq('id', roundId)
+    if (roundError) {
+      setSaveError('Resultado guardado, pero no se pudo marcar la jornada como jugada: ' + roundError.message)
+      setLoading(false)
+      return
+    }
+
+    const statsRows = players.map(player => {
       const st = stats[player.id] ?? { aces: 0, double_faults: 0, bolas_por_3: 0, smash_al_cristal: 0 }
-      await supabase.from('match_stats').upsert({
+      return {
         match_id: matchId,
         player_id: player.id,
         aces: st.aces,
         double_faults: st.double_faults,
         bolas_por_3: st.bolas_por_3,
         smash_al_cristal: st.smash_al_cristal,
-      }, { onConflict: 'match_id,player_id' })
+      }
+    })
+    const { error: statsError } = await supabase.from('match_stats').upsert(statsRows, { onConflict: 'match_id,player_id' })
+    if (statsError) {
+      setSaveError('Resultado guardado, pero fallaron las estadísticas: ' + statsError.message)
+      setLoading(false)
+      return
     }
 
     setSaved(true)
@@ -197,6 +232,15 @@ export default function ResultadoPage() {
               {hasThirdSet ? '− Quitar 3.º set' : '+ Añadir 3.º set'}
             </button>
 
+            {setsError && (
+              <p className="mt-3 text-sm font-semibold" style={{ color: 'var(--red)' }}>⚠ {setsError}</p>
+            )}
+            {needsThirdSet && (
+              <p className="mt-3 text-sm font-semibold" style={{ color: 'var(--orange)' }}>
+                1-1 en sets: añade el 3.º set para decidir el ganador.
+              </p>
+            )}
+
             {/* Resultado calculado */}
             {winner && (
               <div className="mt-4 pt-4 text-sm font-semibold" style={{ borderTop: '1px solid var(--border)' }}>
@@ -221,25 +265,25 @@ export default function ResultadoPage() {
                     <p className="text-sm font-medium mb-2" style={{ color: player.team === 1 ? 'var(--accent)' : 'var(--orange)' }}>
                       {player.name}
                     </p>
-                    <div className="grid grid-cols-4 gap-2">
+                    <div className="grid grid-cols-2 gap-2">
                       {([
                         { key: 'aces', label: '🎯 Aces' },
                         { key: 'double_faults', label: '❌ DF' },
                         { key: 'bolas_por_3', label: '🎱 B×3' },
                         { key: 'smash_al_cristal', label: '💥 SC' },
                       ] as const).map(({ key, label }) => (
-                        <div key={key} className="flex flex-col gap-1">
+                        <div key={key} className="flex items-center justify-between gap-1 rounded-lg px-1.5 py-1" style={{ background: 'var(--surface2)' }}>
                           <label className="text-xs" style={{ color: 'var(--text-muted)' }}>{label}</label>
-                          <div className="flex items-center gap-0.5">
+                          <div className="flex items-center gap-1">
                             <button type="button"
                               onClick={() => setStat(player.id, key, (st[key] ?? 0) - 1)}
-                              className="w-6 h-6 rounded text-xs font-bold flex items-center justify-center"
-                              style={{ background: 'var(--surface2)', border: '1px solid var(--border)' }}>−</button>
+                              className="w-9 h-9 rounded-lg text-sm font-bold flex items-center justify-center shrink-0"
+                              style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>−</button>
                             <span className="w-6 text-center text-sm font-bold">{st[key] ?? 0}</span>
                             <button type="button"
                               onClick={() => setStat(player.id, key, (st[key] ?? 0) + 1)}
-                              className="w-6 h-6 rounded text-xs font-bold flex items-center justify-center"
-                              style={{ background: 'var(--surface2)', border: '1px solid var(--border)' }}>+</button>
+                              className="w-9 h-9 rounded-lg text-sm font-bold flex items-center justify-center shrink-0"
+                              style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>+</button>
                           </div>
                         </div>
                       ))}
@@ -249,6 +293,10 @@ export default function ResultadoPage() {
               })}
             </div>
           </div>
+
+          {saveError && (
+            <p className="text-sm font-semibold text-center" style={{ color: 'var(--red)' }}>⚠ {saveError}</p>
+          )}
 
           <button type="submit" disabled={loading || !winner}
             className="w-full py-3 rounded-xl font-semibold transition hover:opacity-90 disabled:opacity-40"

@@ -3,14 +3,13 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
-import type { BettingMarket, Profile } from '@/lib/types'
+import type { BettingMarket } from '@/lib/types'
 
 interface Props {
   market: BettingMarket
   userId: string
   chipsLeft: number
   roundStatus: string
-  players: Profile[]
 }
 
 const OPTION_COLORS = ['#2E6FF2', '#FF8A3D', '#2BB673', '#FFC93D', '#9AA5B8']
@@ -26,6 +25,7 @@ export default function BettingMarketCard({ market, userId, chipsLeft, roundStat
   )
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
 
   const canBet = roundStatus === 'scheduled' && !market.resolved
   const totalChipsInMarket = Object.values(chips).reduce((s, v) => s + v, 0)
@@ -41,20 +41,31 @@ export default function BettingMarketCard({ market, userId, chipsLeft, roundStat
   async function saveBets() {
     if (totalChipsInMarket > chipsAvailable) return
     setSaving(true)
+    setError('')
 
-    for (const option of market.options ?? []) {
-      const c = chips[option.id] ?? 0
-      if (c > 0) {
-        await supabase.from('bets').upsert({
-          market_id: market.id,
-          option_id: option.id,
-          player_id: userId,
-          chips: c,
-        }, { onConflict: 'market_id,option_id,player_id' })
-      } else {
-        await supabase.from('bets')
-          .delete()
-          .match({ market_id: market.id, option_id: option.id, player_id: userId })
+    const options = market.options ?? []
+    const toUpsert = options
+      .filter(o => (chips[o.id] ?? 0) > 0)
+      .map(o => ({ market_id: market.id, option_id: o.id, player_id: userId, chips: chips[o.id] }))
+    const toDelete = options.filter(o => (chips[o.id] ?? 0) === 0 && myBets.some(b => b.option_id === o.id))
+
+    if (toUpsert.length) {
+      const { error: upsertError } = await supabase.from('bets').upsert(toUpsert, { onConflict: 'market_id,option_id,player_id' })
+      if (upsertError) {
+        setError(upsertError.message.includes('Límite') ? upsertError.message : 'No se pudo guardar la apuesta')
+        setSaving(false)
+        return
+      }
+    }
+
+    for (const option of toDelete) {
+      const { error: deleteError } = await supabase.from('bets')
+        .delete()
+        .match({ market_id: market.id, option_id: option.id, player_id: userId })
+      if (deleteError) {
+        setError('No se pudo actualizar la apuesta')
+        setSaving(false)
+        return
       }
     }
 
@@ -83,10 +94,7 @@ export default function BettingMarketCard({ market, userId, chipsLeft, roundStat
           const cuota = totalOnOption ? (totalMarketChips / totalOnOption).toFixed(1) : '—'
           const color = OPTION_COLORS[idx % OPTION_COLORS.length]
 
-          const isSelfNegativeBet = option.player_id === userId &&
-            (market.description.toLowerCase().includes('doble falta') ||
-             market.description.toLowerCase().includes('error') ||
-             market.description.toLowerCase().includes('perderá'))
+          const isSelfNegativeBet = option.player_id === userId && option.is_self_negative
 
           return (
             <div key={option.id}>
@@ -124,28 +132,31 @@ export default function BettingMarketCard({ market, userId, chipsLeft, roundStat
       </div>
 
       {canBet && (
-        <div className="mt-3 flex items-center justify-between">
-          <span className="text-[11px]" style={{ color: isOverBudget ? 'var(--red)' : 'var(--text-muted2)' }}>
-            {isOverBudget ? `⚠ Te pasas por ${totalChipsInMarket - chipsAvailable} fichas` : `${totalChipsInMarket} fichas`}
-          </span>
-          {editing ? (
-            <button
-              onClick={saveBets}
-              disabled={saving || isOverBudget}
-              className="font-heading text-xs px-3.5 py-1.5 rounded-xl font-bold transition hover:opacity-90 disabled:opacity-40"
-              style={{ background: 'var(--accent)', color: '#fff' }}
-            >
-              {saving ? 'Guardando...' : 'Listo'}
-            </button>
-          ) : (
-            <button
-              onClick={() => setEditing(true)}
-              className="font-heading text-xs px-3.5 py-1.5 rounded-xl font-bold transition hover:opacity-90"
-              style={{ background: 'var(--tint)', color: '#555' }}
-            >
-              Editar
-            </button>
-          )}
+        <div className="mt-3 flex flex-col gap-1.5">
+          {error && <p className="text-[11px]" style={{ color: 'var(--red)' }}>⚠ {error}</p>}
+          <div className="flex items-center justify-between">
+            <span className="text-[11px]" style={{ color: isOverBudget ? 'var(--red)' : 'var(--text-muted2)' }}>
+              {isOverBudget ? `⚠ Te pasas por ${totalChipsInMarket - chipsAvailable} fichas` : `${totalChipsInMarket} fichas`}
+            </span>
+            {editing ? (
+              <button
+                onClick={saveBets}
+                disabled={saving || isOverBudget}
+                className="font-heading text-xs px-3.5 py-1.5 rounded-xl font-bold transition hover:opacity-90 disabled:opacity-40"
+                style={{ background: 'var(--accent)', color: '#fff' }}
+              >
+                {saving ? 'Guardando...' : 'Listo'}
+              </button>
+            ) : (
+              <button
+                onClick={() => setEditing(true)}
+                className="font-heading text-xs px-3.5 py-1.5 rounded-xl font-bold transition hover:opacity-90"
+                style={{ background: 'var(--tint)', color: '#555' }}
+              >
+                Editar
+              </button>
+            )}
+          </div>
         </div>
       )}
     </div>

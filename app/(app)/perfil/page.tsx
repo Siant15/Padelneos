@@ -11,6 +11,7 @@ export default function PerfilPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [error, setError] = useState('')
 
   const [form, setForm] = useState({
     name: '',
@@ -40,11 +41,12 @@ export default function PerfilPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setSaving(true)
+    setError('')
 
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
+    if (!user) { setSaving(false); return }
 
-    await supabase.from('profiles').update({
+    const { error: updateError } = await supabase.from('profiles').update({
       name: form.name,
       racket_brand: form.racket_brand || null,
       dominant_hand: form.dominant_hand || null,
@@ -52,6 +54,10 @@ export default function PerfilPage() {
     }).eq('id', user.id)
 
     setSaving(false)
+    if (updateError) {
+      setError('No se pudo guardar: ' + updateError.message)
+      return
+    }
     setSaved(true)
     router.refresh()
     setTimeout(() => setSaved(false), 2000)
@@ -129,6 +135,8 @@ export default function PerfilPage() {
             ))}
           </div>
         </Field>
+
+        {error && <p className="text-sm text-center" style={{ color: 'var(--red)' }}>⚠ {error}</p>}
 
         <button
           type="submit"

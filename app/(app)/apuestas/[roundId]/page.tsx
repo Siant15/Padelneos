@@ -39,8 +39,6 @@ export default async function ApuestasPage({ params }: { params: Promise<{ round
     .eq('round_id', roundId)
     .order('rank')
 
-  const { data: players } = await supabase.from('profiles').select('id, name')
-
   return (
     <div className="px-5 pt-5 pb-6 flex flex-col gap-3.5">
       <div
@@ -114,7 +112,6 @@ export default async function ApuestasPage({ params }: { params: Promise<{ round
               userId={user?.id ?? ''}
               chipsLeft={chipsLeft}
               roundStatus={round.status}
-              players={players as Profile[] ?? []}
             />
           ))}
         </div>
