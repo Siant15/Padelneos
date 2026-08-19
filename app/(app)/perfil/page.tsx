@@ -1,0 +1,164 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+import { createClient } from '@/lib/supabase/client'
+import { useRouter } from 'next/navigation'
+
+export default function PerfilPage() {
+  const supabase = createClient()
+  const router = useRouter()
+
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+
+  const [form, setForm] = useState({
+    name: '',
+    racket_brand: '',
+    dominant_hand: '',
+    preferred_side: '',
+  })
+
+  useEffect(() => {
+    async function load() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+      if (data) {
+        setForm({
+          name: data.name ?? '',
+          racket_brand: data.racket_brand ?? '',
+          dominant_hand: data.dominant_hand ?? '',
+          preferred_side: data.preferred_side ?? '',
+        })
+      }
+      setLoading(false)
+    }
+    load()
+  }, [])
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setSaving(true)
+
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+
+    await supabase.from('profiles').update({
+      name: form.name,
+      racket_brand: form.racket_brand || null,
+      dominant_hand: form.dominant_hand || null,
+      preferred_side: form.preferred_side || null,
+    }).eq('id', user.id)
+
+    setSaving(false)
+    setSaved(true)
+    router.refresh()
+    setTimeout(() => setSaved(false), 2000)
+  }
+
+  if (loading) {
+    return <div className="px-5 pt-5 pb-6 text-sm" style={{ color: 'var(--text-muted)' }}>Cargando...</div>
+  }
+
+  return (
+    <div className="px-5 pt-5 pb-6">
+      <h1 className="font-heading text-[22px] font-extrabold mb-4">🙋 Mi perfil</h1>
+
+      <form
+        onSubmit={handleSubmit}
+        className="rounded-2xl p-4 flex flex-col gap-4"
+        style={{ background: 'var(--surface)', boxShadow: '0 3px 10px rgba(0,0,0,0.04)' }}
+      >
+        <Field label="Nombre">
+          <input
+            type="text"
+            required
+            value={form.name}
+            onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+            style={inputStyle}
+          />
+        </Field>
+
+        <Field label="🎾 Marca de pala">
+          <input
+            type="text"
+            value={form.racket_brand}
+            onChange={e => setForm(f => ({ ...f, racket_brand: e.target.value }))}
+            placeholder="Ej: Bullpadel, Head, Nox..."
+            style={inputStyle}
+          />
+        </Field>
+
+        <Field label="✋ Mano dominante">
+          <div className="grid grid-cols-2 gap-2">
+            {[{ v: 'diestra', label: 'Diestra' }, { v: 'zurda', label: 'Zurda' }].map(({ v, label }) => (
+              <button
+                key={v}
+                type="button"
+                onClick={() => setForm(f => ({ ...f, dominant_hand: v }))}
+                className="font-heading py-2.5 rounded-[14px] text-sm font-bold transition"
+                style={{
+                  background: form.dominant_hand === v ? 'var(--accent)' : 'var(--surface2)',
+                  color: form.dominant_hand === v ? '#fff' : 'var(--text-muted)',
+                  border: '1px solid var(--border)',
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </Field>
+
+        <Field label="↔️ Lado preferido en pista">
+          <div className="grid grid-cols-2 gap-2">
+            {[{ v: 'drive', label: 'Drive (derecha)' }, { v: 'reves', label: 'Revés (izquierda)' }].map(({ v, label }) => (
+              <button
+                key={v}
+                type="button"
+                onClick={() => setForm(f => ({ ...f, preferred_side: v }))}
+                className="font-heading py-2.5 rounded-[14px] text-sm font-bold transition"
+                style={{
+                  background: form.preferred_side === v ? 'var(--accent)' : 'var(--surface2)',
+                  color: form.preferred_side === v ? '#fff' : 'var(--text-muted)',
+                  border: '1px solid var(--border)',
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </Field>
+
+        <button
+          type="submit"
+          disabled={saving}
+          className="font-heading w-full py-2.5 rounded-[14px] font-bold text-sm transition hover:opacity-90 disabled:opacity-50"
+          style={{ background: saved ? 'var(--green)' : 'var(--accent)', color: '#fff' }}
+        >
+          {saving ? 'Guardando...' : saved ? '✓ Guardado' : 'Guardar cambios'}
+        </button>
+      </form>
+    </div>
+  )
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="block text-sm font-bold mb-1.5" style={{ color: 'var(--text-muted)' }}>{label}</label>
+      {children}
+    </div>
+  )
+}
+
+const inputStyle: React.CSSProperties = {
+  width: '100%',
+  padding: '10px 12px',
+  borderRadius: 14,
+  background: 'var(--surface2)',
+  border: '1px solid var(--border)',
+  color: 'var(--text)',
+  fontSize: 14,
+  outline: 'none',
+}

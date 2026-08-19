@@ -10,7 +10,7 @@ export default async function DashboardPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  const [{ data: standings }, { data: nextRound }] = await Promise.all([
+  const [{ data: standings }, { data: nextRound }, { data: season }] = await Promise.all([
     supabase.from('individual_standings').select('*'),
     supabase
       .from('rounds')
@@ -19,6 +19,7 @@ export default async function DashboardPage() {
       .order('scheduled_date', { ascending: true })
       .limit(1)
       .maybeSingle(),
+    supabase.from('seasons').select('id').eq('status', 'active').maybeSingle(),
   ])
 
   const topIndividual = (standings as IndividualStanding[] | null)?.slice(0, 4) ?? []
@@ -75,9 +76,19 @@ export default async function DashboardPage() {
               </div>
             )}
           </div>
+        ) : !season ? (
+          <Link
+            href="/admin/temporada"
+            className="block rounded-[20px] p-4 text-center transition hover:opacity-90"
+            style={{ background: 'var(--orange-bg)', color: '#7A5A1E' }}
+          >
+            <p className="font-heading font-bold text-sm">⚡ Aún no has creado la liga</p>
+            <p className="text-xs mt-1">Toca aquí para elegir fecha de inicio, día y hora fija de los partidos.</p>
+          </Link>
         ) : (
           <div className="rounded-[20px] p-4 text-sm text-center" style={{ background: 'var(--surface)', color: 'var(--text-muted)', border: '2px solid var(--border)' }}>
-            No hay próximas jornadas programadas.
+            No hay próximas jornadas programadas.{' '}
+            <Link href="/admin/jornadas/nueva" className="font-bold" style={{ color: 'var(--accent)' }}>Crea la primera →</Link>
           </div>
         )}
 

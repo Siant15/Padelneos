@@ -2,8 +2,14 @@ export type Profile = {
   id: string
   name: string
   avatar_url: string | null
+  racket_brand: string | null
+  dominant_hand: 'diestra' | 'zurda' | null
+  preferred_side: 'drive' | 'reves' | null
   created_at: string
 }
+
+export const HAND_LABELS: Record<string, string> = { diestra: 'Diestra', zurda: 'Zurda' }
+export const SIDE_LABELS: Record<string, string> = { drive: 'Drive (derecha)', reves: 'Revés (izquierda)' }
 
 export type Season = {
   id: string

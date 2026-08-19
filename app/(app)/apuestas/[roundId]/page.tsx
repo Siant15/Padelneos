@@ -99,7 +99,11 @@ export default async function ApuestasPage({ params }: { params: Promise<{ round
           style={{ background: 'var(--surface)', color: 'var(--text-muted)', boxShadow: '0 3px 10px rgba(0,0,0,0.04)' }}
         >
           Aún no hay mercados de apuestas para esta jornada.
-          <br />El administrador los creará antes del partido.
+          <br />
+          Créalos desde{' '}
+          <a href={`/admin/jornadas/${roundId}/mercados`} className="font-bold" style={{ color: 'var(--accent)' }}>
+            Admin → Mercados
+          </a>.
         </div>
       ) : (
         <div className="flex flex-col gap-3.5">

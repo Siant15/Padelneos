@@ -86,24 +86,32 @@ export default async function ApuestasPage() {
       {/* Ir a jornada */}
       <section>
         <h2 className="font-heading text-sm font-bold mb-2.5">Por jornada</h2>
-        <div className="flex flex-col gap-2">
-          {(rounds ?? []).map(r => (
-            <Link
-              key={r.id}
-              href={`/apuestas/${r.id}`}
-              className="flex items-center justify-between rounded-2xl px-4 py-3 transition hover:opacity-90"
-              style={{ background: 'var(--surface)', boxShadow: '0 3px 10px rgba(0,0,0,0.04)' }}
-            >
-              <span className="text-[13px] font-bold">Jornada {r.round_number}</span>
-              <div className="flex items-center gap-2 text-xs">
-                <span style={{ color: r.status === 'played' ? 'var(--green)' : 'var(--text-muted)' }}>
-                  {r.status === 'played' ? 'Resuelta' : 'Activa'}
-                </span>
-                <span style={{ color: 'var(--text-muted2)' }}>→</span>
-              </div>
-            </Link>
-          ))}
-        </div>
+        {!rounds?.length ? (
+          <div className="rounded-2xl p-4 text-sm" style={{ background: 'var(--surface)', color: 'var(--text-muted)', boxShadow: '0 3px 10px rgba(0,0,0,0.04)' }}>
+            Aún no hay jornadas creadas, así que no hay mercados de apuestas todavía.
+            <br />
+            Ve a <Link href="/admin" className="font-bold" style={{ color: 'var(--accent)' }}>Admin</Link> para crear la liga y la primera jornada.
+          </div>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {rounds.map(r => (
+              <Link
+                key={r.id}
+                href={`/apuestas/${r.id}`}
+                className="flex items-center justify-between rounded-2xl px-4 py-3 transition hover:opacity-90"
+                style={{ background: 'var(--surface)', boxShadow: '0 3px 10px rgba(0,0,0,0.04)' }}
+              >
+                <span className="text-[13px] font-bold">Jornada {r.round_number}</span>
+                <div className="flex items-center gap-2 text-xs">
+                  <span style={{ color: r.status === 'played' ? 'var(--green)' : 'var(--text-muted)' }}>
+                    {r.status === 'played' ? 'Resuelta' : 'Activa'}
+                  </span>
+                  <span style={{ color: 'var(--text-muted2)' }}>→</span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
       </section>
     </div>
   )
