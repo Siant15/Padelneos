@@ -24,7 +24,7 @@ export default function PerfilPage() {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
-      const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+      const { data } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle()
       if (data) {
         setForm({
           name: data.name ?? '',
@@ -32,6 +32,10 @@ export default function PerfilPage() {
           dominant_hand: data.dominant_hand ?? '',
           preferred_side: data.preferred_side ?? '',
         })
+      } else {
+        // No debería faltar (se crea al registrarse), pero por si acaso
+        // precargamos el nombre desde el email para no dejar el campo vacío.
+        setForm(f => ({ ...f, name: user.email?.split('@')[0] ?? '' }))
       }
       setLoading(false)
     }
@@ -46,12 +50,13 @@ export default function PerfilPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setSaving(false); return }
 
-    const { error: updateError } = await supabase.from('profiles').update({
+    const { error: updateError } = await supabase.from('profiles').upsert({
+      id: user.id,
       name: form.name,
       racket_brand: form.racket_brand || null,
       dominant_hand: form.dominant_hand || null,
       preferred_side: form.preferred_side || null,
-    }).eq('id', user.id)
+    }, { onConflict: 'id' })
 
     setSaving(false)
     if (updateError) {

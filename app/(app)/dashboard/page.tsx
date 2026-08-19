@@ -19,7 +19,7 @@ export default async function DashboardPage() {
       .order('scheduled_date', { ascending: true })
       .limit(1)
       .maybeSingle(),
-    supabase.from('seasons').select('id').eq('status', 'active').maybeSingle(),
+    supabase.from('seasons').select('id').eq('status', 'active').order('created_at', { ascending: false }).limit(1),
   ])
 
   const topIndividual = (standings as IndividualStanding[] | null)?.slice(0, 4) ?? []
@@ -75,8 +75,25 @@ export default async function DashboardPage() {
                 <ConfirmCourtButton roundId={round.id} />
               </div>
             )}
+
+            <div className="mt-3 pt-3 flex gap-2" style={{ borderTop: '1px dashed var(--hairline)' }}>
+              <Link
+                href={`/admin/jornadas/${round.id}/resultado`}
+                className="flex-1 text-center text-xs font-bold py-2 rounded-xl transition hover:opacity-90"
+                style={{ background: 'var(--tint)', color: '#555' }}
+              >
+                📝 Registrar resultado
+              </Link>
+              <Link
+                href={`/admin/jornadas/${round.id}/mercados`}
+                className="flex-1 text-center text-xs font-bold py-2 rounded-xl transition hover:opacity-90"
+                style={{ background: 'var(--surface2)', color: 'var(--accent)' }}
+              >
+                🎰 Mercados
+              </Link>
+            </div>
           </div>
-        ) : !season ? (
+        ) : !season?.length ? (
           <Link
             href="/admin/temporada"
             className="block rounded-[20px] p-4 text-center transition hover:opacity-90"

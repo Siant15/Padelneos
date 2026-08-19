@@ -84,11 +84,31 @@ export default function JornadasAccordion({ items }: { items: JornadaViewModel[]
                   </>
                 )}
 
-                {j.isNext && !j.played && (
-                  <div>
-                    💰 Mercado de apuestas abierto — ver pestaña{' '}
-                    <Link href="/apuestas" className="font-bold" style={{ color: 'var(--accent)' }}>Apuestas</Link>.
-                  </div>
+                {!j.played && (
+                  <>
+                    {j.isNext && (
+                      <div>
+                        💰 Mercado de apuestas abierto — ver pestaña{' '}
+                        <Link href="/apuestas" className="font-bold" style={{ color: 'var(--accent)' }}>Apuestas</Link>.
+                      </div>
+                    )}
+                    <div className="flex gap-2 mt-1">
+                      <Link
+                        href={`/admin/jornadas/${j.id}/resultado`}
+                        className="flex-1 text-center text-xs font-bold py-2 rounded-xl"
+                        style={{ background: 'var(--tint)', color: '#555' }}
+                      >
+                        📝 Registrar resultado
+                      </Link>
+                      <Link
+                        href={`/admin/jornadas/${j.id}/mercados`}
+                        className="flex-1 text-center text-xs font-bold py-2 rounded-xl"
+                        style={{ background: 'var(--surface2)', color: 'var(--accent)' }}
+                      >
+                        🎰 Mercados
+                      </Link>
+                    </div>
+                  </>
                 )}
               </div>
             )}

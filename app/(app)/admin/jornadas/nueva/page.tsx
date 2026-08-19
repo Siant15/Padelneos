@@ -27,10 +27,10 @@ export default function NuevaJornadaPage() {
     async function load() {
       const [{ data: p }, { data: s }] = await Promise.all([
         supabase.from('profiles').select('*').order('name'),
-        supabase.from('seasons').select('*').eq('status', 'active').maybeSingle(),
+        supabase.from('seasons').select('*').eq('status', 'active').order('created_at', { ascending: false }).limit(1),
       ])
       const playerList = (p as Profile[]) ?? []
-      const activeSeason = s as Season | null
+      const activeSeason = ((s as Season[] | null) ?? [])[0] ?? null
       setPlayers(playerList)
       setSeason(activeSeason)
 

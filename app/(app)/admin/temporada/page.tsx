@@ -13,6 +13,8 @@ export default function TemporadaPage() {
   const [loading, setLoading] = useState(false)
   const [saved, setSaved] = useState(false)
   const [season, setSeason] = useState<Season | null>(null)
+  const [loadError, setLoadError] = useState('')
+  const [saveError, setSaveError] = useState('')
 
   const [form, setForm] = useState({
     name: 'Liga Pádel 2025',
@@ -23,33 +25,48 @@ export default function TemporadaPage() {
   })
 
   useEffect(() => {
-    supabase.from('seasons').select('*').eq('status', 'active').maybeSingle().then(({ data }) => {
-      if (data) {
-        setSeason(data as Season)
-        setForm({
-          name: data.name,
-          start_date: data.start_date,
-          day_of_week: data.day_of_week ?? 3,
-          match_time: data.match_time?.slice(0, 5) ?? '20:00',
-          min_matches: data.min_matches,
-        })
-      }
-    })
+    supabase.from('seasons').select('*').eq('status', 'active').order('created_at', { ascending: false })
+      .then(({ data, error }) => {
+        if (error) {
+          setLoadError('No se pudo comprobar si ya existe una liga: ' + error.message)
+          return
+        }
+        const rows = (data as Season[] | null) ?? []
+        if (rows.length > 1) {
+          setLoadError(`Hay ${rows.length} temporadas activas a la vez (esto no debería pasar). Se está usando la más reciente para editar; contacta para limpiar las duplicadas en la base de datos.`)
+        }
+        const current = rows[0]
+        if (current) {
+          setSeason(current)
+          setForm({
+            name: current.name,
+            start_date: current.start_date,
+            day_of_week: current.day_of_week ?? 3,
+            match_time: current.match_time?.slice(0, 5) ?? '20:00',
+            min_matches: current.min_matches,
+          })
+        }
+      })
   }, [])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
+    setSaveError('')
 
-    if (season) {
-      await supabase.from('seasons').update(form).eq('id', season.id)
-    } else {
-      await supabase.from('seasons').insert({ ...form, status: 'active' })
+    const { error } = season
+      ? await supabase.from('seasons').update(form).eq('id', season.id)
+      : await supabase.from('seasons').insert({ ...form, status: 'active' })
+
+    setLoading(false)
+
+    if (error) {
+      setSaveError('No se pudo guardar la temporada: ' + error.message)
+      return
     }
 
     setSaved(true)
-    setLoading(false)
-    setTimeout(() => { setSaved(false); router.push('/admin') }, 1500)
+    setTimeout(() => { setSaved(false); router.push('/admin'); router.refresh() }, 1200)
   }
 
   return (
@@ -58,6 +75,12 @@ export default function TemporadaPage() {
         <button onClick={() => router.back()} className="text-sm" style={{ color: 'var(--text-muted)' }}>← Volver</button>
         <h1 className="text-xl font-bold">{season ? 'Editar temporada' : 'Nueva temporada'}</h1>
       </div>
+
+      {loadError && (
+        <div className="rounded-xl p-3 text-xs" style={{ background: 'var(--orange-bg)', color: '#7A5A1E' }}>
+          ⚠ {loadError}
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <Field label="Nombre de la liga">
@@ -91,6 +114,10 @@ export default function TemporadaPage() {
             onChange={e => setForm(f => ({ ...f, min_matches: +e.target.value }))}
             style={inputStyle} />
         </Field>
+
+        {saveError && (
+          <p className="text-sm text-center" style={{ color: 'var(--red)' }}>⚠ {saveError}</p>
+        )}
 
         <button type="submit" disabled={loading}
           className="w-full py-3 rounded-xl font-semibold transition hover:opacity-90 disabled:opacity-50"
