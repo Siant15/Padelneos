@@ -17,18 +17,28 @@ function playerName(player: BetRow['player']): string | undefined {
 export default async function LigaPage() {
   const supabase = await createClient()
 
-  // Wave 1: todo lo que no depende de nada más, en paralelo.
+  // Wave 1: todo lo que no depende de nada más, en paralelo. El Calendario
+  // solo debe mostrar las jornadas de la temporada ACTIVA (antes se
+  // pedían todas las rounds sin filtrar, así que si quedaba alguna
+  // jornada de una temporada anterior en la BD, aparecía mezclada y
+  // nunca se actualizaba al editar la temporada actual).
   const [
     { data: { user } },
     { data: activeSeasonRow },
-    { data: rounds },
     { data: players },
     { data: allBetResults },
     { data: biggestBet },
   ] = await Promise.all([
     supabase.auth.getUser(),
     supabase.from('seasons').select('id, match_time, default_club').eq('status', 'active').order('created_at', { ascending: false }).limit(1).maybeSingle(),
-    supabase.from('rounds').select(`
+    supabase.from('profiles').select('id, name'),
+    supabase.from('betting_round_results').select('round_id, player_id, rank, chips_net, point_bonus, player:profiles(id, name)'),
+    supabase.from('bets').select('chips, player:profiles(name), option:betting_options(id, label, market:betting_markets(winning_option_id, resolved))').order('chips', { ascending: false }).limit(1).maybeSingle(),
+  ])
+
+  const seasonId = activeSeasonRow?.id
+
+  const { data: rounds } = await supabase.from('rounds').select(`
       *,
       court_booker:profiles!court_booker_id(id, name),
       match:matches(
@@ -38,13 +48,8 @@ export default async function LigaPage() {
         team2_p1:profiles!team2_p1_id(id, name),
         team2_p2:profiles!team2_p2_id(id, name)
       )
-    `).order('scheduled_date', { ascending: true }),
-    supabase.from('profiles').select('id, name'),
-    supabase.from('betting_round_results').select('round_id, player_id, rank, chips_net, point_bonus, player:profiles(id, name)'),
-    supabase.from('bets').select('chips, player:profiles(name), option:betting_options(id, label, market:betting_markets(winning_option_id, resolved))').order('chips', { ascending: false }).limit(1).maybeSingle(),
-  ])
+    `).eq('season_id', seasonId ?? '00000000-0000-0000-0000-000000000000').order('scheduled_date', { ascending: true })
 
-  const seasonId = activeSeasonRow?.id
   const matchIds = (rounds ?? []).map(r => (r.match as { id: string } | null)?.id).filter(Boolean) as string[]
   const roundIds = (rounds ?? []).map(r => r.id)
   const roundById = new Map((rounds ?? []).map(r => [r.id, r]))
