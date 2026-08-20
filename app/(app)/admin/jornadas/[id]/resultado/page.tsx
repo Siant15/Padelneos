@@ -5,6 +5,8 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter, useParams } from 'next/navigation'
 import type { Profile } from '@/lib/types'
 
+type PairForm = { team1_p1_id: string; team1_p2_id: string; team2_p1_id: string; team2_p2_id: string }
+
 type SetScore = { t1: string; t2: string }
 type StatEntry = { aces: number; double_faults: number; bolas_por_3: number; smash_al_cristal: number }
 
@@ -73,6 +75,10 @@ export default function ResultadoPage() {
   const [saveError, setSaveError] = useState('')
   const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error' | 'no-match'>('loading')
   const [loadErrorMsg, setLoadErrorMsg] = useState('')
+  const [allPlayers, setAllPlayers] = useState<Profile[]>([])
+  const [pairForm, setPairForm] = useState<PairForm>({ team1_p1_id: '', team1_p2_id: '', team2_p1_id: '', team2_p2_id: '' })
+  const [creatingMatch, setCreatingMatch] = useState(false)
+  const [pairError, setPairError] = useState('')
 
   useEffect(() => {
     supabase.from('rounds').select(`
@@ -91,6 +97,8 @@ export default function ResultadoPage() {
       const m = data?.match as unknown as { id: string; set1_t1?: number; set1_t2?: number; set2_t1?: number; set2_t2?: number; set3_t1?: number; set3_t2?: number; team1_p1?: { id: string; name: string }; team1_p2?: { id: string; name: string }; team2_p1?: { id: string; name: string }; team2_p2?: { id: string; name: string } } | null
       if (!m) {
         setLoadState('no-match')
+        setRoundNumber(data?.round_number ?? 0)
+        supabase.from('profiles').select('*').order('name').then(({ data: p }) => setAllPlayers((p as Profile[]) ?? []))
         return
       }
       setLoadState('ready')
@@ -164,6 +172,39 @@ export default function ResultadoPage() {
       const current = prev[playerId] ?? { aces: 0, double_faults: 0, bolas_por_3: 0, smash_al_cristal: 0 }
       return { ...prev, [playerId]: { ...current, [field]: n } }
     })
+  }
+
+  const pairIds = [pairForm.team1_p1_id, pairForm.team1_p2_id, pairForm.team2_p1_id, pairForm.team2_p2_id].filter(Boolean)
+  const pairsHaveDuplicate = new Set(pairIds).size !== pairIds.length
+  const allPairsSelected = pairIds.length === 4
+
+  async function handleCreateMatch() {
+    if (!allPairsSelected || pairsHaveDuplicate) return
+    setCreatingMatch(true)
+    setPairError('')
+
+    const { data: newMatch, error } = await supabase.from('matches').insert({
+      round_id: roundId,
+      team1_p1_id: pairForm.team1_p1_id,
+      team1_p2_id: pairForm.team1_p2_id,
+      team2_p1_id: pairForm.team2_p1_id,
+      team2_p2_id: pairForm.team2_p2_id,
+    }).select().single()
+
+    setCreatingMatch(false)
+    if (error || !newMatch) {
+      setPairError('No se pudo crear el partido: ' + (error?.message ?? 'error desconocido'))
+      return
+    }
+
+    setMatchId(newMatch.id)
+    setPlayers([
+      { id: pairForm.team1_p1_id, name: allPlayers.find(p => p.id === pairForm.team1_p1_id)?.name ?? '', team: 1 },
+      { id: pairForm.team1_p2_id, name: allPlayers.find(p => p.id === pairForm.team1_p2_id)?.name ?? '', team: 1 },
+      { id: pairForm.team2_p1_id, name: allPlayers.find(p => p.id === pairForm.team2_p1_id)?.name ?? '', team: 2 },
+      { id: pairForm.team2_p2_id, name: allPlayers.find(p => p.id === pairForm.team2_p2_id)?.name ?? '', team: 2 },
+    ])
+    setLoadState('ready')
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -284,10 +325,65 @@ export default function ResultadoPage() {
       )}
 
       {loadState === 'no-match' && (
-        <div className="rounded-xl p-4 text-sm" style={{ background: 'var(--orange-bg)', color: '#7A5A1E' }}>
-          Esta jornada todavía no tiene las parejas asignadas, así que no se puede registrar un resultado.
-          <br />
-          Ve a <a href={`/admin/jornadas/${roundId}/editar`} className="font-bold underline">Editar jornada</a> para asignarlas primero.
+        <div className="rounded-xl p-4 space-y-4" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
+          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+            Esta jornada todavía no tiene parejas asignadas. Elige los 4 jugadores para crear el partido y poder registrar el resultado.
+          </p>
+          <div className="space-y-4">
+            <div>
+              <p className="text-xs font-medium mb-2" style={{ color: 'var(--accent)' }}>Pareja 1</p>
+              <div className="grid grid-cols-2 gap-2">
+                <PairPlayerSelect
+                  value={pairForm.team1_p1_id}
+                  onChange={v => setPairForm(f => ({ ...f, team1_p1_id: v }))}
+                  players={allPlayers}
+                  exclude={[pairForm.team1_p2_id, pairForm.team2_p1_id, pairForm.team2_p2_id]}
+                  label="Jugador A"
+                />
+                <PairPlayerSelect
+                  value={pairForm.team1_p2_id}
+                  onChange={v => setPairForm(f => ({ ...f, team1_p2_id: v }))}
+                  players={allPlayers}
+                  exclude={[pairForm.team1_p1_id, pairForm.team2_p1_id, pairForm.team2_p2_id]}
+                  label="Jugador B"
+                />
+              </div>
+            </div>
+            <div className="text-center text-sm font-bold" style={{ color: 'var(--text-muted)' }}>vs</div>
+            <div>
+              <p className="text-xs font-medium mb-2" style={{ color: 'var(--orange)' }}>Pareja 2</p>
+              <div className="grid grid-cols-2 gap-2">
+                <PairPlayerSelect
+                  value={pairForm.team2_p1_id}
+                  onChange={v => setPairForm(f => ({ ...f, team2_p1_id: v }))}
+                  players={allPlayers}
+                  exclude={[pairForm.team1_p1_id, pairForm.team1_p2_id, pairForm.team2_p2_id]}
+                  label="Jugador C"
+                />
+                <PairPlayerSelect
+                  value={pairForm.team2_p2_id}
+                  onChange={v => setPairForm(f => ({ ...f, team2_p2_id: v }))}
+                  players={allPlayers}
+                  exclude={[pairForm.team1_p1_id, pairForm.team1_p2_id, pairForm.team2_p1_id]}
+                  label="Jugador D"
+                />
+              </div>
+            </div>
+          </div>
+          {pairsHaveDuplicate && (
+            <p className="text-xs" style={{ color: 'var(--red)' }}>⚠ Un jugador no puede estar en las dos parejas a la vez.</p>
+          )}
+          {pairError && (
+            <p className="text-xs" style={{ color: 'var(--red)' }}>⚠ {pairError}</p>
+          )}
+          <button
+            onClick={handleCreateMatch}
+            disabled={!allPairsSelected || pairsHaveDuplicate || creatingMatch}
+            className="w-full py-3 rounded-xl font-semibold transition hover:opacity-90 disabled:opacity-40"
+            style={{ background: 'var(--accent)', color: '#fff' }}
+          >
+            {creatingMatch ? 'Creando...' : 'Crear partido y continuar'}
+          </button>
         </div>
       )}
 
@@ -442,5 +538,27 @@ export default function ResultadoPage() {
         </form>
       )}
     </div>
+  )
+}
+
+function PairPlayerSelect({ value, onChange, players, exclude, label }: {
+  value: string
+  onChange: (v: string) => void
+  players: Profile[]
+  exclude: string[]
+  label: string
+}) {
+  return (
+    <select
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      className="w-full rounded-lg px-3 py-2.5 text-sm outline-none"
+      style={{ background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)' }}
+    >
+      <option value="">{label}</option>
+      {players.filter(p => !exclude.includes(p.id) || p.id === value).map(p => (
+        <option key={p.id} value={p.id}>{p.name}</option>
+      ))}
+    </select>
   )
 }
