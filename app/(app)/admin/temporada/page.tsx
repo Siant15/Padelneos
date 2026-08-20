@@ -70,47 +70,33 @@ export default function TemporadaPage() {
       })
   }, [])
 
-  async function handleGenerateRounds() {
-    if (!season) return
-    setGenerating(true)
-    setGenerateError('')
-    setGenerateOk(false)
-
+  // Crea las jornadas que falten (fecha + responsable + parejas ya
+  // asignadas rotando las 3 combinaciones posibles con 4 jugadores).
+  // La usan tanto el boton manual como la creacion de una temporada
+  // nueva, para que no haga falta un paso aparte.
+  async function generateRounds(seasonId: string, startDate: string, minMatches: number, existingNumbers: number[]): Promise<{ created: number[]; error: string | null }> {
     const { data: players, error: playersError } = await supabase.from('profiles').select('*').order('created_at')
     if (playersError || !players?.length) {
-      setGenerateError('No se pudieron cargar los jugadores: ' + (playersError?.message ?? 'sin jugadores registrados'))
-      setGenerating(false)
-      return
+      return { created: [], error: 'No se pudieron cargar los jugadores: ' + (playersError?.message ?? 'sin jugadores registrados') }
     }
 
-    const missing = Array.from({ length: form.min_matches }, (_, i) => i + 1)
-      .filter(n => !existingRoundNumbers.includes(n))
+    const missing = Array.from({ length: minMatches }, (_, i) => i + 1)
+      .filter(n => !existingNumbers.includes(n))
 
-    if (!missing.length) {
-      setGenerateError('Ya están creadas todas las jornadas de la temporada.')
-      setGenerating(false)
-      return
-    }
+    if (!missing.length) return { created: [], error: null }
 
     const rows = missing.map(n => ({
-      season_id: season.id,
+      season_id: seasonId,
       round_number: n,
-      scheduled_date: getSeasonMatchDate(form.start_date, n),
+      scheduled_date: getSeasonMatchDate(startDate, n),
       court_booker_id: (players as Profile[])[(n - 1) % players.length].id,
       court_confirmed: false,
       status: 'scheduled',
     }))
 
     const { data: newRounds, error } = await supabase.from('rounds').insert(rows).select('id, round_number')
-    if (error) {
-      setGenerating(false)
-      setGenerateError('No se pudieron crear las jornadas: ' + error.message)
-      return
-    }
+    if (error) return { created: [], error: 'No se pudieron crear las jornadas: ' + error.message }
 
-    // Con exactamente 4 jugadores solo hay 3 formas de repartirlos en 2
-    // parejas: se asignan rotando esas 3 combinaciones automáticamente.
-    // Se pueden cambiar después jornada a jornada si hace falta.
     if (players.length === 4 && newRounds?.length) {
       const p = players as Profile[]
       const pairings = [
@@ -123,15 +109,31 @@ export default function TemporadaPage() {
         return { round_id: r.id, team1_p1_id, team1_p2_id, team2_p1_id, team2_p2_id }
       })
       const { error: matchesError } = await supabase.from('matches').insert(matchRows)
-      if (matchesError) {
-        setGenerating(false)
-        setGenerateError('Las jornadas se crearon, pero las parejas automáticas fallaron: ' + matchesError.message)
-        return
-      }
+      if (matchesError) return { created: missing, error: 'Las jornadas se crearon, pero las parejas automáticas fallaron: ' + matchesError.message }
     }
 
+    return { created: missing, error: null }
+  }
+
+  async function handleGenerateRounds() {
+    if (!season) return
+    setGenerating(true)
+    setGenerateError('')
+    setGenerateOk(false)
+
+    if (existingRoundNumbers.length >= form.min_matches) {
+      setGenerateError('Ya están creadas todas las jornadas de la temporada.')
+      setGenerating(false)
+      return
+    }
+
+    const { created, error } = await generateRounds(season.id, form.start_date, form.min_matches, existingRoundNumbers)
     setGenerating(false)
-    setExistingRoundNumbers(prev => [...prev, ...missing])
+    if (error) {
+      setGenerateError(error)
+      return
+    }
+    setExistingRoundNumbers(prev => [...prev, ...created])
     setGenerateOk(true)
     setTimeout(() => setGenerateOk(false), 3000)
   }
@@ -141,17 +143,30 @@ export default function TemporadaPage() {
     setLoading(true)
     setSaveError('')
 
+    const isNewSeason = !season
     const startDateChanged = !!season && season.start_date !== form.start_date
     const payload = { ...form, default_club: form.default_club || null }
 
-    const { error } = season
-      ? await supabase.from('seasons').update(payload).eq('id', season.id)
-      : await supabase.from('seasons').insert({ ...payload, status: 'active' })
+    const { data: newSeasonRow, error } = season
+      ? await supabase.from('seasons').update(payload).eq('id', season.id).select().maybeSingle()
+      : await supabase.from('seasons').insert({ ...payload, status: 'active' }).select().single()
 
     if (error) {
       setLoading(false)
       setSaveError('No se pudo guardar la temporada: ' + error.message)
       return
+    }
+
+    // Al crear la temporada por primera vez, generamos las 9 jornadas de
+    // golpe (fecha, responsable de reserva y parejas) para no necesitar
+    // un paso aparte después.
+    if (isNewSeason && newSeasonRow) {
+      const { error: generateError } = await generateRounds(newSeasonRow.id, form.start_date, form.min_matches, [])
+      if (generateError) {
+        setLoading(false)
+        setSaveError('La temporada se creó, pero no se pudieron generar las jornadas: ' + generateError)
+        return
+      }
     }
 
     // Si cambia la fecha de inicio, recalculamos la fecha de las jornadas
