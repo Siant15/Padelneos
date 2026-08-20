@@ -115,14 +115,14 @@ export default function TemporadaPage() {
         </div>
       )}
 
-      {form.start_date && form.min_matches === 9 && (
+      {form.start_date && form.min_matches > 0 && (
         <div className="rounded-xl p-4 text-sm" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
           <p className="font-semibold mb-1">🗓️ Calendario propuesto</p>
           <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>
-            3 meses, 9 partidos: se juega 3 semanas seguidas y se descansa 1.
+            {form.min_matches} partidos: se juega 3 semanas seguidas y se descansa 1.
           </p>
           <div className="flex flex-col gap-1">
-            {getSeasonCalendar(form.start_date, 9).map(w => (
+            {getSeasonCalendar(form.start_date, form.min_matches).map(w => (
               <div key={w.week} className="flex items-center justify-between py-1 text-xs" style={{ borderBottom: '1px solid var(--hairline)' }}>
                 <span style={{ color: 'var(--text-muted)' }}>Semana {w.week} · {formatDate(w.date)}</span>
                 {w.matchIndex ? (
