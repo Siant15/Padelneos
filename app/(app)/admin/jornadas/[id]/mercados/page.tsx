@@ -301,6 +301,7 @@ function NewMarketForm({ roundId, players, onSaved }: {
   const [description, setDescription] = useState('')
   const [quantityOptions, setQuantityOptions] = useState(['0', '1', '2', '3+'])
   const [isNegativeOutcome, setIsNegativeOutcome] = useState(false)
+  const [closesAt, setClosesAt] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -315,7 +316,12 @@ function NewMarketForm({ roundId, players, onSaved }: {
 
     const { data: market, error: marketError } = await supabase
       .from('betting_markets')
-      .insert({ round_id: roundId, type, description: description.trim() })
+      .insert({
+        round_id: roundId,
+        type,
+        description: description.trim(),
+        closes_at: closesAt ? new Date(closesAt).toISOString() : null,
+      })
       .select()
       .single()
 
@@ -389,6 +395,22 @@ function NewMarketForm({ roundId, players, onSaved }: {
             className="w-full rounded-lg px-3 py-2.5 text-sm outline-none"
             style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text)' }}
           />
+        </div>
+
+        <div>
+          <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>
+            Cierre de apuestas (opcional)
+          </label>
+          <input
+            type="datetime-local"
+            value={closesAt}
+            onChange={e => setClosesAt(e.target.value)}
+            className="w-full rounded-lg px-3 py-2.5 text-sm outline-none"
+            style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text)' }}
+          />
+          <p className="text-[11px] mt-1" style={{ color: 'var(--text-muted)' }}>
+            Si lo dejas vacío, se puede apostar hasta que se marque la jornada como jugada.
+          </p>
         </div>
 
         {type === 'player_choice' && (

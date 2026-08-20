@@ -15,6 +15,7 @@ export default function EditarJornadaPage() {
   const [loading, setLoading] = useState(false)
   const [saved, setSaved] = useState(false)
   const [saveError, setSaveError] = useState('')
+  const [hasResult, setHasResult] = useState(false)
 
   const [form, setForm] = useState({
     scheduled_date: '',
@@ -34,7 +35,8 @@ export default function EditarJornadaPage() {
     ]).then(([{ data: p }, { data: r }]) => {
       setPlayers((p as Profile[]) ?? [])
       if (r) {
-        const m = (r.match as { id: string; team1_p1_id: string; team1_p2_id: string; team2_p1_id: string; team2_p2_id: string } | null)
+        const m = (r.match as { id: string; team1_p1_id: string; team1_p2_id: string; team2_p1_id: string; team2_p2_id: string; winner: string | null } | null)
+        setHasResult(!!m?.winner)
         setForm({
           scheduled_date: r.scheduled_date,
           court_booker_id: r.court_booker_id ?? '',
@@ -52,9 +54,11 @@ export default function EditarJornadaPage() {
   const pairIds = [form.team1_p1_id, form.team1_p2_id, form.team2_p1_id, form.team2_p2_id].filter(Boolean)
   const hasDuplicatePlayers = form.matchId ? new Set(pairIds).size !== pairIds.length : false
 
+  const blockedPlayedWithoutResult = form.status === 'played' && !hasResult
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (hasDuplicatePlayers) return
+    if (hasDuplicatePlayers || blockedPlayedWithoutResult) return
     setLoading(true)
     setSaveError('')
 
@@ -107,9 +111,14 @@ export default function EditarJornadaPage() {
         <Field label="Estado">
           <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} style={inputStyle}>
             <option value="scheduled">Programada</option>
-            <option value="played">Jugada</option>
+            <option value="played" disabled={!hasResult}>Jugada{!hasResult ? ' (falta registrar resultado)' : ''}</option>
             <option value="cancelled">Cancelada</option>
           </select>
+          {blockedPlayedWithoutResult && (
+            <p className="text-xs mt-1" style={{ color: 'var(--red)' }}>
+              ⚠ No puedes marcarla como jugada sin haber registrado el resultado del partido.
+            </p>
+          )}
         </Field>
 
         <Field label="Responsable reserva">
@@ -175,7 +184,7 @@ export default function EditarJornadaPage() {
           <p className="text-sm text-center" style={{ color: 'var(--red)' }}>⚠ {saveError}</p>
         )}
 
-        <button type="submit" disabled={loading || hasDuplicatePlayers}
+        <button type="submit" disabled={loading || hasDuplicatePlayers || blockedPlayedWithoutResult}
           className="w-full py-3 rounded-xl font-semibold transition hover:opacity-90 disabled:opacity-40"
           style={{ background: saved ? 'var(--green)' : 'var(--accent)', color: '#fff' }}>
           {loading ? 'Guardando...' : saved ? '✓ Guardado' : 'Guardar cambios'}

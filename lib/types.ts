@@ -117,6 +117,7 @@ export type BettingRoundResult = {
 }
 
 export type IndividualStanding = {
+  season_id: string
   player_id: string
   name: string
   matches_played: number
@@ -129,6 +130,7 @@ export type IndividualStanding = {
 }
 
 export type PairStanding = {
+  season_id: string
   pair_key: string
   p1_id: string
   p1_name: string

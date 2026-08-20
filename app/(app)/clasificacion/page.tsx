@@ -8,10 +8,31 @@ const MEDALS = ['🥇', '🥈', '🥉', '4º']
 export default async function ClasificacionPage() {
   const supabase = await createClient()
 
+  const { data: season } = await supabase
+    .from('seasons')
+    .select('id')
+    .eq('status', 'active')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  const seasonId = season?.id
+
+  const { data: rounds } = seasonId
+    ? await supabase.from('rounds').select('id').eq('season_id', seasonId)
+    : { data: [] as { id: string }[] }
+  const roundIds = (rounds ?? []).map(r => r.id)
+
   const [{ data: individual }, { data: pairs }, { data: betResults }] = await Promise.all([
-    supabase.from('individual_standings').select('*'),
-    supabase.from('pair_standings').select('*'),
-    supabase.from('betting_round_results').select('*, player:profiles(id, name)'),
+    seasonId
+      ? supabase.from('individual_standings').select('*').eq('season_id', seasonId)
+      : Promise.resolve({ data: [] as IndividualStanding[] }),
+    seasonId
+      ? supabase.from('pair_standings').select('*').eq('season_id', seasonId)
+      : Promise.resolve({ data: [] as PairStanding[] }),
+    roundIds.length
+      ? supabase.from('betting_round_results').select('*, player:profiles(id, name)').in('round_id', roundIds)
+      : Promise.resolve({ data: [] as BettingRoundResult[] }),
   ])
 
   const individualRows = ((individual as IndividualStanding[] | null) ?? []).map((s, i) => ({

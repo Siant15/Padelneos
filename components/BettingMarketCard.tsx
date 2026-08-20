@@ -27,7 +27,8 @@ export default function BettingMarketCard({ market, userId, chipsLeft, roundStat
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
-  const canBet = roundStatus === 'scheduled' && !market.resolved
+  const isClosedByTime = !!market.closes_at && new Date(market.closes_at) <= new Date()
+  const canBet = roundStatus === 'scheduled' && !market.resolved && !isClosedByTime
   const totalChipsInMarket = Object.values(chips).reduce((s, v) => s + v, 0)
   const originalChipsInMarket = myBets.reduce((s, b) => s + b.chips, 0)
   const chipsAvailable = chipsLeft + originalChipsInMarket
@@ -83,7 +84,15 @@ export default function BettingMarketCard({ market, userId, chipsLeft, roundStat
           {TYPE_ICON[market.type] ?? '🎾'} {market.description}
         </div>
         {market.resolved && <span className="text-xs font-bold" style={{ color: 'var(--green)' }}>✓</span>}
+        {!market.resolved && isClosedByTime && (
+          <span className="text-xs font-bold" style={{ color: 'var(--red)' }}>🔒 Cerrado</span>
+        )}
       </div>
+      {!market.resolved && !isClosedByTime && market.closes_at && (
+        <p className="text-[11px] mt-1" style={{ color: 'var(--text-muted2)' }}>
+          Cierra el {new Date(market.closes_at).toLocaleString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+        </p>
+      )}
 
       <div className="flex flex-col gap-2 mt-2.5">
         {market.options?.map((option, idx) => {

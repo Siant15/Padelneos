@@ -9,6 +9,7 @@ export default function LoginForm() {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [inviteCode, setInviteCode] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [info, setInfo] = useState('')
@@ -44,25 +45,28 @@ export default function LoginForm() {
     setError('')
     setInfo('')
 
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { name } },
+    const res = await fetch('/api/signup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, email, password, inviteCode }),
     })
+    const body = await res.json()
 
-    if (error) {
-      setError(error.message === 'User already registered' ? 'Ese email ya está registrado' : error.message)
+    if (!res.ok) {
+      setError(body.error ?? 'No se pudo crear la cuenta')
       setLoading(false)
       return
     }
 
-    if (data.session) {
-      router.push('/dashboard')
-      router.refresh()
-    } else {
-      setInfo('Cuenta creada. Revisa tu email para confirmar el registro antes de entrar.')
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) {
+      setInfo('Cuenta creada. Ve a "Iniciar sesión" para entrar.')
       setLoading(false)
+      return
     }
+
+    router.push('/dashboard')
+    router.refresh()
   }
 
   async function handleForgotPassword(e: React.FormEvent) {
@@ -129,20 +133,36 @@ export default function LoginForm() {
           )}
 
           {mode === 'signup' && (
-            <div>
-              <label className="block text-sm font-bold mb-1" style={{ color: 'var(--text-muted)' }}>
-                Nombre
-              </label>
-              <input
-                type="text"
-                value={name}
-                onChange={e => setName(e.target.value)}
-                required
-                className="w-full px-3 py-2.5 rounded-[14px] text-sm outline-none transition"
-                style={{ background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)' }}
-                placeholder="Tu nombre"
-              />
-            </div>
+            <>
+              <div>
+                <label className="block text-sm font-bold mb-1" style={{ color: 'var(--text-muted)' }}>
+                  Nombre
+                </label>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={e => setName(e.target.value)}
+                  required
+                  className="w-full px-3 py-2.5 rounded-[14px] text-sm outline-none transition"
+                  style={{ background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)' }}
+                  placeholder="Tu nombre"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-bold mb-1" style={{ color: 'var(--text-muted)' }}>
+                  Código de invitación
+                </label>
+                <input
+                  type="text"
+                  value={inviteCode}
+                  onChange={e => setInviteCode(e.target.value)}
+                  required
+                  className="w-full px-3 py-2.5 rounded-[14px] text-sm outline-none transition"
+                  style={{ background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)' }}
+                  placeholder="Pídeselo a quien te invitó"
+                />
+              </div>
+            </>
           )}
 
           <div>

@@ -5,10 +5,41 @@ import Link from 'next/link'
 export default async function EstadisticasPage() {
   const supabase = await createClient()
 
-  const { data: stats } = await supabase
-    .from('match_stats')
-    .select('*, player:profiles(id, name), match:matches(id, round:rounds(round_number))')
-    .order('created_at', { ascending: false })
+  const [{ data: stats }, { data: players }, { data: matches }] = await Promise.all([
+    supabase
+      .from('match_stats')
+      .select('*, player:profiles(id, name), match:matches(id, round:rounds(round_number))')
+      .order('created_at', { ascending: false }),
+    supabase.from('profiles').select('id, name'),
+    supabase
+      .from('matches')
+      .select('winner, team1_p1_id, team1_p2_id, team2_p1_id, team2_p2_id, round:rounds(scheduled_date)')
+      .not('winner', 'is', null)
+      .order('scheduled_date', { referencedTable: 'rounds', ascending: true }),
+  ])
+
+  // Rachas: recorremos el historial de cada jugador de más antiguo a más
+  // reciente y nos quedamos con la racha actual (positiva o negativa).
+  type Streak = { count: number; kind: 'win' | 'loss' }
+  const streaks: Record<string, Streak> = {}
+  for (const p of players ?? []) {
+    let current: Streak | null = null
+    for (const m of matches ?? []) {
+      const inTeam1 = m.team1_p1_id === p.id || m.team1_p2_id === p.id
+      const inTeam2 = m.team2_p1_id === p.id || m.team2_p2_id === p.id
+      if (!inTeam1 && !inTeam2) continue
+      if (m.winner === 'draw') { current = null; continue }
+      const won = (inTeam1 && m.winner === 'team1') || (inTeam2 && m.winner === 'team2')
+      const kind: 'win' | 'loss' = won ? 'win' : 'loss'
+      if (current && current.kind === kind) current.count++
+      else current = { count: 1, kind }
+    }
+    if (current && current.count >= 2) streaks[p.id] = current
+  }
+  const streakRows = (players ?? [])
+    .filter(p => streaks[p.id])
+    .map(p => ({ name: p.name, ...streaks[p.id] }))
+    .sort((a, b) => b.count - a.count)
 
   // Agrupar por jugador
   type Totals = {
@@ -38,6 +69,22 @@ export default async function EstadisticasPage() {
 
   const rows = Object.entries(totals).map(([id, t]) => ({ id, ...t }))
 
+  // Motes automáticos según quién lidera cada estadística
+  const nicknames: Record<string, string[]> = {}
+  function crownLeader(key: keyof Totals, label: string, requirePositive = true) {
+    if (!rows.length) return
+    const leader = rows.reduce((a, b) => (a[key] > b[key] ? a : b))
+    if (requirePositive && leader[key] <= 0) return
+    nicknames[leader.id] = [...(nicknames[leader.id] ?? []), label]
+  }
+  crownLeader('aces', '🎯 Rey del Ace')
+  crownLeader('smash_al_cristal', '💥 El Cristalero')
+  crownLeader('double_faults', '🧈 Manos de Mantequilla')
+  if (rows.length > 1) {
+    const wall = rows.reduce((a, b) => (a.double_faults < b.double_faults ? a : b))
+    if (wall.double_faults === 0) nicknames[wall.id] = [...(nicknames[wall.id] ?? []), '🧱 Muro']
+  }
+
   return (
     <div className="px-5 pt-5 pb-6 flex flex-col gap-6">
       <div>
@@ -47,6 +94,30 @@ export default async function EstadisticasPage() {
           Curiosidades acumuladas de cada partido: aces, dobles faltas, bolas por 3 y smash al cristal.
         </p>
       </div>
+
+      {/* Rachas */}
+      {streakRows.length > 0 && (
+        <section>
+          <h2 className="font-heading text-sm font-bold mb-2.5">🔥 Rachas</h2>
+          <div className="flex flex-col gap-2">
+            {streakRows.map(s => (
+              <div
+                key={s.name}
+                className="rounded-2xl px-4 py-3 flex items-center justify-between"
+                style={{
+                  background: s.kind === 'win' ? 'var(--green-bg)' : 'var(--orange-bg)',
+                  color: s.kind === 'win' ? 'var(--green)' : 'var(--orange)',
+                }}
+              >
+                <span className="font-bold text-sm">{s.kind === 'win' ? '🔥' : '🥶'} {s.name}</span>
+                <span className="text-xs font-bold">
+                  {s.count} {s.kind === 'win' ? 'victorias' : 'derrotas'} seguidas
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Totales por jugador */}
       <section>
@@ -59,10 +130,19 @@ export default async function EstadisticasPage() {
           <div className="flex flex-col gap-3">
             {rows.map(r => (
               <div key={r.id} className="rounded-2xl p-3.5" style={{ background: 'var(--surface)', boxShadow: '0 3px 10px rgba(0,0,0,0.04)' }}>
-                <div className="flex items-center justify-between mb-2.5">
+                <div className="flex items-center justify-between mb-1">
                   <p className="font-bold text-sm">{r.name}</p>
                   <span className="text-xs" style={{ color: 'var(--text-muted2)' }}>{r.matches} partidos</span>
                 </div>
+                {!!nicknames[r.id]?.length && (
+                  <div className="flex flex-wrap gap-1 mb-2">
+                    {nicknames[r.id].map(n => (
+                      <span key={n} className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'var(--surface2)', color: 'var(--accent)' }}>
+                        {n}
+                      </span>
+                    ))}
+                  </div>
+                )}
                 <div className="grid grid-cols-4 gap-2">
                   <StatBox emoji="🎯" label="Aces" value={r.aces} perMatch={r.matches ? +(r.aces / r.matches).toFixed(1) : 0} />
                   <StatBox emoji="❌" label="DF" value={r.double_faults} perMatch={r.matches ? +(r.double_faults / r.matches).toFixed(1) : 0} />

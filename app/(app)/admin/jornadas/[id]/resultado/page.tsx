@@ -64,6 +64,7 @@ export default function ResultadoPage() {
   const roundId = params.id as string
 
   const [matchId, setMatchId] = useState('')
+  const [roundNumber, setRoundNumber] = useState(0)
   const [players, setPlayers] = useState<{ id: string; name: string; team: 1 | 2 }[]>([])
   const [sets, setSets] = useState<SetScore[]>([{ t1: '', t2: '' }, { t1: '', t2: '' }])
   const [stats, setStats] = useState<Record<string, StatEntry>>({})
@@ -73,6 +74,7 @@ export default function ResultadoPage() {
 
   useEffect(() => {
     supabase.from('rounds').select(`
+      round_number,
       match:matches(id, set1_t1, set1_t2, set2_t1, set2_t2, set3_t1, set3_t2, winner,
         team1_p1:profiles!team1_p1_id(id, name),
         team1_p2:profiles!team1_p2_id(id, name),
@@ -82,6 +84,7 @@ export default function ResultadoPage() {
       const m = data?.match as unknown as { id: string; set1_t1?: number; set1_t2?: number; set2_t1?: number; set2_t2?: number; set3_t1?: number; set3_t2?: number; team1_p1?: { id: string; name: string }; team1_p2?: { id: string; name: string }; team2_p1?: { id: string; name: string }; team2_p2?: { id: string; name: string } } | null
       if (!m) return
       setMatchId(m.id)
+      setRoundNumber(data?.round_number ?? 0)
 
       const ps: { id: string; name: string; team: 1 | 2 }[] = ([
         { id: m.team1_p1?.id ?? '', name: m.team1_p1?.name ?? '', team: 1 as const },
@@ -196,11 +199,53 @@ export default function ResultadoPage() {
 
     setSaved(true)
     setLoading(false)
-    setTimeout(() => { setSaved(false); router.push('/admin'); router.refresh() }, 1500)
+    router.refresh()
   }
 
   const team1Players = players.filter(p => p.team === 1)
   const team2Players = players.filter(p => p.team === 2)
+
+  function buildShareMessage(): string {
+    const [s1, s2, s3] = sets
+    const scoreParts = [`${s1.t1}-${s1.t2}`, `${s2.t1}-${s2.t2}`]
+    if (s3) scoreParts.push(`${s3.t1}-${s3.t2}`)
+    const winnerNames = (winner === 'team1' ? team1Players : team2Players).map(p => p.name).join(' y ')
+
+    const lines = [
+      `🎾 Jornada ${roundNumber}`,
+      `${team1Players.map(p => p.name).join(' / ')} vs ${team2Players.map(p => p.name).join(' / ')}`,
+      `Resultado: ${scoreParts.join(', ')} → ganan ${winnerNames} 🏆`,
+    ]
+
+    const highlights: string[] = []
+    let topAces = { name: '', value: 0 }
+    let topDf = { name: '', value: 0 }
+    let topSmash = { name: '', value: 0 }
+    for (const p of players) {
+      const st = stats[p.id]
+      if (!st) continue
+      if (st.aces > topAces.value) topAces = { name: p.name, value: st.aces }
+      if (st.double_faults > topDf.value) topDf = { name: p.name, value: st.double_faults }
+      if (st.smash_al_cristal > topSmash.value) topSmash = { name: p.name, value: st.smash_al_cristal }
+    }
+    if (topAces.value > 0) highlights.push(`🎯 Más aces: ${topAces.name} (${topAces.value})`)
+    if (topDf.value > 0) highlights.push(`🧈 Más dobles faltas: ${topDf.name} (${topDf.value})`)
+    if (topSmash.value > 0) highlights.push(`💥 Smash al cristal: ${topSmash.name} (${topSmash.value})`)
+
+    if (highlights.length) {
+      lines.push('', '📊 Destacados:', ...highlights)
+    }
+    lines.push('', '¡A por la próxima! 💪')
+    return lines.join('\n')
+  }
+
+  async function handleShare() {
+    const text = buildShareMessage()
+    if (navigator.share) {
+      try { await navigator.share({ text }); return } catch { /* usuario canceló, seguimos al fallback */ }
+    }
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank')
+  }
 
   return (
     <div className="space-y-5 pb-4">
@@ -326,13 +371,30 @@ export default function ResultadoPage() {
             <p className="text-sm font-semibold text-center" style={{ color: 'var(--red)' }}>⚠ {saveError}</p>
           )}
 
-          <button type="submit" disabled={loading || !winner}
-            className="w-full py-3 rounded-xl font-semibold transition hover:opacity-90 disabled:opacity-40"
-            style={{ background: saved ? 'var(--green)' : 'var(--accent)', color: '#fff' }}>
-            {!winner ? 'Completa el marcador primero' :
-              loading ? 'Guardando...' :
-                saved ? '✓ Guardado' : 'Guardar resultado + stats'}
-          </button>
+          {saved ? (
+            <div className="space-y-2">
+              <div className="w-full py-3 rounded-xl font-semibold text-center" style={{ background: 'var(--green)', color: '#fff' }}>
+                ✓ Guardado
+              </div>
+              <button type="button" onClick={handleShare}
+                className="w-full py-3 rounded-xl font-semibold transition hover:opacity-90"
+                style={{ background: '#25D366', color: '#fff' }}>
+                📤 Compartir resultado
+              </button>
+              <button type="button" onClick={() => router.push('/admin')}
+                className="w-full py-2 text-sm font-semibold text-center"
+                style={{ color: 'var(--text-muted)' }}>
+                Volver a Admin
+              </button>
+            </div>
+          ) : (
+            <button type="submit" disabled={loading || !winner}
+              className="w-full py-3 rounded-xl font-semibold transition hover:opacity-90 disabled:opacity-40"
+              style={{ background: 'var(--accent)', color: '#fff' }}>
+              {!winner ? 'Completa el marcador primero' :
+                loading ? 'Guardando...' : 'Guardar resultado + stats'}
+            </button>
+          )}
         </form>
       )}
     </div>

@@ -13,11 +13,13 @@ export default function TemporadaPage() {
   const [loading, setLoading] = useState(false)
   const [saved, setSaved] = useState(false)
   const [season, setSeason] = useState<Season | null>(null)
+  const [playedCount, setPlayedCount] = useState(0)
   const [loadError, setLoadError] = useState('')
   const [saveError, setSaveError] = useState('')
+  const [finishing, setFinishing] = useState(false)
 
   const [form, setForm] = useState({
-    name: 'Liga Pádel 2025',
+    name: `Liga Pádel ${new Date().getFullYear()}`,
     start_date: '',
     day_of_week: 3, // miércoles
     match_time: '20:00',
@@ -26,7 +28,7 @@ export default function TemporadaPage() {
 
   useEffect(() => {
     supabase.from('seasons').select('*').eq('status', 'active').order('created_at', { ascending: false })
-      .then(({ data, error }) => {
+      .then(async ({ data, error }) => {
         if (error) {
           setLoadError('No se pudo comprobar si ya existe una liga: ' + error.message)
           return
@@ -45,6 +47,12 @@ export default function TemporadaPage() {
             match_time: current.match_time?.slice(0, 5) ?? '20:00',
             min_matches: current.min_matches,
           })
+          const { count } = await supabase
+            .from('rounds')
+            .select('id', { count: 'exact', head: true })
+            .eq('season_id', current.id)
+            .eq('status', 'played')
+          setPlayedCount(count ?? 0)
         }
       })
   }, [])
@@ -69,6 +77,23 @@ export default function TemporadaPage() {
     setTimeout(() => { setSaved(false); router.push('/admin'); router.refresh() }, 1200)
   }
 
+  async function handleFinish() {
+    if (!season) return
+    if (!confirm('¿Finalizar esta temporada? La clasificación quedará fijada y podrás crear una nueva liga desde cero.')) return
+    setFinishing(true)
+    setSaveError('')
+
+    const { error } = await supabase.from('seasons').update({ status: 'finished' }).eq('id', season.id)
+
+    setFinishing(false)
+    if (error) {
+      setSaveError('No se pudo finalizar la temporada: ' + error.message)
+      return
+    }
+    router.push('/admin')
+    router.refresh()
+  }
+
   return (
     <div className="space-y-5 pb-4">
       <div className="flex items-center gap-3">
@@ -79,6 +104,13 @@ export default function TemporadaPage() {
       {loadError && (
         <div className="rounded-xl p-3 text-xs" style={{ background: 'var(--orange-bg)', color: '#7A5A1E' }}>
           ⚠ {loadError}
+        </div>
+      )}
+
+      {season && (
+        <div className="rounded-xl p-4 text-sm" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
+          <p className="font-semibold mb-1">📅 Progreso de la temporada</p>
+          <p style={{ color: 'var(--text-muted)' }}>{playedCount} de {form.min_matches} jornadas jugadas</p>
         </div>
       )}
 
@@ -125,6 +157,17 @@ export default function TemporadaPage() {
           {loading ? 'Guardando...' : saved ? '✓ Guardado' : season ? 'Guardar cambios' : 'Crear temporada'}
         </button>
       </form>
+
+      {season && (
+        <button
+          onClick={handleFinish}
+          disabled={finishing}
+          className="w-full py-3 rounded-xl font-semibold text-sm transition hover:opacity-90 disabled:opacity-50"
+          style={{ background: 'var(--orange-bg)', color: '#7A5A1E' }}
+        >
+          {finishing ? 'Finalizando...' : '🏁 Finalizar temporada y empezar otra'}
+        </button>
+      )}
     </div>
   )
 }

@@ -10,8 +10,19 @@ export default async function DashboardPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  const [{ data: standings }, { data: nextRound }, { data: season }] = await Promise.all([
-    supabase.from('individual_standings').select('*'),
+  const { data: season } = await supabase
+    .from('seasons')
+    .select('id')
+    .eq('status', 'active')
+    .order('created_at', { ascending: false })
+    .limit(1)
+
+  const seasonId = season?.[0]?.id
+
+  const [{ data: standings }, { data: nextRound }] = await Promise.all([
+    seasonId
+      ? supabase.from('individual_standings').select('*').eq('season_id', seasonId)
+      : Promise.resolve({ data: [] as IndividualStanding[] }),
     supabase
       .from('rounds')
       .select('*, court_booker:profiles!court_booker_id(id, name), match:matches(*, team1_p1:profiles!team1_p1_id(id, name), team1_p2:profiles!team1_p2_id(id, name), team2_p1:profiles!team2_p1_id(id, name), team2_p2:profiles!team2_p2_id(id, name))')
@@ -19,10 +30,11 @@ export default async function DashboardPage() {
       .order('scheduled_date', { ascending: true })
       .limit(1)
       .maybeSingle(),
-    supabase.from('seasons').select('id').eq('status', 'active').order('created_at', { ascending: false }).limit(1),
   ])
 
-  const topIndividual = (standings as IndividualStanding[] | null)?.slice(0, 4) ?? []
+  const allStandings = (standings as IndividualStanding[] | null) ?? []
+  const topIndividual = allStandings.slice(0, 4)
+  const dinnerPayers = allStandings.length >= 3 ? allStandings.slice(-2).reverse() : []
   const round = nextRound as Round | null
   const match = round?.match as { team1_p1?: { name: string }; team1_p2?: { name: string }; team2_p1?: { name: string }; team2_p2?: { name: string } } | undefined
 
@@ -139,6 +151,19 @@ export default async function DashboardPage() {
             )}
           </div>
         </div>
+
+        {/* Termómetro de la cena */}
+        {dinnerPayers.length === 2 && (
+          <div
+            className="rounded-2xl px-3.5 py-3"
+            style={{ background: 'var(--orange-bg)', color: '#7A5A1E' }}
+          >
+            <p className="text-xs font-bold mb-1">🌡️ Si la liga acabase hoy...</p>
+            <p className="text-xs">
+              Pagarían la cena: <strong>{dinnerPayers[0].name}</strong> y <strong>{dinnerPayers[1].name}</strong>
+            </p>
+          </div>
+        )}
 
         {/* Footer nota */}
         <div
