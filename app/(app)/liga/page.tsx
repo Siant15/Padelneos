@@ -1,4 +1,5 @@
 import { Suspense } from 'react'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import type { IndividualStanding, PairStanding, Profile } from '@/lib/types'
 import { formatDate } from '@/lib/types'
@@ -213,7 +214,16 @@ export default async function LigaPage() {
 
   return (
     <div className="px-5 pt-5 pb-6">
-      <h1 className="font-heading text-[22px] font-extrabold mb-4">🎾 Liga</h1>
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="font-heading text-[22px] font-extrabold">🎾 Liga</h1>
+        <Link
+          href="/admin"
+          className="text-xs font-bold px-3 py-1.5 rounded-xl transition hover:opacity-90"
+          style={{ background: 'var(--tint)', color: '#555' }}
+        >
+          ⚙️ Gestionar
+        </Link>
+      </div>
       <Suspense fallback={null}>
         <LigaTabs
           calendarioItems={calendarioItems}

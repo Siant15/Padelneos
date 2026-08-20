@@ -26,6 +26,12 @@ export default function PerfilPage() {
   const [passwordSaved, setPasswordSaved] = useState(false)
   const [passwordError, setPasswordError] = useState('')
 
+  async function handleLogout() {
+    await supabase.auth.signOut()
+    router.push('/login')
+    router.refresh()
+  }
+
   async function handlePasswordSubmit(e: React.FormEvent) {
     e.preventDefault()
     setPasswordSaving(true)
@@ -217,6 +223,14 @@ export default function PerfilPage() {
           {passwordSaving ? 'Guardando...' : passwordSaved ? '✓ Contraseña actualizada' : 'Cambiar contraseña'}
         </button>
       </form>
+
+      <button
+        onClick={handleLogout}
+        className="font-heading w-full py-2.5 rounded-[14px] font-bold text-sm text-center mt-4 transition hover:opacity-90"
+        style={{ background: 'var(--surface)', color: 'var(--red)', boxShadow: '0 3px 10px rgba(0,0,0,0.04)' }}
+      >
+        Salir
+      </button>
     </div>
   )
 }
