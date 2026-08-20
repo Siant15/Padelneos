@@ -52,7 +52,8 @@ export default function EditarJornadaPage() {
   }, [roundId])
 
   const pairIds = [form.team1_p1_id, form.team1_p2_id, form.team2_p1_id, form.team2_p2_id].filter(Boolean)
-  const hasDuplicatePlayers = form.matchId ? new Set(pairIds).size !== pairIds.length : false
+  const hasDuplicatePlayers = new Set(pairIds).size !== pairIds.length
+  const allPairsSelected = pairIds.length === 4
 
   const blockedPlayedWithoutResult = form.status === 'played' && !hasResult
   const blockedRevertWithResult = hasResult && form.status !== 'played'
@@ -88,6 +89,21 @@ export default function EditarJornadaPage() {
         setLoading(false)
         return
       }
+    } else if (allPairsSelected) {
+      const { data: newMatch, error: matchError } = await supabase.from('matches').insert({
+        round_id: roundId,
+        team1_p1_id: form.team1_p1_id,
+        team1_p2_id: form.team1_p2_id,
+        team2_p1_id: form.team2_p1_id,
+        team2_p2_id: form.team2_p2_id,
+      }).select().single()
+
+      if (matchError) {
+        setSaveError('Jornada guardada, pero las parejas fallaron: ' + matchError.message)
+        setLoading(false)
+        return
+      }
+      if (newMatch) setForm(f => ({ ...f, matchId: newMatch.id }))
     }
 
     setSaved(true)
@@ -134,9 +150,13 @@ export default function EditarJornadaPage() {
           </select>
         </Field>
 
-        {form.matchId && (
-          <div className="rounded-xl p-4" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
+        <div className="rounded-xl p-4" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
             <p className="text-sm font-semibold mb-4">Parejas</p>
+            {!form.matchId && (
+              <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>
+                Esta jornada todavía no tiene parejas asignadas. Elige los 4 jugadores y guarda para crear el partido.
+              </p>
+            )}
             {hasResult && (
               <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>
                 🔒 Este partido ya tiene un resultado registrado. Para cambiar las parejas, borra antes el resultado.
@@ -188,8 +208,7 @@ export default function EditarJornadaPage() {
                 ⚠ Un jugador no puede estar en las dos parejas a la vez.
               </p>
             )}
-          </div>
-        )}
+        </div>
 
         {saveError && (
           <p className="text-sm text-center" style={{ color: 'var(--red)' }}>⚠ {saveError}</p>

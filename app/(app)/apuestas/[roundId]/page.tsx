@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
-import BettingMarketCard from '@/components/BettingMarketCard'
+import BettingMarketsBoard from '@/components/BettingMarketsBoard'
 import type { BettingMarket, Profile } from '@/lib/types'
 
 const CHIPS_PER_ROUND = 100
@@ -104,17 +104,12 @@ export default async function ApuestasPage({ params }: { params: Promise<{ round
           </a>.
         </div>
       ) : (
-        <div className="flex flex-col gap-3.5">
-          {(markets as BettingMarket[]).map(market => (
-            <BettingMarketCard
-              key={market.id}
-              market={market}
-              userId={user?.id ?? ''}
-              chipsLeft={chipsLeft}
-              roundStatus={round.status}
-            />
-          ))}
-        </div>
+        <BettingMarketsBoard
+          markets={markets as BettingMarket[]}
+          userId={user?.id ?? ''}
+          chipsLeft={chipsLeft}
+          roundStatus={round.status}
+        />
       )}
 
       <div

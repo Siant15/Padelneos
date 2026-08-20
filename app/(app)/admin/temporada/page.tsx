@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
-import type { Season } from '@/lib/types'
-import { getSeasonCalendar, formatDate } from '@/lib/types'
+import type { Season, Profile } from '@/lib/types'
+import { getSeasonCalendar, getSeasonMatchDate, formatDate } from '@/lib/types'
 
 const DAYS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
 
@@ -15,9 +15,13 @@ export default function TemporadaPage() {
   const [saved, setSaved] = useState(false)
   const [season, setSeason] = useState<Season | null>(null)
   const [playedCount, setPlayedCount] = useState(0)
+  const [existingRoundNumbers, setExistingRoundNumbers] = useState<number[]>([])
   const [loadError, setLoadError] = useState('')
   const [saveError, setSaveError] = useState('')
   const [finishing, setFinishing] = useState(false)
+  const [generating, setGenerating] = useState(false)
+  const [generateError, setGenerateError] = useState('')
+  const [generateOk, setGenerateOk] = useState(false)
 
   const [form, setForm] = useState({
     name: `Liga Pádel ${new Date().getFullYear()}`,
@@ -54,9 +58,58 @@ export default function TemporadaPage() {
             .eq('season_id', current.id)
             .eq('status', 'played')
           setPlayedCount(count ?? 0)
+
+          const { data: existingRounds } = await supabase
+            .from('rounds')
+            .select('round_number')
+            .eq('season_id', current.id)
+          setExistingRoundNumbers((existingRounds ?? []).map(r => r.round_number))
         }
       })
   }, [])
+
+  async function handleGenerateRounds() {
+    if (!season) return
+    setGenerating(true)
+    setGenerateError('')
+    setGenerateOk(false)
+
+    const { data: players, error: playersError } = await supabase.from('profiles').select('*').order('created_at')
+    if (playersError || !players?.length) {
+      setGenerateError('No se pudieron cargar los jugadores: ' + (playersError?.message ?? 'sin jugadores registrados'))
+      setGenerating(false)
+      return
+    }
+
+    const missing = Array.from({ length: form.min_matches }, (_, i) => i + 1)
+      .filter(n => !existingRoundNumbers.includes(n))
+
+    if (!missing.length) {
+      setGenerateError('Ya están creadas todas las jornadas de la temporada.')
+      setGenerating(false)
+      return
+    }
+
+    const rows = missing.map(n => ({
+      season_id: season.id,
+      round_number: n,
+      scheduled_date: getSeasonMatchDate(form.start_date, n),
+      court_booker_id: (players as Profile[])[(n - 1) % players.length].id,
+      court_confirmed: false,
+      status: 'scheduled',
+    }))
+
+    const { error } = await supabase.from('rounds').insert(rows)
+    setGenerating(false)
+    if (error) {
+      setGenerateError('No se pudieron crear las jornadas: ' + error.message)
+      return
+    }
+
+    setExistingRoundNumbers(prev => [...prev, ...missing])
+    setGenerateOk(true)
+    setTimeout(() => setGenerateOk(false), 3000)
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -133,6 +186,32 @@ export default function TemporadaPage() {
               </div>
             ))}
           </div>
+
+          {season && (
+            <div className="mt-3 pt-3" style={{ borderTop: '1px dashed var(--hairline)' }}>
+              <button
+                type="button"
+                onClick={handleGenerateRounds}
+                disabled={generating || existingRoundNumbers.length >= form.min_matches}
+                className="w-full py-2.5 rounded-xl font-semibold text-sm transition hover:opacity-90 disabled:opacity-50"
+                style={{ background: generateOk ? 'var(--green)' : 'var(--accent)', color: '#fff' }}
+              >
+                {generating
+                  ? 'Creando jornadas...'
+                  : generateOk
+                    ? '✓ Jornadas creadas'
+                    : existingRoundNumbers.length >= form.min_matches
+                      ? '✓ Ya están todas creadas'
+                      : `🗓️ Generar ${form.min_matches - existingRoundNumbers.length} jornada(s) que faltan`}
+              </button>
+              <p className="text-[11px] mt-1.5" style={{ color: 'var(--text-muted)' }}>
+                Crea las jornadas con su fecha y responsable de reserva (rotando entre jugadores). Las parejas de cada partido se asignan después, jornada a jornada.
+              </p>
+              {generateError && (
+                <p className="text-xs mt-1.5" style={{ color: 'var(--red)' }}>⚠ {generateError}</p>
+              )}
+            </div>
+          )}
         </div>
       )}
 

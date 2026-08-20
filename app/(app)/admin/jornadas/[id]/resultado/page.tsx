@@ -147,6 +147,14 @@ export default function ResultadoPage() {
     })
   }
 
+  function setStat(playerId: string, field: keyof StatEntry, value: string) {
+    const n = Math.max(0, parseInt(value, 10) || 0)
+    setStats(prev => {
+      const current = prev[playerId] ?? { aces: 0, double_faults: 0, bolas_por_3: 0, smash_al_cristal: 0 }
+      return { ...prev, [playerId]: { ...current, [field]: n } }
+    })
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!matchId || !winner) return
@@ -352,7 +360,16 @@ export default function ResultadoPage() {
                               onClick={() => adjustStat(player.id, key, -1)}
                               className="w-9 h-9 rounded-lg text-sm font-bold flex items-center justify-center shrink-0"
                               style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>−</button>
-                            <span className="w-6 text-center text-sm font-bold">{st[key] ?? 0}</span>
+                            <input
+                              type="number"
+                              min={0}
+                              inputMode="numeric"
+                              value={st[key] ?? 0}
+                              onChange={e => setStat(player.id, key, e.target.value)}
+                              onFocus={e => e.target.select()}
+                              className="w-9 text-center text-sm font-bold rounded-lg py-1.5 outline-none"
+                              style={{ background: 'var(--surface2)', border: 'none', color: 'var(--text)' }}
+                            />
                             <button type="button"
                               onClick={() => adjustStat(player.id, key, 1)}
                               className="w-9 h-9 rounded-lg text-sm font-bold flex items-center justify-center shrink-0"
