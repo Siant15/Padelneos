@@ -5,6 +5,14 @@ import JornadasAccordion, { type JornadaViewModel } from '@/components/JornadasA
 export default async function JornadasPage() {
   const supabase = await createClient()
 
+  const { data: activeSeason } = await supabase
+    .from('seasons')
+    .select('match_time')
+    .eq('status', 'active')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
   const { data: rounds } = await supabase
     .from('rounds')
     .select(`
@@ -56,6 +64,7 @@ export default async function JornadasPage() {
 
     const isNext = nextRound?.id === round.id
     const played = round.status === 'played'
+    const effectiveTime = (round.scheduled_time ?? activeSeason?.match_time)?.slice(0, 5) ?? ''
 
     let scoreLabel = ''
     if (match && match.set1_t1 !== null) {
@@ -68,6 +77,8 @@ export default async function JornadasPage() {
       id: round.id,
       numLabel: String(round.round_number),
       dateLabel: formatDate(round.scheduled_date),
+      timeLabel: effectiveTime,
+      hasCustomTime: !!round.scheduled_time,
       pairALabel: match ? `${match.team1_p1?.name ?? '?'} / ${match.team1_p2?.name ?? '?'}` : 'Por confirmar',
       pairBLabel: match ? `${match.team2_p1?.name ?? '?'} / ${match.team2_p2?.name ?? '?'}` : '',
       responsableName: round.court_booker?.name ?? 'Sin asignar',

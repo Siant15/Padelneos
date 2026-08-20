@@ -12,17 +12,18 @@ export default async function ApuestasPage({ params }: { params: Promise<{ round
 
   const { data: round } = await supabase
     .from('rounds')
-    .select('id, round_number, scheduled_date, status, season:seasons(match_time)')
+    .select('id, round_number, scheduled_date, scheduled_time, status, season:seasons(match_time)')
     .eq('id', roundId)
     .single()
 
   if (!round) notFound()
 
   // Las apuestas se pueden hacer hasta la hora del partido: si no hay un
-  // cierre manual en un mercado concreto, el corte por defecto es la fecha
-  // de la jornada + la hora habitual de la temporada.
+  // cierre manual en un mercado concreto, el corte por defecto es la hora
+  // concreta de esta jornada (si se puso una) o si no la hora habitual
+  // de la temporada.
   const season = (Array.isArray(round.season) ? round.season[0] : round.season) as { match_time: string | null } | null
-  const matchDateTime = `${round.scheduled_date}T${season?.match_time ?? '23:59:59'}`
+  const matchDateTime = `${round.scheduled_date}T${round.scheduled_time ?? season?.match_time ?? '23:59:59'}`
 
   const { data: markets } = await supabase
     .from('betting_markets')

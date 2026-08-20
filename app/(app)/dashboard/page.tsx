@@ -12,7 +12,7 @@ export default async function DashboardPage() {
 
   const { data: season } = await supabase
     .from('seasons')
-    .select('id')
+    .select('id, match_time')
     .eq('status', 'active')
     .order('created_at', { ascending: false })
     .limit(1)
@@ -44,6 +44,7 @@ export default async function DashboardPage() {
   const topPair = (topPairData as PairStanding | null)?.matches_played ? (topPairData as PairStanding) : null
   const round = nextRound as Round | null
   const match = round?.match as { team1_p1?: { name: string }; team1_p2?: { name: string }; team2_p1?: { name: string }; team2_p2?: { name: string } } | undefined
+  const effectiveTime = (round?.scheduled_time ?? season?.[0]?.match_time)?.slice(0, 5)
 
   return (
     <div className="flex flex-col">
@@ -66,7 +67,14 @@ export default async function DashboardPage() {
             <div className="text-[11px] font-extrabold uppercase tracking-wide" style={{ color: 'var(--accent)' }}>
               📅 Próximo partido · Jornada {round.round_number}
             </div>
-            <div className="font-heading text-[17px] font-bold mt-1 capitalize">{formatDate(round.scheduled_date)}</div>
+            <div className="font-heading text-[17px] font-bold mt-1 capitalize">
+              {formatDate(round.scheduled_date)}{effectiveTime && ` · ${effectiveTime}`}
+              {round.scheduled_time && (
+                <span className="ml-1.5 text-[10px] font-bold px-2 py-0.5 rounded-full align-middle" style={{ background: 'var(--orange-bg)', color: 'var(--orange)' }}>
+                  hora especial
+                </span>
+              )}
+            </div>
 
             {match && (
               <div className="flex justify-between items-center mt-2.5 rounded-[14px] px-3 py-2.5" style={{ background: 'var(--surface2)' }}>

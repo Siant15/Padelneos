@@ -16,9 +16,11 @@ export default function EditarJornadaPage() {
   const [saved, setSaved] = useState(false)
   const [saveError, setSaveError] = useState('')
   const [hasResult, setHasResult] = useState(false)
+  const [seasonMatchTime, setSeasonMatchTime] = useState('')
 
   const [form, setForm] = useState({
     scheduled_date: '',
+    scheduled_time: '',
     court_booker_id: '',
     status: 'scheduled',
     team1_p1_id: '',
@@ -31,14 +33,17 @@ export default function EditarJornadaPage() {
   useEffect(() => {
     Promise.all([
       supabase.from('profiles').select('*').order('name'),
-      supabase.from('rounds').select('*, match:matches(*)').eq('id', roundId).single(),
+      supabase.from('rounds').select('*, match:matches(*), season:seasons(match_time)').eq('id', roundId).single(),
     ]).then(([{ data: p }, { data: r }]) => {
       setPlayers((p as Profile[]) ?? [])
       if (r) {
         const m = (r.match as { id: string; team1_p1_id: string; team1_p2_id: string; team2_p1_id: string; team2_p2_id: string; winner: string | null } | null)
+        const season = (Array.isArray(r.season) ? r.season[0] : r.season) as { match_time: string | null } | null
         setHasResult(!!m?.winner)
+        setSeasonMatchTime(season?.match_time?.slice(0, 5) ?? '')
         setForm({
           scheduled_date: r.scheduled_date,
+          scheduled_time: r.scheduled_time?.slice(0, 5) ?? '',
           court_booker_id: r.court_booker_id ?? '',
           status: r.status,
           team1_p1_id: m?.team1_p1_id ?? '',
@@ -66,6 +71,7 @@ export default function EditarJornadaPage() {
 
     const { error: roundError } = await supabase.from('rounds').update({
       scheduled_date: form.scheduled_date,
+      scheduled_time: form.scheduled_time || null,
       court_booker_id: form.court_booker_id || null,
       status: form.status,
     }).eq('id', roundId)
@@ -122,6 +128,12 @@ export default function EditarJornadaPage() {
         <Field label="Fecha">
           <input type="date" required value={form.scheduled_date}
             onChange={e => setForm(f => ({ ...f, scheduled_date: e.target.value }))}
+            style={inputStyle} />
+        </Field>
+
+        <Field label={`Hora (opcional, si no se pone se usa la habitual${seasonMatchTime ? ` de las ${seasonMatchTime}` : ''})`}>
+          <input type="time" value={form.scheduled_time}
+            onChange={e => setForm(f => ({ ...f, scheduled_time: e.target.value }))}
             style={inputStyle} />
         </Field>
 

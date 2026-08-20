@@ -7,6 +7,8 @@ export type JornadaViewModel = {
   id: string
   numLabel: string
   dateLabel: string
+  timeLabel: string
+  hasCustomTime: boolean
   pairALabel: string
   pairBLabel: string
   responsableName: string
@@ -47,7 +49,10 @@ export default function JornadasAccordion({ items }: { items: JornadaViewModel[]
           >
             <div className="flex justify-between items-center cursor-pointer" onClick={() => toggle(j.id)}>
               <div>
-                <div className="text-[13px] font-extrabold capitalize">Jornada {j.numLabel} · {j.dateLabel}</div>
+                <div className="text-[13px] font-extrabold capitalize">
+                  Jornada {j.numLabel} · {j.dateLabel}{j.timeLabel && ` · ${j.timeLabel}`}
+                  {j.hasCustomTime && <span className="ml-1 text-[10px] font-bold" style={{ color: 'var(--orange)' }}>⏰</span>}
+                </div>
                 <div className="text-xs mt-0.5" style={{ color: 'var(--text-muted2)' }}>
                   {j.pairALabel}{j.pairBLabel && ` vs ${j.pairBLabel}`}
                 </div>

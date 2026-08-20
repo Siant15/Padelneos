@@ -28,6 +28,7 @@ export type Round = {
   season_id: string
   round_number: number
   scheduled_date: string
+  scheduled_time: string | null
   status: 'scheduled' | 'played' | 'cancelled'
   court_booker_id: string | null
   court_confirmed: boolean
