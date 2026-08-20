@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import type { IndividualStanding, Round } from '@/lib/types'
+import type { IndividualStanding, PairStanding, Round } from '@/lib/types'
 import { formatDate } from '@/lib/types'
 import Link from 'next/link'
 import ConfirmCourtButton from '@/components/ConfirmCourtButton'
@@ -19,7 +19,7 @@ export default async function DashboardPage() {
 
   const seasonId = season?.[0]?.id
 
-  const [{ data: standings }, { data: nextRound }] = await Promise.all([
+  const [{ data: standings }, { data: nextRound }, { data: topPairData }] = await Promise.all([
     seasonId
       ? supabase.from('individual_standings').select('*').eq('season_id', seasonId).order('total_points', { ascending: false }).order('sport_points', { ascending: false })
       : Promise.resolve({ data: [] as IndividualStanding[] }),
@@ -33,11 +33,15 @@ export default async function DashboardPage() {
         .limit(1)
         .maybeSingle()
       : Promise.resolve({ data: null as Round | null }),
+    seasonId
+      ? supabase.from('pair_standings').select('*').eq('season_id', seasonId).order('points', { ascending: false }).order('wins', { ascending: false }).limit(1).maybeSingle()
+      : Promise.resolve({ data: null as PairStanding | null }),
   ])
 
   const allStandings = (standings as IndividualStanding[] | null) ?? []
   const topIndividual = allStandings.slice(0, 4)
   const dinnerPayers = allStandings.length >= 3 ? allStandings.slice(-2).reverse() : []
+  const topPair = (topPairData as PairStanding | null)?.matches_played ? (topPairData as PairStanding) : null
   const round = nextRound as Round | null
   const match = round?.match as { team1_p1?: { name: string }; team1_p2?: { name: string }; team2_p1?: { name: string }; team2_p2?: { name: string } } | undefined
 
@@ -154,6 +158,16 @@ export default async function DashboardPage() {
             )}
           </div>
         </div>
+
+        {/* Pareja de oro */}
+        {topPair && (
+          <div className="rounded-2xl px-3.5 py-3" style={{ background: 'var(--surface2)' }}>
+            <p className="text-xs font-bold mb-1" style={{ color: 'var(--accent)' }}>👑 Pareja de oro de la temporada</p>
+            <p className="text-xs">
+              <strong>{topPair.p1_name} / {topPair.p2_name}</strong> · {topPair.wins}-{topPair.losses} en {topPair.matches_played} partidos
+            </p>
+          </div>
+        )}
 
         {/* Termómetro de la cena */}
         {dinnerPayers.length === 2 && (

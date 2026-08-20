@@ -15,9 +15,16 @@ export default async function EstadisticasPage() {
   const seasonId = season?.id
 
   const { data: seasonRounds } = seasonId
-    ? await supabase.from('rounds').select('id').eq('season_id', seasonId)
-    : { data: [] as { id: string }[] }
+    ? await supabase.from('rounds').select('id, court_booker_id').eq('season_id', seasonId)
+    : { data: [] as { id: string; court_booker_id: string | null }[] }
   const seasonRoundIds = (seasonRounds ?? []).map(r => r.id)
+
+  // Rey de la Reserva: quién se ha encargado más veces de reservar pista.
+  const bookingCounts: Record<string, number> = {}
+  for (const r of seasonRounds ?? []) {
+    if (!r.court_booker_id) continue
+    bookingCounts[r.court_booker_id] = (bookingCounts[r.court_booker_id] ?? 0) + 1
+  }
 
   const [{ data: stats }, { data: players }, { data: matches }] = await Promise.all([
     seasonRoundIds.length
@@ -37,6 +44,13 @@ export default async function EstadisticasPage() {
         .order('scheduled_date', { referencedTable: 'rounds', ascending: true })
       : Promise.resolve({ data: [] as { winner: string; team1_p1_id: string; team1_p2_id: string; team2_p1_id: string; team2_p2_id: string }[] }),
   ])
+
+  const reyDeLaReservaId = Object.keys(bookingCounts).length
+    ? Object.entries(bookingCounts).reduce((a, b) => (b[1] > a[1] ? b : a))[0]
+    : null
+  const reyDeLaReserva = reyDeLaReservaId
+    ? { name: (players ?? []).find(p => p.id === reyDeLaReservaId)?.name ?? '?', count: bookingCounts[reyDeLaReservaId] }
+    : null
 
   // Rachas: recorremos el historial de cada jugador de más antiguo a más
   // reciente y nos quedamos con la racha actual (positiva o negativa).
@@ -123,6 +137,16 @@ export default async function EstadisticasPage() {
         </p>
       </div>
 
+      {/* Rey de la Reserva */}
+      {reyDeLaReserva && (
+        <div className="rounded-2xl px-3.5 py-3" style={{ background: 'var(--surface2)' }}>
+          <p className="text-xs font-bold mb-1" style={{ color: 'var(--accent)' }}>🏟️ Rey de la Reserva</p>
+          <p className="text-xs">
+            <strong>{reyDeLaReserva.name}</strong> se ha encargado de reservar pista {reyDeLaReserva.count} {reyDeLaReserva.count === 1 ? 'vez' : 'veces'} esta temporada
+          </p>
+        </div>
+      )}
+
       {/* Rachas */}
       {streakRows.length > 0 && (
         <section>
@@ -152,7 +176,7 @@ export default async function EstadisticasPage() {
         <h2 className="font-heading text-sm font-bold mb-2.5">Totales acumulados</h2>
         {!rows.length ? (
           <div className="rounded-2xl p-4 text-sm" style={{ background: 'var(--surface)', color: 'var(--text-muted)', boxShadow: '0 3px 10px rgba(0,0,0,0.04)' }}>
-            Aún no hay estadísticas registradas. Se rellenan al meter el resultado de cada jornada.
+            Aquí todavía no hay ni un ace registrado. En cuanto juguéis la primera jornada, esto se llena de motes y récords.
           </div>
         ) : (
           <div className="flex flex-col gap-3">
