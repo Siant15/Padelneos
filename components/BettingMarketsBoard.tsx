@@ -10,12 +10,19 @@ interface Props {
   userId: string
   chipsLeft: number
   roundStatus: string
+  matchDateTime: string
 }
 
 const OPTION_COLORS = ['#2E6FF2', '#FF8A3D', '#2BB673', '#FFC93D', '#9AA5B8']
 const TYPE_ICON: Record<string, string> = { yes_no: '🎾', player_choice: '🎯', quantity: '🔢' }
 
-export default function BettingMarketsBoard({ markets, userId, chipsLeft, roundStatus }: Props) {
+// Si un mercado no tiene un cierre manual (closes_at), las apuestas se
+// pueden hacer hasta la hora del partido.
+function marketCloseTime(market: BettingMarket, matchDateTime: string): string {
+  return market.closes_at ?? matchDateTime
+}
+
+export default function BettingMarketsBoard({ markets, userId, chipsLeft, roundStatus, matchDateTime }: Props) {
   const router = useRouter()
   const supabase = createClient()
 
@@ -41,7 +48,7 @@ export default function BettingMarketsBoard({ markets, userId, chipsLeft, roundS
   const isOverBudget = totalChips > chipsAvailable
 
   const editableMarkets = markets.filter(m => {
-    const isClosedByTime = !!m.closes_at && new Date(m.closes_at) <= new Date()
+    const isClosedByTime = new Date(marketCloseTime(m, matchDateTime)) <= new Date()
     return roundStatus === 'scheduled' && !m.resolved && !isClosedByTime
   })
 
@@ -104,7 +111,8 @@ export default function BettingMarketsBoard({ markets, userId, chipsLeft, roundS
       )}
 
       {markets.map(market => {
-        const isClosedByTime = !!market.closes_at && new Date(market.closes_at) <= new Date()
+        const closeTime = marketCloseTime(market, matchDateTime)
+        const isClosedByTime = new Date(closeTime) <= new Date()
         const canBet = editingAll && roundStatus === 'scheduled' && !market.resolved && !isClosedByTime
         const totalMarketChips = (market.options ?? []).reduce((s, o) => s + getTotalChipsOnOption(market, o.id), 0)
 
@@ -119,9 +127,9 @@ export default function BettingMarketsBoard({ markets, userId, chipsLeft, roundS
                 <span className="text-xs font-bold" style={{ color: 'var(--red)' }}>🔒 Cerrado</span>
               )}
             </div>
-            {!market.resolved && !isClosedByTime && market.closes_at && (
+            {!market.resolved && !isClosedByTime && (
               <p className="text-[11px] mt-1" style={{ color: 'var(--text-muted2)' }}>
-                Cierra el {new Date(market.closes_at).toLocaleString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                Cierra el {new Date(closeTime).toLocaleString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
               </p>
             )}
 

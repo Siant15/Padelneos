@@ -416,7 +416,7 @@ function NewMarketForm({ roundId, players, onSaved }: {
             style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text)' }}
           />
           <p className="text-[11px] mt-1" style={{ color: 'var(--text-muted)' }}>
-            Si lo dejas vacío, se puede apostar hasta que se marque la jornada como jugada.
+            Si lo dejas vacío, se puede apostar hasta la hora del partido (la hora habitual de la temporada).
           </p>
         </div>
 
