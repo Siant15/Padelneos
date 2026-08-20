@@ -5,6 +5,9 @@
 -- Ejecutar en Supabase SQL Editor.
 -- ============================================================
 
+drop view if exists individual_standings;
+drop view if exists pair_standings;
+
 create or replace view individual_standings as
 with match_points as (
   select
