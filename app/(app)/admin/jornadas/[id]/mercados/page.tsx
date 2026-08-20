@@ -85,8 +85,12 @@ export default function MercadosPage() {
   const [markets, setMarkets] = useState<MarketWithAll[]>([])
   const [players, setPlayers] = useState<Profile[]>([])
   const [roundStatus, setRoundStatus] = useState('')
+  const [previousRoundId, setPreviousRoundId] = useState<string | null>(null)
   const [showNewForm, setShowNewForm] = useState(false)
   const [resolving, setResolving] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState<string | null>(null)
+  const [copying, setCopying] = useState(false)
+  const [copyError, setCopyError] = useState('')
   const [payoutError, setPayoutError] = useState('')
   const [resolveError, setResolveError] = useState('')
   const [payoutsCalculated, setPayoutsCalculated] = useState(false)
@@ -100,15 +104,94 @@ export default function MercadosPage() {
         .eq('round_id', roundId)
         .order('created_at'),
       supabase.from('profiles').select('*').order('name'),
-      supabase.from('rounds').select('status').eq('id', roundId).single(),
+      supabase.from('rounds').select('status, round_number, season_id').eq('id', roundId).single(),
     ])
     setLoadError(marketsError ? 'No se pudieron cargar los mercados: ' + marketsError.message : '')
     setMarkets((m as MarketWithAll[]) ?? [])
     setPlayers((p as Profile[]) ?? [])
     setRoundStatus(r?.status ?? '')
+
+    if (r?.round_number && r.round_number > 1) {
+      const { data: prevRound } = await supabase
+        .from('rounds')
+        .select('id')
+        .eq('season_id', r.season_id)
+        .eq('round_number', r.round_number - 1)
+        .maybeSingle()
+      setPreviousRoundId(prevRound?.id ?? null)
+    } else {
+      setPreviousRoundId(null)
+    }
   }, [roundId])
 
   useEffect(() => { loadData() }, [loadData])
+
+  async function copyFromPreviousRound() {
+    if (!previousRoundId) return
+    setCopying(true)
+    setCopyError('')
+
+    const { data: prevMarkets, error: prevError } = await supabase
+      .from('betting_markets')
+      .select('type, description, options:betting_options!market_id(label, player_id, value, is_self_negative)')
+      .eq('round_id', previousRoundId)
+
+    if (prevError) {
+      setCopyError('No se pudieron leer los mercados de la jornada anterior: ' + prevError.message)
+      setCopying(false)
+      return
+    }
+    if (!prevMarkets?.length) {
+      setCopyError('La jornada anterior no tenía mercados.')
+      setCopying(false)
+      return
+    }
+
+    for (const pm of prevMarkets as { type: string; description: string; options: { label: string; player_id: string | null; value: string | null; is_self_negative: boolean }[] }[]) {
+      const { data: newMarket, error: marketError } = await supabase
+        .from('betting_markets')
+        .insert({ round_id: roundId, type: pm.type, description: pm.description })
+        .select()
+        .single()
+
+      if (marketError || !newMarket) {
+        setCopyError('Fallo copiando "' + pm.description + '": ' + (marketError?.message ?? 'error desconocido'))
+        setCopying(false)
+        await loadData()
+        return
+      }
+
+      const options = pm.options.map(o => ({
+        market_id: newMarket.id,
+        label: o.label,
+        player_id: o.player_id,
+        value: o.value,
+        is_self_negative: o.is_self_negative,
+      }))
+      const { error: optionsError } = await supabase.from('betting_options').insert(options)
+      if (optionsError) {
+        setCopyError('Fallo copiando las opciones de "' + pm.description + '": ' + optionsError.message)
+        setCopying(false)
+        await loadData()
+        return
+      }
+    }
+
+    setCopying(false)
+    await loadData()
+  }
+
+  async function deleteMarket(marketId: string) {
+    if (!confirm('¿Borrar este mercado? Se perderán las apuestas hechas en él.')) return
+    setDeleting(marketId)
+    const { error } = await supabase.from('betting_markets').delete().eq('id', marketId)
+    setDeleting(null)
+    if (error) {
+      setLoadError('No se pudo borrar el mercado: ' + error.message)
+      return
+    }
+    await loadData()
+  }
 
   async function resolveMarket(market: MarketWithAll, winningOptionId: string) {
     if (!confirm('¿Seguro? Una vez resuelto el mercado no se puede deshacer desde aquí.')) return
@@ -173,6 +256,23 @@ export default function MercadosPage() {
         />
       )}
 
+      {!markets.length && previousRoundId && (
+        <div className="rounded-xl p-4" style={{ background: 'var(--surface2)', border: '1px solid var(--accent)' }}>
+          <p className="text-sm font-semibold mb-1">📋 ¿Mismos mercados que la jornada anterior?</p>
+          <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>
+            Copia las preguntas de la jornada pasada para no escribirlas otra vez. Si alguna no la quieres esta semana, la borras después con un tap.
+          </p>
+          {copyError && <p className="text-xs mb-2" style={{ color: 'var(--red)' }}>⚠ {copyError}</p>}
+          <button
+            onClick={copyFromPreviousRound}
+            disabled={copying}
+            className="w-full py-2.5 rounded-lg font-semibold text-sm transition hover:opacity-90 disabled:opacity-50"
+            style={{ background: 'var(--accent)', color: '#fff' }}>
+            {copying ? 'Copiando...' : '📋 Copiar mercados de la jornada anterior'}
+          </button>
+        </div>
+      )}
+
       {/* Mercados existentes */}
       {!markets.length ? (
         <div className="rounded-xl p-5 text-center text-sm" style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
@@ -185,7 +285,9 @@ export default function MercadosPage() {
               key={market.id}
               market={market}
               resolving={resolving === market.id}
+              deleting={deleting === market.id}
               onResolve={(optId) => resolveMarket(market, optId)}
+              onDelete={() => deleteMarket(market.id)}
             />
           ))}
         </div>
@@ -217,10 +319,12 @@ export default function MercadosPage() {
 }
 
 // ─── Tarjeta de mercado ───────────────────────────────────────
-function MarketCard({ market, resolving, onResolve }: {
+function MarketCard({ market, resolving, deleting, onResolve, onDelete }: {
   market: MarketWithAll
   resolving: boolean
+  deleting: boolean
   onResolve: (optId: string) => void
+  onDelete: () => void
 }) {
   const [selectedOption, setSelectedOption] = useState('')
 
@@ -235,10 +339,22 @@ function MarketCard({ market, resolving, onResolve }: {
         <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'var(--surface2)', color: 'var(--text-muted)' }}>
           {market.type === 'yes_no' ? 'Sí/No' : market.type === 'player_choice' ? 'Jugador' : 'Cantidad'}
         </span>
-        {market.resolved
-          ? <span className="text-xs font-semibold" style={{ color: 'var(--green)' }}>✓ Resuelta</span>
-          : <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{totalPot} fichas en juego</span>
-        }
+        <div className="flex items-center gap-2">
+          {market.resolved
+            ? <span className="text-xs font-semibold" style={{ color: 'var(--green)' }}>✓ Resuelta</span>
+            : <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{totalPot} fichas en juego</span>
+          }
+          {!market.resolved && totalPot === 0 && (
+            <button
+              onClick={onDelete}
+              disabled={deleting}
+              aria-label="Borrar mercado"
+              className="text-xs px-1.5 disabled:opacity-40"
+              style={{ color: 'var(--red)' }}>
+              {deleting ? '...' : '🗑️'}
+            </button>
+          )}
+        </div>
       </div>
 
       <p className="font-semibold text-sm mb-3">{market.description}</p>

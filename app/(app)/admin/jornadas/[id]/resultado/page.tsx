@@ -71,6 +71,8 @@ export default function ResultadoPage() {
   const [loading, setLoading] = useState(false)
   const [saved, setSaved] = useState(false)
   const [saveError, setSaveError] = useState('')
+  const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error' | 'no-match'>('loading')
+  const [loadErrorMsg, setLoadErrorMsg] = useState('')
 
   useEffect(() => {
     supabase.from('rounds').select(`
@@ -80,9 +82,18 @@ export default function ResultadoPage() {
         team1_p2:profiles!team1_p2_id(id, name),
         team2_p1:profiles!team2_p1_id(id, name),
         team2_p2:profiles!team2_p2_id(id, name))
-    `).eq('id', roundId).single().then(({ data }) => {
+    `).eq('id', roundId).single().then(({ data, error }) => {
+      if (error) {
+        setLoadErrorMsg('No se pudo cargar la jornada: ' + error.message)
+        setLoadState('error')
+        return
+      }
       const m = data?.match as unknown as { id: string; set1_t1?: number; set1_t2?: number; set2_t1?: number; set2_t2?: number; set3_t1?: number; set3_t2?: number; team1_p1?: { id: string; name: string }; team1_p2?: { id: string; name: string }; team2_p1?: { id: string; name: string }; team2_p2?: { id: string; name: string } } | null
-      if (!m) return
+      if (!m) {
+        setLoadState('no-match')
+        return
+      }
+      setLoadState('ready')
       setMatchId(m.id)
       setRoundNumber(data?.round_number ?? 0)
 
@@ -262,9 +273,25 @@ export default function ResultadoPage() {
         <h1 className="text-xl font-bold">Resultado del partido</h1>
       </div>
 
-      {!matchId ? (
+      {loadState === 'loading' && (
         <div className="text-sm" style={{ color: 'var(--text-muted)' }}>Cargando...</div>
-      ) : (
+      )}
+
+      {loadState === 'error' && (
+        <div className="rounded-xl p-4 text-sm" style={{ background: 'var(--orange-bg)', color: '#7A5A1E' }}>
+          ⚠ {loadErrorMsg}
+        </div>
+      )}
+
+      {loadState === 'no-match' && (
+        <div className="rounded-xl p-4 text-sm" style={{ background: 'var(--orange-bg)', color: '#7A5A1E' }}>
+          Esta jornada todavía no tiene las parejas asignadas, así que no se puede registrar un resultado.
+          <br />
+          Ve a <a href={`/admin/jornadas/${roundId}/editar`} className="font-bold underline">Editar jornada</a> para asignarlas primero.
+        </div>
+      )}
+
+      {loadState === 'ready' && (
         <form onSubmit={handleSubmit} className="space-y-6">
 
           {/* Sets */}
