@@ -116,16 +116,46 @@ export default function TemporadaPage() {
     setLoading(true)
     setSaveError('')
 
+    const startDateChanged = !!season && season.start_date !== form.start_date
+
     const { error } = season
       ? await supabase.from('seasons').update(form).eq('id', season.id)
       : await supabase.from('seasons').insert({ ...form, status: 'active' })
 
-    setLoading(false)
-
     if (error) {
+      setLoading(false)
       setSaveError('No se pudo guardar la temporada: ' + error.message)
       return
     }
+
+    // Si cambia la fecha de inicio, recalculamos la fecha de las jornadas
+    // ya generadas que todavía no se han jugado (las jugadas se respetan).
+    if (season && startDateChanged) {
+      const { data: pendingRounds, error: roundsError } = await supabase
+        .from('rounds')
+        .select('id, round_number')
+        .eq('season_id', season.id)
+        .eq('status', 'scheduled')
+
+      if (roundsError) {
+        setLoading(false)
+        setSaveError('La temporada se guardó, pero no se pudieron actualizar las fechas de las jornadas: ' + roundsError.message)
+        return
+      }
+
+      const updates = (pendingRounds ?? []).map(r =>
+        supabase.from('rounds').update({ scheduled_date: getSeasonMatchDate(form.start_date, r.round_number) }).eq('id', r.id)
+      )
+      const results = await Promise.all(updates)
+      const failed = results.find(r => r.error)
+      if (failed?.error) {
+        setLoading(false)
+        setSaveError('La temporada se guardó, pero alguna jornada no se pudo reprogramar: ' + failed.error.message)
+        return
+      }
+    }
+
+    setLoading(false)
 
     setSaved(true)
     setTimeout(() => { setSaved(false); router.push('/admin'); router.refresh() }, 1200)
