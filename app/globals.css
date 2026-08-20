@@ -1,4 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Nunito:wght@400;600;700;800&display=swap');
 @import "tailwindcss";
 
 :root {
@@ -11,8 +10,8 @@
   --hairline: #F0EFEA;
   --hairline2: #F7F7F4;
   --text: #2B2B2B;
-  --text-muted: #8A8A8A;
-  --text-muted2: #9A9A9A;
+  --text-muted: #52525B;
+  --text-muted2: #6B7280;
   --accent: #2E6FF2;
   --accent-hover: #5B8CFF;
   --green: #1E9E5A;
@@ -22,8 +21,6 @@
   --yellow-text: #5A3E00;
   --orange: #D98A1B;
   --orange-bg: #FFF1DA;
-  --font-heading: 'Baloo 2', sans-serif;
-  --font-body: 'Nunito', sans-serif;
 }
 
 body {
@@ -42,4 +39,9 @@ h1, h2, h3, h4, .font-heading {
 
 ::-webkit-scrollbar {
   display: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }

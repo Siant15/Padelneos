@@ -1,8 +1,32 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
+const supabaseOrigin = 'https://ghxwjbwvgestdvhjqqsl.supabase.co'
+
+function buildCsp(nonce: string) {
+  return [
+    "default-src 'self'",
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`,
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data:",
+    "font-src 'self'",
+    `connect-src 'self' ${supabaseOrigin} wss://ghxwjbwvgestdvhjqqsl.supabase.co`,
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+  ].join('; ')
+}
+
 export async function proxy(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({ request })
+  const nonce = Buffer.from(crypto.randomUUID()).toString('base64')
+  const csp = buildCsp(nonce)
+
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set('x-nonce', nonce)
+  requestHeaders.set('Content-Security-Policy', csp)
+
+  let supabaseResponse = NextResponse.next({ request: { headers: requestHeaders } })
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -14,7 +38,7 @@ export async function proxy(request: NextRequest) {
         },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
-          supabaseResponse = NextResponse.next({ request })
+          supabaseResponse = NextResponse.next({ request: { headers: requestHeaders } })
           cookiesToSet.forEach(({ name, value, options }) =>
             supabaseResponse.cookies.set(name, value, options)
           )
@@ -26,16 +50,24 @@ export async function proxy(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
 
   const isAuthPage = request.nextUrl.pathname.startsWith('/login')
-  const isPublicPath = request.nextUrl.pathname === '/'
+  // /reset-password llega con un token de recuperación en la URL que solo el
+  // cliente puede procesar (establece la sesión tras cargar la página); si el
+  // proxy la bloquea por falta de sesión de servidor, el enlace del email nunca funciona.
+  const isPublicPath = request.nextUrl.pathname === '/' || request.nextUrl.pathname === '/reset-password'
 
   if (!user && !isAuthPage && !isPublicPath) {
-    return NextResponse.redirect(new URL('/login', request.url))
+    const redirect = NextResponse.redirect(new URL('/login', request.url))
+    redirect.headers.set('Content-Security-Policy', csp)
+    return redirect
   }
 
   if (user && isAuthPage) {
-    return NextResponse.redirect(new URL('/dashboard', request.url))
+    const redirect = NextResponse.redirect(new URL('/dashboard', request.url))
+    redirect.headers.set('Content-Security-Policy', csp)
+    return redirect
   }
 
+  supabaseResponse.headers.set('Content-Security-Policy', csp)
   return supabaseResponse
 }
 

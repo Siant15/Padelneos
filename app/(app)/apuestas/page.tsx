@@ -41,6 +41,18 @@ export default async function ApuestasPage() {
     .order('scheduled_date', { ascending: false })
     .limit(10)
 
+  const roundIds = (rounds ?? []).map(r => r.id)
+  const { data: marketsByRound } = roundIds.length
+    ? await supabase.from('betting_markets').select('round_id, resolved').in('round_id', roundIds)
+    : { data: [] as { round_id: string; resolved: boolean }[] }
+
+  function bettingStatus(roundId: string) {
+    const markets = (marketsByRound ?? []).filter(m => m.round_id === roundId)
+    if (!markets.length) return { label: 'Sin apuestas', color: 'var(--text-muted2)' }
+    if (markets.every(m => m.resolved)) return { label: 'Resuelta', color: 'var(--green)' }
+    return { label: 'Activa', color: 'var(--orange)' }
+  }
+
   return (
     <div className="px-5 pt-5 pb-6 flex flex-col gap-6">
       <h1 className="font-heading text-[22px] font-extrabold">💰 Apuestas</h1>
@@ -94,22 +106,23 @@ export default async function ApuestasPage() {
           </div>
         ) : (
           <div className="flex flex-col gap-2">
-            {rounds.map(r => (
-              <Link
-                key={r.id}
-                href={`/apuestas/${r.id}`}
-                className="flex items-center justify-between rounded-2xl px-4 py-3 transition hover:opacity-90"
-                style={{ background: 'var(--surface)', boxShadow: '0 3px 10px rgba(0,0,0,0.04)' }}
-              >
-                <span className="text-[13px] font-bold">Jornada {r.round_number}</span>
-                <div className="flex items-center gap-2 text-xs">
-                  <span style={{ color: r.status === 'played' ? 'var(--green)' : 'var(--text-muted)' }}>
-                    {r.status === 'played' ? 'Resuelta' : 'Activa'}
-                  </span>
-                  <span style={{ color: 'var(--text-muted2)' }}>→</span>
-                </div>
-              </Link>
-            ))}
+            {rounds.map(r => {
+              const status = bettingStatus(r.id)
+              return (
+                <Link
+                  key={r.id}
+                  href={`/apuestas/${r.id}`}
+                  className="flex items-center justify-between rounded-2xl px-4 py-3 transition hover:opacity-90"
+                  style={{ background: 'var(--surface)', boxShadow: '0 3px 10px rgba(0,0,0,0.04)' }}
+                >
+                  <span className="text-[13px] font-bold">Jornada {r.round_number}</span>
+                  <div className="flex items-center gap-2 text-xs">
+                    <span style={{ color: status.color }}>{status.label}</span>
+                    <span style={{ color: 'var(--text-muted2)' }}>→</span>
+                  </div>
+                </Link>
+              )
+            })}
           </div>
         )}
       </section>

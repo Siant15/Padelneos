@@ -14,6 +14,7 @@ export default function EditarJornadaPage() {
   const [players, setPlayers] = useState<Profile[]>([])
   const [loading, setLoading] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [saveError, setSaveError] = useState('')
 
   const [form, setForm] = useState({
     scheduled_date: '',
@@ -48,24 +49,41 @@ export default function EditarJornadaPage() {
     })
   }, [roundId])
 
+  const pairIds = [form.team1_p1_id, form.team1_p2_id, form.team2_p1_id, form.team2_p2_id].filter(Boolean)
+  const hasDuplicatePlayers = form.matchId ? new Set(pairIds).size !== pairIds.length : false
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (hasDuplicatePlayers) return
     setLoading(true)
+    setSaveError('')
 
-    await Promise.all([
-      supabase.from('rounds').update({
-        scheduled_date: form.scheduled_date,
-        court_booker_id: form.court_booker_id || null,
-        status: form.status,
-      }).eq('id', roundId),
+    const { error: roundError } = await supabase.from('rounds').update({
+      scheduled_date: form.scheduled_date,
+      court_booker_id: form.court_booker_id || null,
+      status: form.status,
+    }).eq('id', roundId)
 
-      form.matchId && supabase.from('matches').update({
+    if (roundError) {
+      setSaveError('No se pudo guardar la jornada: ' + roundError.message)
+      setLoading(false)
+      return
+    }
+
+    if (form.matchId) {
+      const { error: matchError } = await supabase.from('matches').update({
         team1_p1_id: form.team1_p1_id,
         team1_p2_id: form.team1_p2_id,
         team2_p1_id: form.team2_p1_id,
         team2_p2_id: form.team2_p2_id,
-      }).eq('id', form.matchId),
-    ])
+      }).eq('id', form.matchId)
+
+      if (matchError) {
+        setSaveError('Jornada guardada, pero las parejas fallaron: ' + matchError.message)
+        setLoading(false)
+        return
+      }
+    }
 
     setSaved(true)
     setLoading(false)
@@ -108,41 +126,79 @@ export default function EditarJornadaPage() {
               <div>
                 <p className="text-xs font-medium mb-2" style={{ color: 'var(--accent)' }}>Pareja 1</p>
                 <div className="grid grid-cols-2 gap-2">
-                  {(['team1_p1_id', 'team1_p2_id'] as const).map((key, i) => (
-                    <select key={key} value={form[key]}
-                      onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
-                      style={inputStyle}>
-                      <option value="">{i === 0 ? 'Jugador A' : 'Jugador B'}</option>
-                      {players.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                    </select>
-                  ))}
+                  <PlayerSelect
+                    value={form.team1_p1_id}
+                    onChange={v => setForm(f => ({ ...f, team1_p1_id: v }))}
+                    players={players}
+                    exclude={[form.team1_p2_id, form.team2_p1_id, form.team2_p2_id]}
+                    label="Jugador A"
+                  />
+                  <PlayerSelect
+                    value={form.team1_p2_id}
+                    onChange={v => setForm(f => ({ ...f, team1_p2_id: v }))}
+                    players={players}
+                    exclude={[form.team1_p1_id, form.team2_p1_id, form.team2_p2_id]}
+                    label="Jugador B"
+                  />
                 </div>
               </div>
               <div className="text-center text-sm font-bold" style={{ color: 'var(--text-muted)' }}>vs</div>
               <div>
                 <p className="text-xs font-medium mb-2" style={{ color: 'var(--orange)' }}>Pareja 2</p>
                 <div className="grid grid-cols-2 gap-2">
-                  {(['team2_p1_id', 'team2_p2_id'] as const).map((key, i) => (
-                    <select key={key} value={form[key]}
-                      onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
-                      style={inputStyle}>
-                      <option value="">{i === 0 ? 'Jugador C' : 'Jugador D'}</option>
-                      {players.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                    </select>
-                  ))}
+                  <PlayerSelect
+                    value={form.team2_p1_id}
+                    onChange={v => setForm(f => ({ ...f, team2_p1_id: v }))}
+                    players={players}
+                    exclude={[form.team1_p1_id, form.team1_p2_id, form.team2_p2_id]}
+                    label="Jugador C"
+                  />
+                  <PlayerSelect
+                    value={form.team2_p2_id}
+                    onChange={v => setForm(f => ({ ...f, team2_p2_id: v }))}
+                    players={players}
+                    exclude={[form.team1_p1_id, form.team1_p2_id, form.team2_p1_id]}
+                    label="Jugador D"
+                  />
                 </div>
               </div>
             </div>
+            {hasDuplicatePlayers && (
+              <p className="text-xs mt-3" style={{ color: 'var(--red)' }}>
+                ⚠ Un jugador no puede estar en las dos parejas a la vez.
+              </p>
+            )}
           </div>
         )}
 
-        <button type="submit" disabled={loading}
+        {saveError && (
+          <p className="text-sm text-center" style={{ color: 'var(--red)' }}>⚠ {saveError}</p>
+        )}
+
+        <button type="submit" disabled={loading || hasDuplicatePlayers}
           className="w-full py-3 rounded-xl font-semibold transition hover:opacity-90 disabled:opacity-40"
           style={{ background: saved ? 'var(--green)' : 'var(--accent)', color: '#fff' }}>
           {loading ? 'Guardando...' : saved ? '✓ Guardado' : 'Guardar cambios'}
         </button>
       </form>
     </div>
+  )
+}
+
+function PlayerSelect({ value, onChange, players, exclude, label }: {
+  value: string
+  onChange: (v: string) => void
+  players: Profile[]
+  exclude: string[]
+  label: string
+}) {
+  return (
+    <select value={value} onChange={e => onChange(e.target.value)} style={inputStyle}>
+      <option value="">{label}</option>
+      {players.filter(p => !exclude.includes(p.id) || p.id === value).map(p => (
+        <option key={p.id} value={p.id}>{p.name}</option>
+      ))}
+    </select>
   )
 }
 

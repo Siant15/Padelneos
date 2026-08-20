@@ -8,7 +8,21 @@ import type { Profile } from '@/lib/types'
 type SetScore = { t1: string; t2: string }
 type StatEntry = { aces: number; double_faults: number; bolas_por_3: number; smash_al_cristal: number }
 
-type MatchStatus = { winner: 'team1' | 'team2' | null; error: string | null; needsThirdSet: boolean }
+type MatchStatus = {
+  winner: 'team1' | 'team2' | null
+  error: string | null
+  needsThirdSet: boolean
+  decidedInTwo: boolean
+}
+
+// Marcador válido de un set de pádel: 6-0..6-4, 7-5 o 7-6 (con tie-break)
+function isValidSetScore(a: number, b: number): boolean {
+  const hi = Math.max(a, b)
+  const lo = Math.min(a, b)
+  if (hi === 6 && lo <= 4) return true
+  if (hi === 7 && (lo === 5 || lo === 6)) return true
+  return false
+}
 
 function evaluateSets(sets: SetScore[]): MatchStatus {
   const parsed = sets.map(s => ({
@@ -16,27 +30,31 @@ function evaluateSets(sets: SetScore[]): MatchStatus {
     t2: s.t2.trim() === '' ? null : parseInt(s.t2, 10),
   }))
   const [s1, s2, s3] = parsed
+  const notDecided = { winner: null, error: null, needsThirdSet: false, decidedInTwo: false } as const
 
   if (s1.t1 === null || s1.t2 === null || s2.t1 === null || s2.t2 === null) {
-    return { winner: null, error: null, needsThirdSet: false }
+    return notDecided
   }
-  if (s1.t1 === s1.t2 || s2.t1 === s2.t2) {
-    return { winner: null, error: 'Un set no puede terminar en empate', needsThirdSet: false }
+  if (!isValidSetScore(s1.t1, s1.t2)) {
+    return { ...notDecided, error: 'El set 1 no es un resultado válido de pádel (6-0 a 6-4, 7-5 o 7-6)' }
+  }
+  if (!isValidSetScore(s2.t1, s2.t2)) {
+    return { ...notDecided, error: 'El set 2 no es un resultado válido de pádel (6-0 a 6-4, 7-5 o 7-6)' }
   }
 
   const w1 = s1.t1 > s1.t2 ? 'team1' : 'team2'
   const w2 = s2.t1 > s2.t2 ? 'team1' : 'team2'
-  if (w1 === w2) return { winner: w1, error: null, needsThirdSet: false }
+  if (w1 === w2) return { winner: w1, error: null, needsThirdSet: false, decidedInTwo: true }
 
   // 1-1: hace falta un tercer set decisivo
   if (!s3 || s3.t1 === null || s3.t2 === null) {
-    return { winner: null, error: null, needsThirdSet: true }
+    return { ...notDecided, needsThirdSet: true }
   }
-  if (s3.t1 === s3.t2) {
-    return { winner: null, error: 'El tercer set no puede terminar en empate', needsThirdSet: false }
+  if (!isValidSetScore(s3.t1, s3.t2)) {
+    return { ...notDecided, error: 'El set 3 no es un resultado válido de pádel (6-0 a 6-4, 7-5 o 7-6)' }
   }
   const w3 = s3.t1 > s3.t2 ? 'team1' : 'team2'
-  return { winner: w3, error: null, needsThirdSet: false }
+  return { winner: w3, error: null, needsThirdSet: false, decidedInTwo: false }
 }
 
 export default function ResultadoPage() {
@@ -101,7 +119,7 @@ export default function ResultadoPage() {
     })
   }, [roundId])
 
-  const { winner, error: setsError, needsThirdSet } = evaluateSets(sets)
+  const { winner, error: setsError, needsThirdSet, decidedInTwo } = evaluateSets(sets)
   const hasThirdSet = sets.length === 3
 
   function setScore(setIdx: number, team: 't1' | 't2', value: string) {
@@ -229,11 +247,18 @@ export default function ResultadoPage() {
               ))}
             </div>
 
-            <button type="button" onClick={toggleThirdSet}
-              className="mt-3 text-xs px-3 py-1.5 rounded-lg transition hover:opacity-80"
-              style={{ border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
-              {hasThirdSet ? '− Quitar 3.º set' : '+ Añadir 3.º set'}
-            </button>
+            {(hasThirdSet || !decidedInTwo) && (
+              <button type="button" onClick={toggleThirdSet}
+                className="mt-3 text-xs px-3 py-1.5 rounded-lg transition hover:opacity-80"
+                style={{ border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
+                {hasThirdSet ? '− Quitar 3.º set' : '+ Añadir 3.º set'}
+              </button>
+            )}
+            {decidedInTwo && !hasThirdSet && (
+              <p className="mt-2 text-xs" style={{ color: 'var(--text-muted)' }}>
+                Partido decidido en 2 sets — no hace falta un 3.º.
+              </p>
+            )}
 
             {setsError && (
               <p className="mt-3 text-sm font-semibold" style={{ color: 'var(--red)' }}>⚠ {setsError}</p>

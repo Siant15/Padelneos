@@ -37,6 +37,8 @@ export default function NavBar({ userId }: { userId: string }) {
         <div className="relative">
           <button
             onClick={() => setMenuOpen(v => !v)}
+            aria-label="Menú de gestión de la liga"
+            aria-expanded={menuOpen}
             className="w-8 h-8 rounded-full flex items-center justify-center text-sm"
             style={{ background: 'var(--tint)', color: 'var(--text-muted)' }}
           >
@@ -70,7 +72,7 @@ export default function NavBar({ userId }: { userId: string }) {
       {/* Bottom nav fija */}
       <nav
         className="fixed bottom-0 left-0 right-0 z-40 flex items-stretch"
-        style={{ background: 'var(--surface)', borderTop: '1px solid var(--tint)' }}
+        style={{ background: 'var(--surface)', borderTop: '1px solid var(--tint)', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
       >
         {NAV.map(({ href, label, icon }) => {
           const active = pathname === href || pathname.startsWith(href + '/')
@@ -78,11 +80,12 @@ export default function NavBar({ userId }: { userId: string }) {
             <Link
               key={href}
               href={href}
+              aria-current={active ? 'page' : undefined}
               className="flex flex-col items-center gap-0.5 flex-1 py-2"
-              style={{ color: active ? 'var(--accent)' : '#B0B0AA' }}
+              style={{ color: active ? 'var(--accent)' : 'var(--text-muted2)' }}
             >
               <span className="text-lg">{icon}</span>
-              <span className="text-[9px] font-bold text-center leading-tight" style={{ fontFamily: 'var(--font-body)' }}>{label}</span>
+              <span className="text-[11px] font-bold text-center leading-tight" style={{ fontFamily: 'var(--font-body)' }}>{label}</span>
             </Link>
           )
         })}
