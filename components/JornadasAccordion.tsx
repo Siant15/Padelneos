@@ -94,7 +94,7 @@ export default function JornadasAccordion({ items }: { items: JornadaViewModel[]
                     {j.isNext && (
                       <div>
                         💰 Mercado de apuestas abierto — ver pestaña{' '}
-                        <Link href="/apuestas" className="font-bold" style={{ color: 'var(--accent)' }}>Apuestas</Link>.
+                        <Link href="/liga?tab=apuestas" className="font-bold" style={{ color: 'var(--accent)' }}>Apuestas</Link>.
                       </div>
                     )}
                     <div className="flex gap-2 mt-1">

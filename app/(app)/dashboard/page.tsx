@@ -138,7 +138,7 @@ export default async function DashboardPage() {
 
         {/* CTA apuestas */}
         <Link
-          href="/apuestas"
+          href="/liga?tab=apuestas"
           className="font-heading rounded-2xl py-3.5 font-extrabold text-sm flex items-center justify-center gap-2 transition hover:opacity-90"
           style={{ background: 'var(--yellow)', color: 'var(--yellow-text)' }}
         >

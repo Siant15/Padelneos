@@ -7,10 +7,8 @@ import { useState } from 'react'
 
 const NAV = [
   { href: '/dashboard', label: 'Inicio', icon: '🏠' },
-  { href: '/jornadas', label: 'Calendario', icon: '📅' },
-  { href: '/clasificacion', label: 'Clasificación', icon: '🏆' },
-  { href: '/apuestas', label: 'Apuestas', icon: '💰' },
-  { href: '/perfil', label: 'Mi perfil', icon: '🙋' },
+  { href: '/liga', label: 'Liga', icon: '🎾', extraPrefixes: ['/apuestas', '/admin'] },
+  { href: '/perfil', label: 'Perfil', icon: '🙋' },
 ]
 
 export default function NavBar({ userId }: { userId: string }) {
@@ -74,8 +72,9 @@ export default function NavBar({ userId }: { userId: string }) {
         className="fixed bottom-0 left-0 right-0 z-40 flex items-stretch"
         style={{ background: 'var(--surface)', borderTop: '1px solid var(--tint)', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
       >
-        {NAV.map(({ href, label, icon }) => {
-          const active = pathname === href || pathname.startsWith(href + '/')
+        {NAV.map(({ href, label, icon, extraPrefixes }) => {
+          const active = pathname === href || pathname.startsWith(href + '/') ||
+            (extraPrefixes?.some(p => pathname === p || pathname.startsWith(p + '/')) ?? false)
           return (
             <Link
               key={href}

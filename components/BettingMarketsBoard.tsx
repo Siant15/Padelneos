@@ -37,7 +37,6 @@ export default function BettingMarketsBoard({ markets, userId, chipsLeft, roundS
     }
   }
 
-  const [editingAll, setEditingAll] = useState(false)
   const [chips, setChips] = useState<Record<string, number>>(originalChips)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -51,17 +50,18 @@ export default function BettingMarketsBoard({ markets, userId, chipsLeft, roundS
     const isClosedByTime = new Date(marketCloseTime(m, matchDateTime)) <= new Date()
     return roundStatus === 'scheduled' && !m.resolved && !isClosedByTime
   })
+  const editableOptionIds = new Set(editableMarkets.flatMap(m => (m.options ?? []).map(o => o.id)))
+  const hasChanges = [...editableOptionIds].some(id => (chips[id] ?? 0) !== (originalChips[id] ?? 0))
 
   function getTotalChipsOnOption(market: BettingMarket, optionId: string) {
     return market.bets?.filter(b => b.option_id === optionId).reduce((s, b) => s + b.chips, 0) ?? 0
   }
 
   async function saveAll() {
-    if (isOverBudget) return
+    if (isOverBudget || !hasChanges) return
     setSaving(true)
     setError('')
 
-    const editableOptionIds = new Set(editableMarkets.flatMap(m => (m.options ?? []).map(o => o.id)))
     const toUpsert = Object.entries(chips)
       .filter(([optionId, value]) => value > 0 && editableOptionIds.has(optionId))
       .map(([optionId, value]) => ({ market_id: optionMarketId[optionId], option_id: optionId, player_id: userId, chips: value }))
@@ -87,25 +87,14 @@ export default function BettingMarketsBoard({ markets, userId, chipsLeft, roundS
     }
 
     setSaving(false)
-    setEditingAll(false)
     router.refresh()
   }
 
   return (
     <div className="flex flex-col gap-3.5">
-      {editableMarkets.length > 0 && (
-        <button
-          onClick={() => editingAll ? saveAll() : setEditingAll(true)}
-          disabled={saving || (editingAll && isOverBudget)}
-          className="font-heading text-sm px-4 py-2.5 rounded-2xl font-bold self-end transition hover:opacity-90 disabled:opacity-40"
-          style={{ background: editingAll ? 'var(--accent)' : 'var(--tint)', color: editingAll ? '#fff' : '#555' }}
-        >
-          {saving ? 'Guardando...' : editingAll ? '✓ Guardar todas las apuestas' : '✏️ Editar todas las apuestas'}
-        </button>
-      )}
       {error && <p className="text-xs" style={{ color: 'var(--red)' }}>⚠ {error}</p>}
-      {editingAll && (
-        <p className="text-xs -mt-2" style={{ color: isOverBudget ? 'var(--red)' : 'var(--text-muted2)' }}>
+      {editableMarkets.length > 0 && (
+        <p className="text-xs" style={{ color: isOverBudget ? 'var(--red)' : 'var(--text-muted2)' }}>
           {isOverBudget ? `⚠ Te pasas por ${totalChips - chipsAvailable} fichas` : `${totalChips}/${chipsAvailable} fichas usadas en esta jornada`}
         </p>
       )}
@@ -113,7 +102,7 @@ export default function BettingMarketsBoard({ markets, userId, chipsLeft, roundS
       {markets.map(market => {
         const closeTime = marketCloseTime(market, matchDateTime)
         const isClosedByTime = new Date(closeTime) <= new Date()
-        const canBet = editingAll && roundStatus === 'scheduled' && !market.resolved && !isClosedByTime
+        const canBet = roundStatus === 'scheduled' && !market.resolved && !isClosedByTime
         const totalMarketChips = (market.options ?? []).reduce((s, o) => s + getTotalChipsOnOption(market, o.id), 0)
 
         return (
@@ -163,6 +152,7 @@ export default function BettingMarketsBoard({ markets, userId, chipsLeft, roundS
                           max={chipsAvailable}
                           value={myChips}
                           onChange={e => setChips(c => ({ ...c, [option.id]: Math.max(0, parseInt(e.target.value) || 0) }))}
+                          onFocus={e => e.target.select()}
                           className="w-[52px] text-center text-xs rounded-lg py-1 outline-none"
                           style={{ border: '1px solid var(--hairline)', color: 'var(--text)' }}
                         />
@@ -180,6 +170,17 @@ export default function BettingMarketsBoard({ markets, userId, chipsLeft, roundS
           </div>
         )
       })}
+
+      {editableMarkets.length > 0 && (
+        <button
+          onClick={saveAll}
+          disabled={saving || !hasChanges || isOverBudget}
+          className="font-heading text-sm py-3 rounded-2xl font-bold transition hover:opacity-90 disabled:opacity-40"
+          style={{ background: 'var(--accent)', color: '#fff' }}
+        >
+          {saving ? 'Guardando...' : hasChanges ? '✓ Guardar apuestas' : 'Sin cambios que guardar'}
+        </button>
+      )}
     </div>
   )
 }

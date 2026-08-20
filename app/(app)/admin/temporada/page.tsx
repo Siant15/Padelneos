@@ -99,13 +99,36 @@ export default function TemporadaPage() {
       status: 'scheduled',
     }))
 
-    const { error } = await supabase.from('rounds').insert(rows)
-    setGenerating(false)
+    const { data: newRounds, error } = await supabase.from('rounds').insert(rows).select('id, round_number')
     if (error) {
+      setGenerating(false)
       setGenerateError('No se pudieron crear las jornadas: ' + error.message)
       return
     }
 
+    // Con exactamente 4 jugadores solo hay 3 formas de repartirlos en 2
+    // parejas: se asignan rotando esas 3 combinaciones automáticamente.
+    // Se pueden cambiar después jornada a jornada si hace falta.
+    if (players.length === 4 && newRounds?.length) {
+      const p = players as Profile[]
+      const pairings = [
+        [p[0].id, p[1].id, p[2].id, p[3].id],
+        [p[0].id, p[2].id, p[1].id, p[3].id],
+        [p[0].id, p[3].id, p[1].id, p[2].id],
+      ]
+      const matchRows = newRounds.map(r => {
+        const [team1_p1_id, team1_p2_id, team2_p1_id, team2_p2_id] = pairings[(r.round_number - 1) % 3]
+        return { round_id: r.id, team1_p1_id, team1_p2_id, team2_p1_id, team2_p2_id }
+      })
+      const { error: matchesError } = await supabase.from('matches').insert(matchRows)
+      if (matchesError) {
+        setGenerating(false)
+        setGenerateError('Las jornadas se crearon, pero las parejas automáticas fallaron: ' + matchesError.message)
+        return
+      }
+    }
+
+    setGenerating(false)
     setExistingRoundNumbers(prev => [...prev, ...missing])
     setGenerateOk(true)
     setTimeout(() => setGenerateOk(false), 3000)
@@ -235,7 +258,7 @@ export default function TemporadaPage() {
                       : `🗓️ Generar ${form.min_matches - existingRoundNumbers.length} jornada(s) que faltan`}
               </button>
               <p className="text-[11px] mt-1.5" style={{ color: 'var(--text-muted)' }}>
-                Crea las jornadas con su fecha y responsable de reserva (rotando entre jugadores). Las parejas de cada partido se asignan después, jornada a jornada.
+                Crea las jornadas con fecha, responsable de reserva y parejas ya asignadas (rotando las 3 combinaciones posibles). Puedes cambiar cualquiera después, jornada a jornada.
               </p>
               {generateError && (
                 <p className="text-xs mt-1.5" style={{ color: 'var(--red)' }}>⚠ {generateError}</p>

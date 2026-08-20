@@ -130,7 +130,7 @@ export default async function EstadisticasPage() {
   return (
     <div className="px-5 pt-5 pb-6 flex flex-col gap-6">
       <div>
-        <Link href="/clasificacion" className="text-xs font-bold" style={{ color: 'var(--text-muted)' }}>← Clasificación</Link>
+        <Link href="/liga?tab=clasificacion" className="text-xs font-bold" style={{ color: 'var(--text-muted)' }}>← Clasificación</Link>
         <h1 className="font-heading text-[22px] font-extrabold mt-1">📊 Estadísticas</h1>
         <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
           Curiosidades acumuladas de cada partido: aces, dobles faltas, bolas por 3 y smash al cristal.
