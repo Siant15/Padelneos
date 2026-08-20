@@ -28,6 +28,7 @@ export default function TemporadaPage() {
     start_date: '',
     day_of_week: 3, // miércoles
     match_time: '20:00',
+    default_club: '',
     min_matches: 9,
   })
 
@@ -50,6 +51,7 @@ export default function TemporadaPage() {
             start_date: current.start_date,
             day_of_week: current.day_of_week ?? 3,
             match_time: current.match_time?.slice(0, 5) ?? '20:00',
+            default_club: current.default_club ?? '',
             min_matches: current.min_matches,
           })
           const { count } = await supabase
@@ -140,10 +142,11 @@ export default function TemporadaPage() {
     setSaveError('')
 
     const startDateChanged = !!season && season.start_date !== form.start_date
+    const payload = { ...form, default_club: form.default_club || null }
 
     const { error } = season
-      ? await supabase.from('seasons').update(form).eq('id', season.id)
-      : await supabase.from('seasons').insert({ ...form, status: 'active' })
+      ? await supabase.from('seasons').update(payload).eq('id', season.id)
+      : await supabase.from('seasons').insert({ ...payload, status: 'active' })
 
     if (error) {
       setLoading(false)
@@ -292,6 +295,13 @@ export default function TemporadaPage() {
         <Field label="Hora habitual">
           <input type="time" value={form.match_time}
             onChange={e => setForm(f => ({ ...f, match_time: e.target.value }))}
+            style={inputStyle} />
+        </Field>
+
+        <Field label="Club habitual (opcional)">
+          <input type="text" value={form.default_club}
+            onChange={e => setForm(f => ({ ...f, default_club: e.target.value }))}
+            placeholder="Ej: Club Padel Indoor"
             style={inputStyle} />
         </Field>
 

@@ -9,6 +9,8 @@ export type JornadaViewModel = {
   dateLabel: string
   timeLabel: string
   hasCustomTime: boolean
+  clubLabel: string
+  hasCustomClub: boolean
   pairALabel: string
   pairBLabel: string
   responsableName: string
@@ -71,6 +73,9 @@ export default function JornadasAccordion({ items }: { items: JornadaViewModel[]
                 style={{ borderTop: '1px dashed #EEE', color: '#555' }}
               >
                 <div>🏟️ Reserva: {j.responsableName} — {j.reservaConfirmed ? 'confirmada ✅' : 'pendiente ⏳'}</div>
+                {j.clubLabel && (
+                  <div>📍 Club: {j.clubLabel}{j.hasCustomClub && ' (especial)'}</div>
+                )}
 
                 {j.played && (
                   <>

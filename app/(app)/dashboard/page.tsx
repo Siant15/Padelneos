@@ -12,7 +12,7 @@ export default async function DashboardPage() {
 
   const { data: season } = await supabase
     .from('seasons')
-    .select('id, match_time')
+    .select('id, match_time, default_club')
     .eq('status', 'active')
     .order('created_at', { ascending: false })
     .limit(1)
@@ -45,6 +45,7 @@ export default async function DashboardPage() {
   const round = nextRound as Round | null
   const match = round?.match as { team1_p1?: { name: string }; team1_p2?: { name: string }; team2_p1?: { name: string }; team2_p2?: { name: string } } | undefined
   const effectiveTime = (round?.scheduled_time ?? season?.[0]?.match_time)?.slice(0, 5)
+  const effectiveClub = round?.club ?? season?.[0]?.default_club
 
   return (
     <div className="flex flex-col">
@@ -75,6 +76,12 @@ export default async function DashboardPage() {
                 </span>
               )}
             </div>
+
+            {effectiveClub && (
+              <div className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
+                📍 {effectiveClub}{round.club && ' (club especial)'}
+              </div>
+            )}
 
             {match && (
               <div className="flex justify-between items-center mt-2.5 rounded-[14px] px-3 py-2.5" style={{ background: 'var(--surface2)' }}>

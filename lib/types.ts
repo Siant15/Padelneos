@@ -18,6 +18,7 @@ export type Season = {
   end_date: string | null
   day_of_week: number | null
   match_time: string | null
+  default_club: string | null
   min_matches: number
   status: 'active' | 'finished'
   created_at: string
@@ -29,6 +30,7 @@ export type Round = {
   round_number: number
   scheduled_date: string
   scheduled_time: string | null
+  club: string | null
   status: 'scheduled' | 'played' | 'cancelled'
   court_booker_id: string | null
   court_confirmed: boolean

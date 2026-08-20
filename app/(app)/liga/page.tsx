@@ -27,7 +27,7 @@ export default async function LigaPage() {
     { data: biggestBet },
   ] = await Promise.all([
     supabase.auth.getUser(),
-    supabase.from('seasons').select('id, match_time').eq('status', 'active').order('created_at', { ascending: false }).limit(1).maybeSingle(),
+    supabase.from('seasons').select('id, match_time, default_club').eq('status', 'active').order('created_at', { ascending: false }).limit(1).maybeSingle(),
     supabase.from('rounds').select(`
       *,
       court_booker:profiles!court_booker_id(id, name),
@@ -89,6 +89,7 @@ export default async function LigaPage() {
     const isNext = nextRound?.id === round.id
     const played = round.status === 'played'
     const effectiveTime = (round.scheduled_time ?? activeSeasonRow?.match_time)?.slice(0, 5) ?? ''
+    const effectiveClub = round.club ?? activeSeasonRow?.default_club ?? ''
 
     let scoreLabel = ''
     if (match && match.set1_t1 !== null) {
@@ -103,6 +104,8 @@ export default async function LigaPage() {
       dateLabel: formatDate(round.scheduled_date),
       timeLabel: effectiveTime,
       hasCustomTime: !!round.scheduled_time,
+      clubLabel: effectiveClub,
+      hasCustomClub: !!round.club,
       pairALabel: match ? `${match.team1_p1?.name ?? '?'} / ${match.team1_p2?.name ?? '?'}` : 'Por confirmar',
       pairBLabel: match ? `${match.team2_p1?.name ?? '?'} / ${match.team2_p2?.name ?? '?'}` : '',
       responsableName: round.court_booker?.name ?? 'Sin asignar',
