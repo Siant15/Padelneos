@@ -55,10 +55,11 @@ export default function EditarJornadaPage() {
   const hasDuplicatePlayers = form.matchId ? new Set(pairIds).size !== pairIds.length : false
 
   const blockedPlayedWithoutResult = form.status === 'played' && !hasResult
+  const blockedRevertWithResult = hasResult && form.status !== 'played'
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (hasDuplicatePlayers || blockedPlayedWithoutResult) return
+    if (hasDuplicatePlayers || blockedPlayedWithoutResult || blockedRevertWithResult) return
     setLoading(true)
     setSaveError('')
 
@@ -119,6 +120,11 @@ export default function EditarJornadaPage() {
               ⚠ No puedes marcarla como jugada sin haber registrado el resultado del partido.
             </p>
           )}
+          {blockedRevertWithResult && (
+            <p className="text-xs mt-1" style={{ color: 'var(--red)' }}>
+              ⚠ Esta jornada ya tiene un resultado registrado, no puedes quitarle el estado &quot;Jugada&quot;.
+            </p>
+          )}
         </Field>
 
         <Field label="Responsable reserva">
@@ -131,7 +137,12 @@ export default function EditarJornadaPage() {
         {form.matchId && (
           <div className="rounded-xl p-4" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
             <p className="text-sm font-semibold mb-4">Parejas</p>
-            <div className="space-y-4">
+            {hasResult && (
+              <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>
+                🔒 Este partido ya tiene un resultado registrado. Para cambiar las parejas, borra antes el resultado.
+              </p>
+            )}
+            <fieldset disabled={hasResult} className="space-y-4">
               <div>
                 <p className="text-xs font-medium mb-2" style={{ color: 'var(--accent)' }}>Pareja 1</p>
                 <div className="grid grid-cols-2 gap-2">
@@ -171,7 +182,7 @@ export default function EditarJornadaPage() {
                   />
                 </div>
               </div>
-            </div>
+            </fieldset>
             {hasDuplicatePlayers && (
               <p className="text-xs mt-3" style={{ color: 'var(--red)' }}>
                 ⚠ Un jugador no puede estar en las dos parejas a la vez.
@@ -184,7 +195,7 @@ export default function EditarJornadaPage() {
           <p className="text-sm text-center" style={{ color: 'var(--red)' }}>⚠ {saveError}</p>
         )}
 
-        <button type="submit" disabled={loading || hasDuplicatePlayers || blockedPlayedWithoutResult}
+        <button type="submit" disabled={loading || hasDuplicatePlayers || blockedPlayedWithoutResult || blockedRevertWithResult}
           className="w-full py-3 rounded-xl font-semibold transition hover:opacity-90 disabled:opacity-40"
           style={{ background: saved ? 'var(--green)' : 'var(--accent)', color: '#fff' }}>
           {loading ? 'Guardando...' : saved ? '✓ Guardado' : 'Guardar cambios'}

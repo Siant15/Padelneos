@@ -6,11 +6,14 @@ import Link from 'next/link'
 export default async function AdminPage() {
   const supabase = await createClient()
 
-  const [{ data: seasons }, { data: rounds }, { data: players }] = await Promise.all([
+  const [{ data: seasons, error: seasonsError }, { data: rounds, error: roundsError }, { data: players, error: playersError }] = await Promise.all([
     supabase.from('seasons').select('*').eq('status', 'active').order('created_at', { ascending: false }).limit(1),
     supabase.from('rounds').select('*, match:matches(id, winner)').order('round_number').limit(20),
     supabase.from('profiles').select('*').order('created_at'),
   ])
+  if (seasonsError) console.error('admin: error al leer seasons', seasonsError)
+  if (roundsError) console.error('admin: error al leer rounds', roundsError)
+  if (playersError) console.error('admin: error al leer profiles', playersError)
   const season = seasons?.[0] as Season | undefined
 
   const playerCount = players?.length ?? 0

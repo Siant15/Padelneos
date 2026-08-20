@@ -88,6 +88,7 @@ export default function MercadosPage() {
   const [showNewForm, setShowNewForm] = useState(false)
   const [resolving, setResolving] = useState<string | null>(null)
   const [payoutError, setPayoutError] = useState('')
+  const [resolveError, setResolveError] = useState('')
   const [payoutsCalculated, setPayoutsCalculated] = useState(false)
   const [calculating, setCalculating] = useState(false)
   const [loadError, setLoadError] = useState('')
@@ -112,11 +113,12 @@ export default function MercadosPage() {
   async function resolveMarket(market: MarketWithAll, winningOptionId: string) {
     if (!confirm('¿Seguro? Una vez resuelto el mercado no se puede deshacer desde aquí.')) return
     setResolving(market.id)
+    setResolveError('')
     const { error } = await supabase.from('betting_markets').update({
       resolved: true,
       winning_option_id: winningOptionId,
     }).eq('id', market.id)
-    if (error) alert('No se pudo resolver el mercado: ' + error.message)
+    if (error) setResolveError('No se pudo resolver el mercado: ' + error.message)
     await loadData()
     setResolving(null)
   }
@@ -155,6 +157,11 @@ export default function MercadosPage() {
       {loadError && (
         <div className="rounded-xl p-3 text-xs" style={{ background: 'var(--orange-bg)', color: '#7A5A1E' }}>
           ⚠ {loadError}
+        </div>
+      )}
+      {resolveError && (
+        <div className="rounded-xl p-3 text-xs" style={{ background: 'var(--orange-bg)', color: '#7A5A1E' }}>
+          ⚠ {resolveError}
         </div>
       )}
 

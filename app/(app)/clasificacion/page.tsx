@@ -25,10 +25,10 @@ export default async function ClasificacionPage() {
 
   const [{ data: individual }, { data: pairs }, { data: betResults }] = await Promise.all([
     seasonId
-      ? supabase.from('individual_standings').select('*').eq('season_id', seasonId)
+      ? supabase.from('individual_standings').select('*').eq('season_id', seasonId).order('total_points', { ascending: false }).order('sport_points', { ascending: false })
       : Promise.resolve({ data: [] as IndividualStanding[] }),
     seasonId
-      ? supabase.from('pair_standings').select('*').eq('season_id', seasonId)
+      ? supabase.from('pair_standings').select('*').eq('season_id', seasonId).order('points', { ascending: false }).order('wins', { ascending: false })
       : Promise.resolve({ data: [] as PairStanding[] }),
     roundIds.length
       ? supabase.from('betting_round_results').select('*, player:profiles(id, name)').in('round_id', roundIds)

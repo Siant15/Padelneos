@@ -5,17 +5,37 @@ import Link from 'next/link'
 export default async function EstadisticasPage() {
   const supabase = await createClient()
 
+  const { data: season } = await supabase
+    .from('seasons')
+    .select('id')
+    .eq('status', 'active')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  const seasonId = season?.id
+
+  const { data: seasonRounds } = seasonId
+    ? await supabase.from('rounds').select('id').eq('season_id', seasonId)
+    : { data: [] as { id: string }[] }
+  const seasonRoundIds = (seasonRounds ?? []).map(r => r.id)
+
   const [{ data: stats }, { data: players }, { data: matches }] = await Promise.all([
-    supabase
-      .from('match_stats')
-      .select('*, player:profiles(id, name), match:matches(id, round:rounds(round_number))')
-      .order('created_at', { ascending: false }),
+    seasonRoundIds.length
+      ? supabase
+        .from('match_stats')
+        .select('*, player:profiles(id, name), match:matches!inner(id, round_id, round:rounds(round_number))')
+        .in('match.round_id', seasonRoundIds)
+        .order('created_at', { ascending: false })
+      : Promise.resolve({ data: [] as MatchStat[] }),
     supabase.from('profiles').select('id, name'),
-    supabase
-      .from('matches')
-      .select('winner, team1_p1_id, team1_p2_id, team2_p1_id, team2_p2_id, round:rounds(scheduled_date)')
-      .not('winner', 'is', null)
-      .order('scheduled_date', { referencedTable: 'rounds', ascending: true }),
+    seasonRoundIds.length
+      ? supabase
+        .from('matches')
+        .select('winner, team1_p1_id, team1_p2_id, team2_p1_id, team2_p2_id, round:rounds(scheduled_date)')
+        .in('round_id', seasonRoundIds)
+        .not('winner', 'is', null)
+        .order('scheduled_date', { referencedTable: 'rounds', ascending: true })
+      : Promise.resolve({ data: [] as { winner: string; team1_p1_id: string; team1_p2_id: string; team2_p1_id: string; team2_p2_id: string }[] }),
   ])
 
   // Rachas: recorremos el historial de cada jugador de más antiguo a más
@@ -69,20 +89,28 @@ export default async function EstadisticasPage() {
 
   const rows = Object.entries(totals).map(([id, t]) => ({ id, ...t }))
 
-  // Motes automáticos según quién lidera cada estadística
+  // Motes automáticos según quién lidera cada estadística. Si hay empate
+  // en el valor máximo, se corona a todos los empatados (no arbitrariamente
+  // al primero del array).
   const nicknames: Record<string, string[]> = {}
   function crownLeader(key: keyof Totals, label: string, requirePositive = true) {
     if (!rows.length) return
-    const leader = rows.reduce((a, b) => (a[key] > b[key] ? a : b))
-    if (requirePositive && leader[key] <= 0) return
-    nicknames[leader.id] = [...(nicknames[leader.id] ?? []), label]
+    const max = Math.max(...rows.map(r => r[key]))
+    if (requirePositive && max <= 0) return
+    for (const r of rows.filter(r => r[key] === max)) {
+      nicknames[r.id] = [...(nicknames[r.id] ?? []), label]
+    }
   }
   crownLeader('aces', '🎯 Rey del Ace')
   crownLeader('smash_al_cristal', '💥 El Cristalero')
   crownLeader('double_faults', '🧈 Manos de Mantequilla')
   if (rows.length > 1) {
-    const wall = rows.reduce((a, b) => (a.double_faults < b.double_faults ? a : b))
-    if (wall.double_faults === 0) nicknames[wall.id] = [...(nicknames[wall.id] ?? []), '🧱 Muro']
+    const min = Math.min(...rows.map(r => r.double_faults))
+    if (min === 0) {
+      for (const r of rows.filter(r => r.double_faults === 0)) {
+        nicknames[r.id] = [...(nicknames[r.id] ?? []), '🧱 Muro']
+      }
+    }
   }
 
   return (
@@ -166,7 +194,8 @@ export default async function EstadisticasPage() {
               { label: '🎱 Más bolas por 3', key: 'bolas_por_3' as const },
               { label: '💥 Más smash al cristal', key: 'smash_al_cristal' as const },
             ].map(({ label, key }, i) => {
-              const leader = rows.reduce((a, b) => a[key] > b[key] ? a : b)
+              const max = Math.max(...rows.map(r => r[key]))
+              const leaders = rows.filter(r => r[key] === max)
               return (
                 <div
                   key={key}
@@ -175,8 +204,8 @@ export default async function EstadisticasPage() {
                 >
                   <span className="text-sm">{label}</span>
                   <div className="text-right">
-                    <span className="font-bold text-sm">{leader.name}</span>
-                    <span className="text-xs ml-2" style={{ color: 'var(--text-muted2)' }}>({leader[key]})</span>
+                    <span className="font-bold text-sm">{leaders.map(l => l.name).join(' / ')}</span>
+                    <span className="text-xs ml-2" style={{ color: 'var(--text-muted2)' }}>({max})</span>
                   </div>
                 </div>
               )

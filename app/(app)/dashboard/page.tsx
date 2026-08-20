@@ -21,15 +21,18 @@ export default async function DashboardPage() {
 
   const [{ data: standings }, { data: nextRound }] = await Promise.all([
     seasonId
-      ? supabase.from('individual_standings').select('*').eq('season_id', seasonId)
+      ? supabase.from('individual_standings').select('*').eq('season_id', seasonId).order('total_points', { ascending: false }).order('sport_points', { ascending: false })
       : Promise.resolve({ data: [] as IndividualStanding[] }),
-    supabase
-      .from('rounds')
-      .select('*, court_booker:profiles!court_booker_id(id, name), match:matches(*, team1_p1:profiles!team1_p1_id(id, name), team1_p2:profiles!team1_p2_id(id, name), team2_p1:profiles!team2_p1_id(id, name), team2_p2:profiles!team2_p2_id(id, name))')
-      .eq('status', 'scheduled')
-      .order('scheduled_date', { ascending: true })
-      .limit(1)
-      .maybeSingle(),
+    seasonId
+      ? supabase
+        .from('rounds')
+        .select('*, court_booker:profiles!court_booker_id(id, name), match:matches(*, team1_p1:profiles!team1_p1_id(id, name), team1_p2:profiles!team1_p2_id(id, name), team2_p1:profiles!team2_p1_id(id, name), team2_p2:profiles!team2_p2_id(id, name))')
+        .eq('season_id', seasonId)
+        .eq('status', 'scheduled')
+        .order('scheduled_date', { ascending: true })
+        .limit(1)
+        .maybeSingle()
+      : Promise.resolve({ data: null as Round | null }),
   ])
 
   const allStandings = (standings as IndividualStanding[] | null) ?? []

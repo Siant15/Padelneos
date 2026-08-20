@@ -1,0 +1,12 @@
+{
+  "name": "Liga Pádel",
+  "short_name": "Liga Pádel",
+  "description": "Liga privada de pádel entre amigos",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#FAF6EF",
+  "theme_color": "#2E6FF2",
+  "icons": [
+    { "src": "/favicon.ico", "sizes": "48x48", "type": "image/x-icon" }
+  ]
+}

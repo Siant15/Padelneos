@@ -9,9 +9,10 @@ export default async function ApuestasPage() {
   // Clasificación de apuestas acumulada
   const { data: players } = await supabase.from('profiles').select('id, name')
 
-  const { data: allResults } = await supabase
+  const { data: allResults, error: resultsError } = await supabase
     .from('betting_round_results')
     .select('*, player:profiles(id, name)')
+  if (resultsError) console.error('apuestas: error al leer betting_round_results', resultsError)
 
   // Agrupar por jugador
   type BettingTotal = { player_id: string; name: string; chips_total: number; total_bonus: number; rounds: number }

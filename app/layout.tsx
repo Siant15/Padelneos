@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Baloo_2, Nunito } from 'next/font/google'
 import './globals.css'
 
@@ -19,6 +19,16 @@ const nunito = Nunito({
 export const metadata: Metadata = {
   title: 'Liga Pádel',
   description: 'Liga privada de pádel entre amigos',
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'Liga Pádel',
+  },
+}
+
+export const viewport: Viewport = {
+  themeColor: '#2E6FF2',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
