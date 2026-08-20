@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import type { Profile, Season } from '@/lib/types'
+import { getSeasonMatchDate } from '@/lib/types'
 
 export default function NuevaJornadaPage() {
   const supabase = createClient()
@@ -53,14 +54,17 @@ export default function NuevaJornadaPage() {
         setForm(f => ({ ...f, court_booker_id: nextBooker.id }))
       }
 
-      // Sugerir fecha: siguiente jornada = última fecha + 7 días, o fecha de inicio de temporada si es la primera
+      // Sugerir fecha según el calendario de la temporada (9 partidos en 12
+      // semanas: se juegan 3 semanas seguidas y se descansa 1 antes de las
+      // 3 siguientes). Si no hay fecha de inicio guardada, se usa última
+      // fecha + 7 días como respaldo.
       let suggestedDate = ''
-      if (lastRound) {
+      if (activeSeason.start_date) {
+        suggestedDate = getSeasonMatchDate(activeSeason.start_date, nextNum)
+      } else if (lastRound) {
         const d = new Date(lastRound.scheduled_date + 'T12:00:00')
         d.setDate(d.getDate() + 7)
         suggestedDate = d.toISOString().slice(0, 10)
-      } else if (activeSeason.start_date) {
-        suggestedDate = activeSeason.start_date
       }
       if (suggestedDate) setForm(f => ({ ...f, scheduled_date: suggestedDate }))
     }

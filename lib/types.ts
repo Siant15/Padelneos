@@ -170,3 +170,36 @@ export function getPairName(match: Match, team: 'team1' | 'team2'): string {
   }
   return `${match.team2_p1?.name ?? '?'} & ${match.team2_p2?.name ?? '?'}`
 }
+
+// ─── Calendario de temporada ───────────────────────────────────
+// Las ligas duran 3 meses (12 semanas) con 9 partidos, 1 por semana:
+// se juegan 3 semanas seguidas y se descansa 1, repitiendo el patrón
+// (semanas 4, 8 y 12 son descanso). Con matchIndex 1-9 devuelve en
+// qué semana (1-12) cae ese partido.
+export function getSeasonMatchWeek(matchIndex: number): number {
+  const n = matchIndex - 1
+  return Math.floor(n / 3) * 4 + (n % 3) + 1
+}
+
+export function getSeasonMatchDate(startDate: string, matchIndex: number): string {
+  const week = getSeasonMatchWeek(matchIndex)
+  const d = new Date(startDate + 'T12:00:00')
+  d.setDate(d.getDate() + (week - 1) * 7)
+  return d.toISOString().slice(0, 10)
+}
+
+export type SeasonCalendarWeek = { week: number; date: string; matchIndex: number | null }
+
+export function getSeasonCalendar(startDate: string, totalMatches = 9): SeasonCalendarWeek[] {
+  const totalWeeks = Math.ceil(totalMatches / 3) * 4
+  const matchWeeks = new Map<number, number>()
+  for (let i = 1; i <= totalMatches; i++) matchWeeks.set(getSeasonMatchWeek(i), i)
+
+  const weeks: SeasonCalendarWeek[] = []
+  for (let week = 1; week <= totalWeeks; week++) {
+    const d = new Date(startDate + 'T12:00:00')
+    d.setDate(d.getDate() + (week - 1) * 7)
+    weeks.push({ week, date: d.toISOString().slice(0, 10), matchIndex: matchWeeks.get(week) ?? null })
+  }
+  return weeks
+}

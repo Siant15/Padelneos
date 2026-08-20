@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import type { Season } from '@/lib/types'
+import { getSeasonCalendar, formatDate } from '@/lib/types'
 
 const DAYS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
 
@@ -111,6 +112,27 @@ export default function TemporadaPage() {
         <div className="rounded-xl p-4 text-sm" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
           <p className="font-semibold mb-1">📅 Progreso de la temporada</p>
           <p style={{ color: 'var(--text-muted)' }}>{playedCount} de {form.min_matches} jornadas jugadas</p>
+        </div>
+      )}
+
+      {form.start_date && form.min_matches === 9 && (
+        <div className="rounded-xl p-4 text-sm" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
+          <p className="font-semibold mb-1">🗓️ Calendario propuesto</p>
+          <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>
+            3 meses, 9 partidos: se juega 3 semanas seguidas y se descansa 1.
+          </p>
+          <div className="flex flex-col gap-1">
+            {getSeasonCalendar(form.start_date, 9).map(w => (
+              <div key={w.week} className="flex items-center justify-between py-1 text-xs" style={{ borderBottom: '1px solid var(--hairline)' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Semana {w.week} · {formatDate(w.date)}</span>
+                {w.matchIndex ? (
+                  <span className="font-bold" style={{ color: 'var(--accent)' }}>J{w.matchIndex}</span>
+                ) : (
+                  <span style={{ color: 'var(--text-muted2)' }}>Descanso</span>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
