@@ -99,11 +99,18 @@ export default function JornadasAccordion({ items }: { items: JornadaViewModel[]
                     )}
                     <div className="flex gap-2 mt-1">
                       <Link
+                        href={`/admin/jornadas/${j.id}/editar`}
+                        className="flex-1 text-center text-xs font-bold py-2 rounded-xl"
+                        style={{ background: 'var(--tint)', color: '#555' }}
+                      >
+                        ✏️ Editar
+                      </Link>
+                      <Link
                         href={`/admin/jornadas/${j.id}/resultado`}
                         className="flex-1 text-center text-xs font-bold py-2 rounded-xl"
                         style={{ background: 'var(--tint)', color: '#555' }}
                       >
-                        📝 Registrar resultado
+                        📝 Resultado
                       </Link>
                       <Link
                         href={`/admin/jornadas/${j.id}/mercados`}

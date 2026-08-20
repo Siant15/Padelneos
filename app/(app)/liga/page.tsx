@@ -1,29 +1,34 @@
 import { Suspense } from 'react'
 import { createClient } from '@/lib/supabase/server'
-import type { BettingRoundResult, IndividualStanding, PairStanding, Profile } from '@/lib/types'
+import type { IndividualStanding, PairStanding, Profile } from '@/lib/types'
 import { formatDate } from '@/lib/types'
 import LigaTabs from '@/components/LigaTabs'
 import type { JornadaViewModel } from '@/components/JornadasAccordion'
 
 const MEDALS = ['🥇', '🥈', '🥉', '4º']
 
+type BetRow = { round_id: string; player_id: string; rank: number; chips_net: number; point_bonus: number; player: { id: string; name: string } | { id: string; name: string }[] | null }
+
+function playerName(player: BetRow['player']): string | undefined {
+  const p = Array.isArray(player) ? player[0] : player
+  return p?.name
+}
+
 export default async function LigaPage() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
 
-  const { data: activeSeasonRow } = await supabase
-    .from('seasons')
-    .select('id, match_time')
-    .eq('status', 'active')
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-  const seasonId = activeSeasonRow?.id
-
-  // ─── Calendario ───────────────────────────────────────────
-  const { data: rounds } = await supabase
-    .from('rounds')
-    .select(`
+  // Wave 1: todo lo que no depende de nada más, en paralelo.
+  const [
+    { data: { user } },
+    { data: activeSeasonRow },
+    { data: rounds },
+    { data: players },
+    { data: allBetResults },
+    { data: biggestBet },
+  ] = await Promise.all([
+    supabase.auth.getUser(),
+    supabase.from('seasons').select('id, match_time').eq('status', 'active').order('created_at', { ascending: false }).limit(1).maybeSingle(),
+    supabase.from('rounds').select(`
       *,
       court_booker:profiles!court_booker_id(id, name),
       match:matches(
@@ -33,23 +38,34 @@ export default async function LigaPage() {
         team2_p1:profiles!team2_p1_id(id, name),
         team2_p2:profiles!team2_p2_id(id, name)
       )
-    `)
-    .order('scheduled_date', { ascending: true })
+    `).order('scheduled_date', { ascending: true }),
+    supabase.from('profiles').select('id, name'),
+    supabase.from('betting_round_results').select('round_id, player_id, rank, chips_net, point_bonus, player:profiles(id, name)'),
+    supabase.from('bets').select('chips, player:profiles(name), option:betting_options(id, label, market:betting_markets(winning_option_id, resolved))').order('chips', { ascending: false }).limit(1).maybeSingle(),
+  ])
 
-  const matchIds = (rounds ?? [])
-    .map(r => (r.match as { id: string } | null)?.id)
-    .filter(Boolean) as string[]
+  const seasonId = activeSeasonRow?.id
+  const matchIds = (rounds ?? []).map(r => (r.match as { id: string } | null)?.id).filter(Boolean) as string[]
   const roundIds = (rounds ?? []).map(r => r.id)
+  const roundById = new Map((rounds ?? []).map(r => [r.id, r]))
 
-  const [{ data: allStats }, { data: allBetResults }] = await Promise.all([
+  // Wave 2: depende de los ids que acabamos de sacar en la wave 1, también en paralelo.
+  const [{ data: allStats }, { data: individual }, { data: pairs }, { data: marketsByRound }] = await Promise.all([
     matchIds.length
       ? supabase.from('match_stats').select('*, player:profiles(id, name)').in('match_id', matchIds)
       : Promise.resolve({ data: [] }),
+    seasonId
+      ? supabase.from('individual_standings').select('*').eq('season_id', seasonId).order('total_points', { ascending: false }).order('sport_points', { ascending: false })
+      : Promise.resolve({ data: [] as IndividualStanding[] }),
+    seasonId
+      ? supabase.from('pair_standings').select('*').eq('season_id', seasonId).order('points', { ascending: false }).order('wins', { ascending: false })
+      : Promise.resolve({ data: [] as PairStanding[] }),
     roundIds.length
-      ? supabase.from('betting_round_results').select('*, player:profiles(id, name)').in('round_id', roundIds).order('rank')
-      : Promise.resolve({ data: [] }),
+      ? supabase.from('betting_markets').select('round_id, resolved').in('round_id', roundIds)
+      : Promise.resolve({ data: [] as { round_id: string; resolved: boolean }[] }),
   ])
 
+  // ─── Calendario ───────────────────────────────────────────
   const nextRound = (rounds ?? []).find(r => r.status !== 'played')
 
   const calendarioItems: JornadaViewModel[] = (rounds ?? []).map(round => {
@@ -66,9 +82,9 @@ export default async function LigaPage() {
         line: `${s.aces} aces · ${s.double_faults} df · ${s.bolas_por_3} bolas3 · ${s.smash_al_cristal} cristal`,
       }))
 
-    const betResults = (allBetResults ?? []).filter((b: { round_id: string }) => b.round_id === round.id)
-    const betWinner = betResults.find((b: { rank: number }) => b.rank === 1)
-    const betSecond = betResults.find((b: { rank: number }) => b.rank === 2)
+    const betResults = ((allBetResults ?? []) as BetRow[]).filter(b => b.round_id === round.id)
+    const betWinner = betResults.find(b => b.rank === 1)
+    const betSecond = betResults.find(b => b.rank === 2)
 
     const isNext = nextRound?.id === round.id
     const played = round.status === 'played'
@@ -103,29 +119,12 @@ export default async function LigaPage() {
           ? `${match.team2_p1?.name} / ${match.team2_p2?.name}`
           : '',
       stats,
-      betWinner: betWinner?.player?.name ?? '',
-      betSecond: betSecond?.player?.name ?? '',
+      betWinner: (betWinner && playerName(betWinner.player)) ?? '',
+      betSecond: (betSecond && playerName(betSecond.player)) ?? '',
     }
   })
 
   // ─── Clasificación ────────────────────────────────────────
-  const { data: seasonRoundsForResults } = seasonId
-    ? await supabase.from('rounds').select('id').eq('season_id', seasonId)
-    : { data: [] as { id: string }[] }
-  const seasonRoundIds = (seasonRoundsForResults ?? []).map(r => r.id)
-
-  const [{ data: individual }, { data: pairs }, { data: betResultsForSeason }] = await Promise.all([
-    seasonId
-      ? supabase.from('individual_standings').select('*').eq('season_id', seasonId).order('total_points', { ascending: false }).order('sport_points', { ascending: false })
-      : Promise.resolve({ data: [] as IndividualStanding[] }),
-    seasonId
-      ? supabase.from('pair_standings').select('*').eq('season_id', seasonId).order('points', { ascending: false }).order('wins', { ascending: false })
-      : Promise.resolve({ data: [] as PairStanding[] }),
-    seasonRoundIds.length
-      ? supabase.from('betting_round_results').select('*, player:profiles(id, name)').in('round_id', seasonRoundIds)
-      : Promise.resolve({ data: [] as BettingRoundResult[] }),
-  ])
-
   const individualRows = ((individual as IndividualStanding[] | null) ?? []).map((s, i) => ({
     medal: MEDALS[i] ?? `${i + 1}º`,
     name: s.name,
@@ -143,8 +142,10 @@ export default async function LigaPage() {
   }))
 
   const betTotalsForSeason: Record<string, { name: string; wins: number; pts: number }> = {}
-  for (const r of (betResultsForSeason as BettingRoundResult[] | null) ?? []) {
-    const name = (r.player as Profile)?.name ?? '?'
+  for (const r of (allBetResults ?? []) as BetRow[]) {
+    const round = roundById.get(r.round_id)
+    if (!seasonId || round?.season_id !== seasonId) continue
+    const name = playerName(r.player) ?? '?'
     if (!betTotalsForSeason[r.player_id]) betTotalsForSeason[r.player_id] = { name, wins: 0, pts: 0 }
     if (r.rank === 1) betTotalsForSeason[r.player_id].wins++
     betTotalsForSeason[r.player_id].pts += r.point_bonus
@@ -154,17 +155,11 @@ export default async function LigaPage() {
     .map((r, i) => ({ medal: MEDALS[i] ?? `${i + 1}º`, name: r.name, wins: r.wins, pts: r.pts }))
 
   // ─── Apuestas (índice) ────────────────────────────────────
-  const { data: players } = await supabase.from('profiles').select('id, name')
-
-  const { data: allResults } = await supabase
-    .from('betting_round_results')
-    .select('*, player:profiles(id, name)')
-
   type BettingTotal = { player_id: string; name: string; chips_total: number; total_bonus: number; rounds: number }
   const bettingTotals: Record<string, BettingTotal> = {}
-  for (const r of (allResults as BettingRoundResult[] | null) ?? []) {
+  for (const r of (allBetResults ?? []) as BetRow[]) {
     if (!bettingTotals[r.player_id]) {
-      bettingTotals[r.player_id] = { player_id: r.player_id, name: (r.player as Profile)?.name ?? '?', chips_total: 0, total_bonus: 0, rounds: 0 }
+      bettingTotals[r.player_id] = { player_id: r.player_id, name: playerName(r.player) ?? '?', chips_total: 0, total_bonus: 0, rounds: 0 }
     }
     bettingTotals[r.player_id].chips_total += r.chips_net
     bettingTotals[r.player_id].total_bonus += r.point_bonus
@@ -172,16 +167,16 @@ export default async function LigaPage() {
   }
   const bettingRanking = Object.values(bettingTotals).sort((a, b) => b.chips_total - a.chips_total)
 
-  const { data: resultsChrono } = await supabase
-    .from('betting_round_results')
-    .select('player_id, rank, player:profiles(id, name), round:rounds(scheduled_date)')
-    .order('scheduled_date', { referencedTable: 'round', ascending: true })
-
+  // Nostradamus: racha de jornadas seguidas quedando 1º, en orden cronológico
+  // (reutilizamos la fecha de cada jornada ya cargada, sin otra consulta).
   let nostradamus: { name: string; count: number } | null = null
   for (const p of (players as { id: string; name: string }[] | null) ?? []) {
+    const resultsForPlayer = ((allBetResults ?? []) as BetRow[])
+      .filter(r => r.player_id === p.id)
+      .map(r => ({ rank: r.rank, date: roundById.get(r.round_id)?.scheduled_date ?? '' }))
+      .sort((a, b) => a.date.localeCompare(b.date))
     let streak = 0
-    for (const r of (resultsChrono as { player_id: string; rank: number }[] | null) ?? []) {
-      if (r.player_id !== p.id) continue
+    for (const r of resultsForPlayer) {
       if (r.rank === 1) streak++
       else streak = 0
     }
@@ -190,37 +185,23 @@ export default async function LigaPage() {
     }
   }
 
-  const { data: biggestBet } = await supabase
-    .from('bets')
-    .select('chips, player:profiles(name), option:betting_options(id, label, market:betting_markets(winning_option_id, resolved))')
-    .order('chips', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-
   type BiggestBet = { chips: number; player: { name: string } | null; option: { id: string; label: string; market: { winning_option_id: string | null; resolved: boolean } | null } | null }
   const bb = biggestBet as BiggestBet | null
   const biggestBetWon = bb?.option?.market?.resolved ? bb.option.id === bb.option.market.winning_option_id : null
 
-  const { data: apuestasRounds } = await supabase
-    .from('rounds')
-    .select('id, round_number, scheduled_date, status')
-    .order('scheduled_date', { ascending: false })
-    .limit(10)
-
-  const apuestasRoundIds = (apuestasRounds ?? []).map(r => r.id)
-  const { data: marketsByRound } = apuestasRoundIds.length
-    ? await supabase.from('betting_markets').select('round_id, resolved').in('round_id', apuestasRoundIds)
-    : { data: [] as { round_id: string; resolved: boolean }[] }
-
-  const apuestasRoundsView = (apuestasRounds ?? []).map(r => {
-    const marketsForRound = (marketsByRound ?? []).filter(m => m.round_id === r.id)
-    const status = !marketsForRound.length
-      ? { label: 'Sin mercados aún', color: 'var(--text-muted2)' }
-      : marketsForRound.every(m => m.resolved)
-        ? { label: 'Resuelta', color: 'var(--green)' }
-        : { label: 'Activa', color: 'var(--orange)' }
-    return { id: r.id, roundNumber: r.round_number, statusLabel: status.label, statusColor: status.color }
-  })
+  const apuestasRoundsView = (rounds ?? [])
+    .slice()
+    .sort((a, b) => b.scheduled_date.localeCompare(a.scheduled_date))
+    .slice(0, 10)
+    .map(r => {
+      const marketsForRound = (marketsByRound ?? []).filter(m => m.round_id === r.id)
+      const status = !marketsForRound.length
+        ? { label: 'Sin mercados aún', color: 'var(--text-muted2)' }
+        : marketsForRound.every(m => m.resolved)
+          ? { label: 'Resuelta', color: 'var(--green)' }
+          : { label: 'Activa', color: 'var(--orange)' }
+      return { id: r.id, roundNumber: r.round_number, statusLabel: status.label, statusColor: status.color }
+    })
 
   return (
     <div className="px-5 pt-5 pb-6">
