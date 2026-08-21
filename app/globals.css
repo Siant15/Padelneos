@@ -1,26 +1,32 @@
 @import "tailwindcss";
 
 :root {
-  --bg: #EDEAE1;
-  --page-bg: #FDF9F0;
-  --surface: #FFFFFF;
-  --surface2: #F5F8FF;
-  --tint: #F0EFEA;
-  --border: #DCE6FF;
-  --hairline: #F0EFEA;
-  --hairline2: #F7F7F4;
-  --text: #2B2B2B;
-  --text-muted: #52525B;
-  --text-muted2: #6B7280;
-  --accent: #2E6FF2;
-  --accent-hover: #5B8CFF;
-  --green: #1E9E5A;
-  --green-bg: #DFF6E8;
+  /* Rediseño: verde como color de marca/CTA principal, naranja para
+     apuestas, fondo cálido cremoso. Ver design_handoff_liga_padel. */
+  --bg: oklch(0.93 0.006 260);
+  --page-bg: oklch(0.97 0.02 85);
+  --surface: oklch(0.995 0.004 85);
+  --surface2: oklch(0.94 0.03 155);
+  --tint: oklch(0.93 0.015 85);
+  --border: oklch(0.9 0.015 85);
+  --hairline: oklch(0.93 0.015 85);
+  --hairline2: oklch(0.96 0.01 85);
+  --text: oklch(0.25 0.02 260);
+  --text-muted: oklch(0.52 0.02 260);
+  --text-muted2: oklch(0.6 0.015 260);
+  --accent: oklch(0.42 0.1 155);
+  --accent-hover: oklch(0.35 0.1 155);
+  --green: oklch(0.42 0.1 155);
+  --green-bg: oklch(0.94 0.03 155);
   --red: #D64545;
-  --yellow: #FFC93D;
-  --yellow-text: #5A3E00;
-  --orange: #D98A1B;
-  --orange-bg: #FFF1DA;
+  --yellow: oklch(0.72 0.16 55);
+  --yellow-text: #FFFFFF;
+  --orange: oklch(0.5 0.14 55);
+  --orange-bg: oklch(0.95 0.05 55);
+  --heat-low: oklch(0.6 0.13 220);
+  --heat-mid: oklch(0.72 0.13 150);
+  --heat-high: oklch(0.75 0.15 70);
+  --heat-max: oklch(0.62 0.19 30);
 }
 
 body {

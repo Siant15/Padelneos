@@ -52,7 +52,7 @@ export default async function DashboardPage() {
       {/* Header degradado */}
       <div
         className="px-5 pt-4 pb-3 text-white"
-        style={{ background: 'linear-gradient(135deg,#2E6FF2,#5B8CFF)', borderRadius: '0 0 24px 24px' }}
+        style={{ background: 'linear-gradient(135deg, oklch(0.44 0.1 155), oklch(0.38 0.09 160))', borderRadius: '0 0 24px 24px' }}
       >
         <div className="font-heading text-[17px] font-extrabold">👋 ¡Hola!</div>
         <div className="text-xs opacity-90 mt-0.5">4 jugadores · 9 jornadas · ~4 meses</div>
@@ -63,7 +63,7 @@ export default async function DashboardPage() {
         {round ? (
           <div
             className="rounded-[20px] p-4"
-            style={{ background: 'var(--surface)', boxShadow: '0 4px 14px rgba(46,111,242,0.08)', border: '2px solid var(--border)' }}
+            style={{ background: 'var(--surface)', boxShadow: '0 4px 14px oklch(0.42 0.1 155 / 0.1)', border: '2px solid var(--border)' }}
           >
             <div className="text-[11px] font-extrabold uppercase tracking-wide" style={{ color: 'var(--accent)' }}>
               📅 Próximo partido · Jornada {round.round_number}
@@ -86,7 +86,7 @@ export default async function DashboardPage() {
             {match && (
               <div className="flex justify-between items-center mt-2.5 rounded-[14px] px-3 py-2.5" style={{ background: 'var(--surface2)' }}>
                 <span className="text-[13px] font-bold">{match.team1_p1?.name} / {match.team1_p2?.name}</span>
-                <span className="text-[11px] font-bold" style={{ color: '#9AA5B8' }}>VS</span>
+                <span className="text-[11px] font-bold" style={{ color: 'var(--text-muted2)' }}>VS</span>
                 <span className="text-[13px] font-bold">{match.team2_p1?.name} / {match.team2_p2?.name}</span>
               </div>
             )}

@@ -122,7 +122,7 @@ export default async function ApuestasPage({ params }: { params: Promise<{ round
 
       <div
         className="rounded-2xl px-3.5 py-3 text-xs"
-        style={{ background: 'var(--surface2)', color: '#3A5FC4' }}
+        style={{ background: 'var(--surface2)', color: 'oklch(0.35 0.08 155)' }}
       >
         ⚖️ Menos fichas en el resultado ganador = mayor premio. No puedes apostar en contra de ti mismo.
       </div>

@@ -13,7 +13,7 @@ interface Props {
   matchDateTime: string
 }
 
-const OPTION_COLORS = ['#2E6FF2', '#FF8A3D', '#2BB673', '#FFC93D', '#9AA5B8']
+const OPTION_COLORS = ['oklch(0.42 0.1 155)', 'oklch(0.72 0.16 55)', '#2BB673', '#FFC93D', 'oklch(0.6 0.02 260)']
 const TYPE_ICON: Record<string, string> = { yes_no: '🎾', player_choice: '🎯', quantity: '🔢' }
 
 // Si un mercado no tiene un cierre manual (closes_at), las apuestas se
@@ -139,7 +139,7 @@ export default function BettingMarketsBoard({ markets, userId, chipsLeft, roundS
                         {isWinner && '🏆 '}{option.label}
                         {isSelfNegativeBet && <span className="ml-1" style={{ color: 'var(--red)' }}>🚫</span>}
                       </span>
-                      <span style={{ color: '#9AA5B8' }}>cuota x{cuota}</span>
+                      <span style={{ color: 'var(--text-muted2)' }}>cuota x{cuota}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <div className="flex-1 h-2.5 rounded-full overflow-hidden" style={{ background: 'var(--tint)' }}>
@@ -157,7 +157,7 @@ export default function BettingMarketsBoard({ markets, userId, chipsLeft, roundS
                           style={{ border: '1px solid var(--hairline)', color: 'var(--text)' }}
                         />
                       ) : (
-                        <span className="text-[11px] w-[38px] text-right" style={{ color: '#9AA5B8' }}>{myChips}f</span>
+                        <span className="text-[11px] w-[38px] text-right" style={{ color: 'var(--text-muted2)' }}>{myChips}f</span>
                       )}
                     </div>
                     {isSelfNegativeBet && (
