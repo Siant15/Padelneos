@@ -4,6 +4,7 @@ import { formatDate } from '@/lib/types'
 import Link from 'next/link'
 import ConfirmCourtButton from '@/components/ConfirmCourtButton'
 import { getRoundBettingContext, getSeasonBettingRanking } from '@/lib/betting-queries'
+import { getCachedActiveSeason, getCachedSeasonRounds, getCachedSeasonAggregates } from '@/lib/supabase/cached'
 
 const MEDALS = ['🥇', '🥈', '🥉', '4º']
 
@@ -22,42 +23,29 @@ export default async function DashboardPage() {
   const supabase = await createClient()
   const user = await getCachedUser()
 
-  const [{ data: profile }, { data: season }] = await Promise.all([
+  const [{ data: profile }, activeSeasonRow] = await Promise.all([
     user ? supabase.from('profiles').select('name, avatar_url').eq('id', user.id).maybeSingle() : Promise.resolve({ data: null }),
-    supabase
-      .from('seasons')
-      .select('id')
-      .eq('status', 'active')
-      .order('created_at', { ascending: false })
-      .limit(1),
+    getCachedActiveSeason(),
   ])
 
-  const seasonId = season?.[0]?.id
+  const seasonId = activeSeasonRow?.id
+  // Temporada/jornadas/clasificaciones: iguales para los 4 jugadores,
+  // vienen de la caché compartida con Liga (lib/supabase/cached.ts) en
+  // vez de pedirse de cero en cada navegación entre pestañas.
+  const rounds = seasonId ? await getCachedSeasonRounds(seasonId) : []
+  const matchIds = rounds.map(r => (r.match as { id: string } | null)?.id).filter(Boolean) as string[]
+  const roundIds = rounds.map(r => r.id)
 
-  const [{ data: standings }, { data: nextRound }, { data: topPairData }, { data: seasonRoundDates }, seasonRankingEarly] = await Promise.all([
-    seasonId
-      ? supabase.from('individual_standings').select('*').eq('season_id', seasonId).order('total_points', { ascending: false }).order('sport_points', { ascending: false })
-      : Promise.resolve({ data: [] as IndividualStanding[] }),
-    seasonId
-      ? supabase
-        .from('rounds')
-        .select('*, court_booker:profiles!court_booker_id(id, name), match:matches(*, team1_p1:profiles!team1_p1_id(id, name), team1_p2:profiles!team1_p2_id(id, name), team2_p1:profiles!team2_p1_id(id, name), team2_p2:profiles!team2_p2_id(id, name))')
-        .eq('season_id', seasonId)
-        .eq('status', 'scheduled')
-        .order('round_number', { ascending: true })
-        .limit(1)
-        .maybeSingle()
-      : Promise.resolve({ data: null as Round | null }),
-    seasonId
-      ? supabase.from('pair_standings').select('*').eq('season_id', seasonId).order('points', { ascending: false }).order('wins', { ascending: false }).limit(1).maybeSingle()
-      : Promise.resolve({ data: null as PairStanding | null }),
-    seasonId
-      ? supabase.from('rounds').select('scheduled_date').eq('season_id', seasonId).neq('status', 'played').order('round_number', { ascending: true })
-      : Promise.resolve({ data: [] as { scheduled_date: string | null }[] }),
+  const [{ individual, pairs }, seasonRankingEarly] = await Promise.all([
+    seasonId ? getCachedSeasonAggregates(seasonId, matchIds, roundIds) : Promise.resolve({ individual: [], pairs: [] }),
     seasonId ? getSeasonBettingRanking(supabase, seasonId) : Promise.resolve([]),
   ])
 
-  const allStandings = (standings as IndividualStanding[] | null) ?? []
+  const nextRound = (rounds.find(r => r.status === 'scheduled') as Round | undefined) ?? null
+  const topPairData = (pairs as PairStanding[])[0] ?? null
+  const seasonRoundDates = rounds.filter(r => r.status !== 'played').map(r => ({ scheduled_date: r.scheduled_date }))
+
+  const allStandings = (individual as IndividualStanding[] | null) ?? []
   const topIndividual = allStandings.slice(0, 4)
   const topPair = (topPairData as PairStanding | null)?.matches_played ? (topPairData as PairStanding) : null
   const round = nextRound as Round | null
@@ -179,7 +167,7 @@ export default async function DashboardPage() {
               </Link>
             </div>
           </div>
-        ) : !season?.length ? (
+        ) : !seasonId ? (
           <Link
             href="/liga"
             className="block rounded-[20px] p-4 text-center transition hover:opacity-90"

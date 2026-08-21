@@ -5,6 +5,7 @@ import { formatDate, getJornadaReservaStatus } from '@/lib/types'
 import LigaTabs from '@/components/LigaTabs'
 import type { JornadaViewModel } from '@/components/JornadasAccordion'
 import { getRoundActa, getRoundBettingContext } from '@/lib/betting-queries'
+import { getCachedActiveSeason, getCachedPlayers, getCachedSeasonRounds, getCachedSeasonAggregates } from '@/lib/supabase/cached'
 import type { ApuestasRoundEntry } from '@/components/ApuestasTab'
 
 const MEDALS = ['🥇', '🥈', '🥉', '4º']
@@ -21,57 +22,23 @@ export default async function LigaPage() {
   const user = await getCachedUser()
   const userId = user?.id ?? ''
 
-  // Wave 1: todo lo que no depende de nada más, en paralelo. El Calendario
-  // solo debe mostrar las jornadas de la temporada ACTIVA (antes se
-  // pedían todas las rounds sin filtrar, así que si quedaba alguna
-  // jornada de una temporada anterior en la BD, aparecía mezclada y
-  // nunca se actualizaba al editar la temporada actual).
-  const [
-    { data: activeSeasonRow },
-    { data: players },
-    { data: allBetResults },
-  ] = await Promise.all([
-    supabase.from('seasons').select('id, name, min_matches').eq('status', 'active').order('created_at', { ascending: false }).limit(1).maybeSingle(),
-    supabase.from('profiles').select('id, name'),
-    supabase.from('betting_round_results').select('round_id, player_id, rank, chips_net, point_bonus, player:profiles(id, name)'),
+  // Temporada activa, jugadores y jornadas: iguales para los 4 jugadores,
+  // así que vienen de la caché de lib/supabase/cached.ts (unos segundos de
+  // margen) en vez de pedirse de cero en cada navegación entre pestañas.
+  const [activeSeasonRow, players] = await Promise.all([
+    getCachedActiveSeason(),
+    getCachedPlayers(),
   ])
 
   const seasonId = activeSeasonRow?.id
-
-  const { data: rounds } = await supabase.from('rounds').select(`
-      *,
-      court_booker:profiles!court_booker_id(id, name),
-      match:matches(
-        id, winner, set1_t1, set1_t2, set2_t1, set2_t2, set3_t1, set3_t2,
-        team1_p1:profiles!team1_p1_id(id, name),
-        team1_p2:profiles!team1_p2_id(id, name),
-        team2_p1:profiles!team2_p1_id(id, name),
-        team2_p2:profiles!team2_p2_id(id, name)
-      )
-    `).eq('season_id', seasonId ?? '00000000-0000-0000-0000-000000000000').order('round_number', { ascending: true })
+  const rounds = seasonId ? await getCachedSeasonRounds(seasonId) : []
 
   const matchIds = (rounds ?? []).map(r => (r.match as { id: string } | null)?.id).filter(Boolean) as string[]
   const roundIds = (rounds ?? []).map(r => r.id)
 
-  // Wave 2: depende de los ids que acabamos de sacar en la wave 1, también en paralelo
-  // (incluye round_settlements, que antes se pedía suelta después de esta tanda).
-  const [{ data: allStats }, { data: individual }, { data: pairs }, { data: marketsByRound }, { data: settlements }] = await Promise.all([
-    matchIds.length
-      ? supabase.from('match_stats').select('*, player:profiles(id, name)').in('match_id', matchIds)
-      : Promise.resolve({ data: [] }),
-    seasonId
-      ? supabase.from('individual_standings').select('*').eq('season_id', seasonId).order('total_points', { ascending: false }).order('sport_points', { ascending: false })
-      : Promise.resolve({ data: [] as IndividualStanding[] }),
-    seasonId
-      ? supabase.from('pair_standings').select('*').eq('season_id', seasonId).order('points', { ascending: false }).order('wins', { ascending: false })
-      : Promise.resolve({ data: [] as PairStanding[] }),
-    roundIds.length
-      ? supabase.from('betting_markets').select('round_id, resolved').in('round_id', roundIds)
-      : Promise.resolve({ data: [] as { round_id: string; resolved: boolean }[] }),
-    roundIds.length
-      ? supabase.from('round_settlements').select('round_id').is('voided_at', null).in('round_id', roundIds)
-      : Promise.resolve({ data: [] as { round_id: string }[] }),
-  ])
+  const { allStats, individual, pairs, marketsByRound, settlements, allBetResults } = seasonId
+    ? await getCachedSeasonAggregates(seasonId, matchIds, roundIds)
+    : { allStats: [], individual: [], pairs: [], marketsByRound: [], settlements: [], allBetResults: [] }
 
   // ─── Calendario ───────────────────────────────────────────
   const nextRound = (rounds ?? []).find(r => r.status !== 'played')
