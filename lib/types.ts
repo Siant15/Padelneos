@@ -184,6 +184,65 @@ export type PairStanding = {
   points: number
 }
 
+// Riesgo de acabar 3º/4º (quien paga la cena al terminar la liga): en
+// vez de un % fijo por puesto actual, se simulan TODAS las combinaciones
+// de resultados de las jornadas que quedan (ya se conocen las parejas de
+// cada una) y se cuenta en cuántas cada jugador termina en el fondo de
+// la tabla. Misma regla de puntos que individual_standings (victoria=2,
+// derrota=0 por jugador; el bonus de apuestas ya acumulado se mantiene
+// fijo, porque las apuestas futuras no se pueden predecir) — para que la
+// simulación no contradiga la clasificación real que ya se muestra.
+export type DinnerRiskTier = { level: 1 | 2 | 3 | 4; label: string; emoji: string; colorVar: string; probability: number }
+
+export const DINNER_RISK_TIERS: Omit<DinnerRiskTier, 'probability'>[] = [
+  { level: 1, label: 'Tranquilo', emoji: '😌', colorVar: 'var(--heat-low)' },
+  { level: 2, label: 'Vigilando', emoji: '👀', colorVar: 'var(--heat-mid)' },
+  { level: 3, label: 'En peligro', emoji: '😬', colorVar: 'var(--heat-high)' },
+  { level: 4, label: 'Va a pagar la cena', emoji: '🍽️', colorVar: 'var(--heat-max)' },
+]
+
+function dinnerRiskTierFor(probability: number): DinnerRiskTier {
+  const tier = probability < 0.15 ? DINNER_RISK_TIERS[0]
+    : probability < 0.4 ? DINNER_RISK_TIERS[1]
+    : probability < 0.65 ? DINNER_RISK_TIERS[2]
+    : DINNER_RISK_TIERS[3]
+  return { ...tier, probability }
+}
+
+export function estimateDinnerRisk(
+  players: { id: string; sportPoints: number; bettingBonus: number }[],
+  remainingPairings: { pair1: [string, string]; pair2: [string, string] }[]
+): Record<string, DinnerRiskTier> {
+  // Tope defensivo: 2^n combinaciones se vuelve inviable con muchas
+  // jornadas por jugar. No pasa en esta liga (9-12 jornadas de por sí),
+  // pero si alguna vez hubiera más, se simulan solo las siguientes 20.
+  const n = Math.min(remainingPairings.length, 20)
+  const totalCombos = 2 ** n
+  const bottomCount: Record<string, number> = {}
+  for (const p of players) bottomCount[p.id] = 0
+
+  for (let mask = 0; mask < totalCombos; mask++) {
+    const sport: Record<string, number> = {}
+    for (const p of players) sport[p.id] = p.sportPoints
+
+    for (let i = 0; i < n; i++) {
+      const { pair1, pair2 } = remainingPairings[i]
+      const pair1Wins = ((mask >> i) & 1) === 0
+      for (const id of pair1Wins ? pair1 : pair2) sport[id] = (sport[id] ?? 0) + 2
+    }
+
+    const ranked = players
+      .map(p => ({ id: p.id, total: sport[p.id] + p.bettingBonus, sport: sport[p.id] }))
+      .sort((a, b) => b.total - a.total || b.sport - a.sport || a.id.localeCompare(b.id))
+
+    for (const bottom of ranked.slice(2)) bottomCount[bottom.id]++
+  }
+
+  const result: Record<string, DinnerRiskTier> = {}
+  for (const p of players) result[p.id] = dinnerRiskTierFor(bottomCount[p.id] / totalCombos)
+  return result
+}
+
 export const DAYS_ES = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
 
 export function formatDate(dateStr: string): string {

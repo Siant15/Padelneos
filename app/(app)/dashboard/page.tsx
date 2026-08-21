@@ -1,23 +1,13 @@
 import { createClient, getCachedUser } from '@/lib/supabase/server'
 import type { IndividualStanding, PairStanding, Round } from '@/lib/types'
-import { formatDate } from '@/lib/types'
+import { formatDate, estimateDinnerRisk } from '@/lib/types'
 import Link from 'next/link'
 import ConfirmCourtButton from '@/components/ConfirmCourtButton'
+import DinnerRiskInfo from '@/components/DinnerRiskInfo'
 import { getRoundBettingContext, getSeasonBettingRanking } from '@/lib/betting-queries'
 import { getCachedActiveSeason, getCachedSeasonRounds, getCachedSeasonAggregates } from '@/lib/supabase/cached'
 
 const MEDALS = ['🥇', '🥈', '🥉', '4º']
-
-// Riesgo de cena por posición: cuanto más abajo en la clasificación,
-// más alto el % (y el color pasa de azul a rojo).
-// Los 4 puestos suman 100% entre todos.
-const HEAT_BY_RANK = [10, 20, 30, 40]
-function heatColor(heat: number): string {
-  if (heat <= 10) return 'var(--heat-low)'
-  if (heat <= 20) return 'var(--heat-mid)'
-  if (heat <= 30) return 'var(--heat-high)'
-  return 'var(--heat-max)'
-}
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -47,6 +37,23 @@ export default async function DashboardPage() {
 
   const allStandings = (individual as IndividualStanding[] | null) ?? []
   const topIndividual = allStandings.slice(0, 4)
+
+  // Riesgo de cena: se simulan todas las combinaciones de resultados de
+  // las jornadas que quedan (las parejas de cada una ya están fijadas de
+  // antemano, así que no hay que adivinarlas).
+  const remainingPairings = rounds
+    .filter(r => r.status === 'scheduled')
+    .map(r => {
+      const m = r.match as { team1_p1?: { id: string }; team1_p2?: { id: string }; team2_p1?: { id: string }; team2_p2?: { id: string } } | null
+      if (!m?.team1_p1?.id || !m.team1_p2?.id || !m.team2_p1?.id || !m.team2_p2?.id) return null
+      return { pair1: [m.team1_p1.id, m.team1_p2.id] as [string, string], pair2: [m.team2_p1.id, m.team2_p2.id] as [string, string] }
+    })
+    .filter((x): x is { pair1: [string, string]; pair2: [string, string] } => !!x)
+
+  const dinnerRisk = estimateDinnerRisk(
+    allStandings.map(s => ({ id: s.player_id, sportPoints: s.sport_points, bettingBonus: s.betting_bonus })),
+    remainingPairings
+  )
   const topPair = (topPairData as PairStanding | null)?.matches_played ? (topPairData as PairStanding) : null
   const round = nextRound as Round | null
   const match = round?.match as { team1_p1?: { name: string }; team1_p2?: { name: string }; team2_p1?: { name: string }; team2_p2?: { name: string } } | undefined
@@ -209,16 +216,21 @@ export default async function DashboardPage() {
 
         {/* Clasificación individual top 4 */}
         <div>
-          <div className="font-heading text-sm font-bold mb-2">🏆 Clasificación individual</div>
+          <Link href="/liga?tab=clasificacion" className="font-heading text-sm font-bold mb-2 flex items-center gap-1 hover:opacity-80">
+            🏆 Clasificación individual <span style={{ color: 'var(--text-muted2)' }}>→</span>
+          </Link>
           <div className="rounded-[18px] px-3.5" style={{ background: 'var(--surface)', boxShadow: '0 4px 14px rgba(0,0,0,0.04)' }}>
             {!!topIndividual.length && (
               <div className="flex justify-between items-center pt-2" style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--text-muted2)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                 <span>Jugador</span>
-                <span className="flex gap-4"><span>Pts</span><span>🌡️ Cena</span></span>
+                <span className="flex items-center gap-4">
+                  <span>Pts</span>
+                  <span className="flex items-center gap-1">🌡️ Cena <DinnerRiskInfo /></span>
+                </span>
               </div>
             )}
             {topIndividual.map((row, i) => {
-              const heat = HEAT_BY_RANK[i] ?? HEAT_BY_RANK[HEAT_BY_RANK.length - 1]
+              const risk = dinnerRisk[row.player_id]
               return (
                 <div
                   key={row.player_id}
@@ -228,13 +240,16 @@ export default async function DashboardPage() {
                   <span className="text-[13px] font-bold">{MEDALS[i]} {row.name}</span>
                   <div className="flex items-center gap-4">
                     <span className="text-[13px] font-extrabold w-6 text-right" style={{ color: 'var(--accent)' }}>{row.total_points}</span>
-                    <span
-                      className="flex items-center justify-center w-[34px] h-[26px] rounded-full text-white font-extrabold text-[10.5px]"
-                      style={{ background: heatColor(heat) }}
-                      title="Riesgo de pagar la cena"
-                    >
-                      {heat}%
-                    </span>
+                    {risk && (
+                      <span
+                        className="flex items-center justify-center w-[34px] h-[26px] rounded-full text-[14px]"
+                        style={{ background: risk.colorVar }}
+                        title={risk.label}
+                        aria-label={`Riesgo de pagar la cena: ${risk.label}`}
+                      >
+                        {risk.emoji}
+                      </span>
+                    )}
                   </div>
                 </div>
               )
