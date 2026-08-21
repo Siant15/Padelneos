@@ -20,6 +20,40 @@ export default function PerfilPage() {
     preferred_side: '',
   })
 
+  const [userId, setUserId] = useState('')
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+  const [uploadingAvatar, setUploadingAvatar] = useState(false)
+  const [avatarError, setAvatarError] = useState('')
+
+  async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file || !userId) return
+    setUploadingAvatar(true)
+    setAvatarError('')
+
+    const ext = file.name.split('.').pop() || 'jpg'
+    const path = `${userId}/avatar.${ext}`
+
+    const { error: uploadError } = await supabase.storage.from('avatars').upload(path, file, { upsert: true })
+    if (uploadError) {
+      setAvatarError('No se pudo subir la foto: ' + uploadError.message)
+      setUploadingAvatar(false)
+      return
+    }
+
+    const { data: pub } = supabase.storage.from('avatars').getPublicUrl(path)
+    const url = `${pub.publicUrl}?t=${Date.now()}`
+
+    const { error: updateError } = await supabase.from('profiles').update({ avatar_url: url }).eq('id', userId)
+    setUploadingAvatar(false)
+    if (updateError) {
+      setAvatarError('Foto subida, pero no se pudo guardar: ' + updateError.message)
+      return
+    }
+    setAvatarUrl(url)
+    router.refresh()
+  }
+
   const [newPassword, setNewPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [passwordSaving, setPasswordSaving] = useState(false)
@@ -53,6 +87,7 @@ export default function PerfilPage() {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
+      setUserId(user.id)
       const { data } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle()
       if (data) {
         setForm({
@@ -61,6 +96,7 @@ export default function PerfilPage() {
           dominant_hand: data.dominant_hand ?? '',
           preferred_side: data.preferred_side ?? '',
         })
+        setAvatarUrl(data.avatar_url ?? null)
       } else {
         // No debería faltar (se crea al registrarse), pero por si acaso
         // precargamos el nombre desde el email para no dejar el campo vacío.
@@ -104,6 +140,26 @@ export default function PerfilPage() {
   return (
     <div className="px-5 pt-5 pb-6">
       <h1 className="font-heading text-[22px] font-extrabold mb-4">🙋 Mi perfil</h1>
+
+      <div className="flex flex-col items-center mb-5">
+        <label className="relative cursor-pointer">
+          <input type="file" accept="image/*" onChange={handleAvatarChange} className="hidden" disabled={uploadingAvatar} />
+          {avatarUrl ? (
+            <img src={avatarUrl} alt="Foto de perfil" className="w-21 h-21 rounded-full object-cover" style={{ width: 84, height: 84, border: '2px solid var(--border)' }} />
+          ) : (
+            <div
+              className="flex items-center justify-center rounded-full font-heading font-extrabold text-2xl"
+              style={{ width: 84, height: 84, background: 'var(--surface2)', color: 'var(--accent)', border: '2px solid var(--border)' }}
+            >
+              {form.name.slice(0, 2).toUpperCase() || '🎾'}
+            </div>
+          )}
+        </label>
+        <span className="text-xs font-bold mt-2" style={{ color: 'var(--accent)' }}>
+          {uploadingAvatar ? 'Subiendo...' : '📷 Cambiar foto'}
+        </span>
+        {avatarError && <p className="text-xs mt-1" style={{ color: 'var(--red)' }}>⚠ {avatarError}</p>}
+      </div>
 
       <form
         onSubmit={handleSubmit}

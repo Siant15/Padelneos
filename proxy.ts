@@ -8,7 +8,7 @@ function buildCsp(nonce: string) {
     "default-src 'self'",
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`,
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data:",
+    `img-src 'self' data: ${supabaseOrigin}`,
     "font-src 'self'",
     `connect-src 'self' ${supabaseOrigin} wss://ghxwjbwvgestdvhjqqsl.supabase.co`,
     "object-src 'none'",

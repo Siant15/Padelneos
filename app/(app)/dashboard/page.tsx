@@ -21,7 +21,7 @@ export default async function DashboardPage() {
   const { data: { user } } = await supabase.auth.getUser()
 
   const [{ data: profile }, { data: season }] = await Promise.all([
-    user ? supabase.from('profiles').select('name').eq('id', user.id).maybeSingle() : Promise.resolve({ data: null }),
+    user ? supabase.from('profiles').select('name, avatar_url').eq('id', user.id).maybeSingle() : Promise.resolve({ data: null }),
     supabase
       .from('seasons')
       .select('id, match_time, default_club')
@@ -74,21 +74,32 @@ export default async function DashboardPage() {
     <div className="flex flex-col">
       {/* Header degradado */}
       <div
-        className="px-5 pt-4 pb-3 text-white"
+        className="px-5 pt-4 pb-3 text-white flex items-center gap-4"
         style={{ background: 'linear-gradient(135deg, oklch(0.44 0.1 155), oklch(0.38 0.09 160))', borderRadius: '0 0 24px 24px' }}
       >
-        <div className="font-heading text-[17px] font-extrabold">👋 ¡Hola{profile?.name ? ` ${profile.name}` : ''}!</div>
-        {seasonId && (
-          <div className="flex gap-2 flex-wrap mt-2.5">
-            <span className="text-xs font-bold px-3 py-1.5 rounded-full" style={{ background: 'rgba(255,255,255,0.18)' }}>
-              ⏳ Quedan {remainingJornadas} jornada{remainingJornadas === 1 ? '' : 's'}
-            </span>
-            {remainingMonths > 0 && (
+        <div className="flex-1">
+          <div className="font-heading text-[17px] font-extrabold">👋 ¡Hola{profile?.name ? ` ${profile.name}` : ''}!</div>
+          {seasonId && (
+            <div className="flex gap-2 flex-wrap mt-2.5">
               <span className="text-xs font-bold px-3 py-1.5 rounded-full" style={{ background: 'rgba(255,255,255,0.18)' }}>
-                📆 ~{remainingMonths} mes{remainingMonths === 1 ? '' : 'es'} para terminar
+                ⏳ Quedan {remainingJornadas} jornada{remainingJornadas === 1 ? '' : 's'}
               </span>
-            )}
-          </div>
+              {remainingMonths > 0 && (
+                <span className="text-xs font-bold px-3 py-1.5 rounded-full" style={{ background: 'rgba(255,255,255,0.18)' }}>
+                  📆 ~{remainingMonths} mes{remainingMonths === 1 ? '' : 'es'} para terminar
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+        {profile?.avatar_url && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={profile.avatar_url}
+            alt=""
+            className="rounded-lg object-cover shrink-0"
+            style={{ width: 56, height: 72 }}
+          />
         )}
       </div>
 
