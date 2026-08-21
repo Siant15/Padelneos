@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { type JornadaViewModel } from '@/components/JornadasAccordion'
 import ClasificacionTabs from '@/components/ClasificacionTabs'
@@ -12,8 +12,7 @@ type ActiveSeasonInfo = { id: string; name: string; minMatches: number }
 
 type IndividualRow = { medal: string; name: string; pj: number; pg: number; pe: number; pp: number; apuestas: number; total: number }
 type PairRow = { name: string; pj: number; pg: number; pe: number; pp: number; pts: number }
-type ApuestasRankRow = { medal: string; name: string; wins: number; pts: number }
-type BettingTotalRow = { player_id: string; name: string; chips_total: number; total_bonus: number; rounds: number }
+type ApuestasMatrixRow = { name: string; cells: (number | null)[]; total: number }
 type BiggestBetView = { playerName: string; chips: number; optionLabel: string; won: boolean | null }
 type ApuestasRoundRow = { id: string; roundNumber: number; statusLabel: string; statusColor: string }
 type ApuestasHistoricalSeason = { seasonId: string; seasonName: string; rounds: ApuestasRoundRow[] }
@@ -33,13 +32,12 @@ export default function LigaTabs({
   isLeagueComplete,
   clasificacionIndividual,
   clasificacionParejas,
-  clasificacionApuestas,
-  apuestasRanking,
+  clasificacionApuestasMatrix,
+  clasificacionApuestasRoundLabels,
   apuestasNostradamus,
   apuestasBiggestBet,
   apuestasRounds,
   apuestasHistoricalSeasons,
-  currentUserId,
 }: {
   activeSeason: ActiveSeasonInfo | null
   players: PlayerLite[]
@@ -47,13 +45,12 @@ export default function LigaTabs({
   isLeagueComplete: boolean
   clasificacionIndividual: IndividualRow[]
   clasificacionParejas: PairRow[]
-  clasificacionApuestas: ApuestasRankRow[]
-  apuestasRanking: BettingTotalRow[]
+  clasificacionApuestasMatrix: ApuestasMatrixRow[]
+  clasificacionApuestasRoundLabels: string[]
   apuestasNostradamus: { name: string; count: number } | null
   apuestasBiggestBet: BiggestBetView | null
   apuestasRounds: ApuestasRoundRow[]
   apuestasHistoricalSeasons: ApuestasHistoricalSeason[]
-  currentUserId: string
 }) {
   const searchParams = useSearchParams()
   const initial = searchParams.get('tab') as Section | null
@@ -88,7 +85,12 @@ export default function LigaTabs({
 
       {section === 'clasificacion' && (
         <>
-          <ClasificacionTabs individual={clasificacionIndividual} parejas={clasificacionParejas} apuestas={clasificacionApuestas} />
+          <ClasificacionTabs
+            individual={clasificacionIndividual}
+            parejas={clasificacionParejas}
+            apuestasMatrix={clasificacionApuestasMatrix}
+            apuestasRoundLabels={clasificacionApuestasRoundLabels}
+          />
           <Link
             href="/estadisticas"
             className="flex items-center justify-between rounded-2xl px-4 py-3.5 transition hover:opacity-90"
@@ -126,41 +128,6 @@ export default function LigaTabs({
           )}
 
           <section>
-            <h2 className="font-heading text-sm font-bold mb-2.5">Ranking de apostadores</h2>
-            <div className="rounded-2xl px-3.5" style={{ background: 'var(--surface)', boxShadow: '0 3px 10px rgba(0,0,0,0.04)' }}>
-              {apuestasRanking.length === 0 ? (
-                <div className="py-8 text-center text-sm" style={{ color: 'var(--text-muted)' }}>
-                  Todavía nadie ha hecho fortuna (ni se ha arruinado) apostando
-                </div>
-              ) : (
-                apuestasRanking.map((r, i) => (
-                  <div
-                    key={r.player_id}
-                    className="flex items-center justify-between py-2.5"
-                    style={{ borderBottom: i < apuestasRanking.length - 1 ? '1px solid var(--hairline)' : undefined }}
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <span className="font-bold w-5 text-center text-sm" style={{ color: i === 0 ? 'var(--yellow)' : 'var(--text-muted2)' }}>
-                        {i + 1}
-                      </span>
-                      <span className="text-[13px] font-bold">{r.name}</span>
-                      {r.player_id === currentUserId && (
-                        <span className="text-xs" style={{ color: 'var(--accent)' }}>(tú)</span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-3 text-xs">
-                      <span style={{ color: r.chips_total >= 0 ? 'var(--green)' : 'var(--red)' }}>
-                        {r.chips_total >= 0 ? '+' : ''}{r.chips_total}🎰
-                      </span>
-                      <span className="font-bold" style={{ color: 'var(--accent)' }}>+{r.total_bonus}pt</span>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </section>
-
-          <section>
             <h2 className="font-heading text-sm font-bold mb-2.5">Por jornada</h2>
             {!apuestasRounds.length ? (
               <div className="rounded-2xl p-4 text-sm" style={{ background: 'var(--surface)', color: 'var(--text-muted)', boxShadow: '0 3px 10px rgba(0,0,0,0.04)' }}>
@@ -169,26 +136,7 @@ export default function LigaTabs({
                 Ve a la pestaña <Link href="/liga?tab=calendario" className="font-bold" style={{ color: 'var(--accent)' }}>Calendario</Link> para crear la liga.
               </div>
             ) : (
-              <>
-                <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
-                  {apuestasRounds
-                    .slice()
-                    .sort((a, b) => a.roundNumber - b.roundNumber)
-                    .map(r => (
-                      <Link
-                        key={r.id}
-                        href={`/apuestas/${r.id}`}
-                        className="shrink-0 rounded-xl px-3.5 py-2 font-bold text-[13px] transition hover:opacity-90"
-                        style={{ background: 'var(--surface)', border: `1px solid ${r.statusColor}`, color: r.statusColor }}
-                      >
-                        J{r.roundNumber}
-                      </Link>
-                    ))}
-                </div>
-                <p className="text-[11px] mt-1.5" style={{ color: 'var(--text-muted)' }}>
-                  Toca una jornada para ver o hacer tus apuestas.
-                </p>
-              </>
+              <RoundJumper rounds={apuestasRounds} />
             )}
           </section>
 
@@ -201,6 +149,57 @@ export default function LigaTabs({
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// Navegador rápido de jornadas: desplegable (salta directo) + botones
+// anterior/siguiente, en vez de una fila de chips que hay que arrastrar
+// una a una.
+function RoundJumper({ rounds }: { rounds: ApuestasRoundRow[] }) {
+  const router = useRouter()
+  const sorted = [...rounds].sort((a, b) => a.roundNumber - b.roundNumber)
+  const [selectedId, setSelectedId] = useState(sorted[0]?.id ?? '')
+  const index = sorted.findIndex(r => r.id === selectedId)
+  const current = index === -1 ? sorted[0] : sorted[index]
+
+  function go(id: string) {
+    setSelectedId(id)
+    router.push(`/apuestas/${id}`)
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <button
+        type="button"
+        onClick={() => index > 0 && go(sorted[index - 1].id)}
+        disabled={index <= 0}
+        className="w-9 h-9 shrink-0 rounded-xl font-bold disabled:opacity-30"
+        style={{ background: 'var(--tint)', color: '#555' }}
+        aria-label="Jornada anterior"
+      >
+        ‹
+      </button>
+      <select
+        value={current?.id ?? ''}
+        onChange={e => go(e.target.value)}
+        className="flex-1 text-sm font-bold rounded-xl px-3 py-2.5 outline-none"
+        style={{ background: 'var(--surface)', border: `1px solid ${current?.statusColor ?? 'var(--border)'}`, color: current?.statusColor ?? 'var(--text)' }}
+      >
+        {sorted.map(r => (
+          <option key={r.id} value={r.id}>J{r.roundNumber} · {r.statusLabel}</option>
+        ))}
+      </select>
+      <button
+        type="button"
+        onClick={() => index < sorted.length - 1 && go(sorted[index + 1].id)}
+        disabled={index === -1 || index >= sorted.length - 1}
+        className="w-9 h-9 shrink-0 rounded-xl font-bold disabled:opacity-30"
+        style={{ background: 'var(--tint)', color: '#555' }}
+        aria-label="Jornada siguiente"
+      >
+        ›
+      </button>
     </div>
   )
 }

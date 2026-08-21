@@ -4,7 +4,7 @@ import { useState } from 'react'
 
 type IndividualRow = { medal: string; name: string; pj: number; pg: number; pe: number; pp: number; apuestas: number; total: number }
 type PairRow = { name: string; pj: number; pg: number; pe: number; pp: number; pts: number }
-type ApuestasRow = { medal: string; name: string; wins: number; pts: number }
+type ApuestasMatrixRow = { name: string; cells: (number | null)[]; total: number }
 
 const SEGMENTS = [
   { key: 'individual', label: '🏅 Individual' },
@@ -14,10 +14,11 @@ const SEGMENTS = [
 
 type Segment = typeof SEGMENTS[number]['key']
 
-export default function ClasificacionTabs({ individual, parejas, apuestas }: {
+export default function ClasificacionTabs({ individual, parejas, apuestasMatrix, apuestasRoundLabels }: {
   individual: IndividualRow[]
   parejas: PairRow[]
-  apuestas: ApuestasRow[]
+  apuestasMatrix: ApuestasMatrixRow[]
+  apuestasRoundLabels: string[]
 }) {
   const [seg, setSeg] = useState<Segment>('individual')
 
@@ -97,23 +98,36 @@ export default function ClasificacionTabs({ individual, parejas, apuestas }: {
       )}
 
       {seg === 'apuestas' && (
-        <div className="rounded-2xl px-3 py-1.5" style={{ background: 'var(--surface)', boxShadow: '0 3px 10px rgba(0,0,0,0.04)' }}>
-          <div className="grid text-[10px] font-extrabold py-2" style={{ gridTemplateColumns: '1.6fr 0.8fr 0.8fr', color: 'var(--text-muted2)', borderBottom: '1px solid var(--hairline)' }}>
-            <span>JUGADOR</span><span>1º/2º</span><span>PTS</span>
-          </div>
-          {apuestas.map((row, i) => (
-            <div
-              key={row.name}
-              className="grid text-xs items-center py-2.5"
-              style={{ gridTemplateColumns: '1.6fr 0.8fr 0.8fr', borderBottom: i < apuestas.length - 1 ? '1px solid var(--hairline2)' : undefined }}
-            >
-              <span className="font-bold">{row.medal} {row.name}</span>
-              <span>{row.wins}</span>
-              <span className="font-extrabold" style={{ color: 'var(--accent)' }}>{row.pts}</span>
+        <div className="rounded-2xl py-1.5" style={{ background: 'var(--surface)', boxShadow: '0 3px 10px rgba(0,0,0,0.04)' }}>
+          {!apuestasMatrix.length ? (
+            <div className="py-8 text-center text-sm" style={{ color: 'var(--text-muted)' }}>Aún no hay jornadas liquidadas</div>
+          ) : (
+            <div className="overflow-x-auto px-3" style={{ scrollbarWidth: 'thin' }}>
+              <table className="text-xs" style={{ borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--hairline)' }}>
+                    <th className="text-left font-extrabold py-2 pr-3 sticky left-0" style={{ color: 'var(--text-muted2)', background: 'var(--surface)' }}>JUGADOR</th>
+                    {apuestasRoundLabels.map(label => (
+                      <th key={label} className="font-extrabold py-2 px-2 text-center" style={{ color: 'var(--text-muted2)' }}>{label}</th>
+                    ))}
+                    <th className="font-extrabold py-2 pl-3 text-right" style={{ color: 'var(--text-muted2)' }}>PTS</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {apuestasMatrix.map((row, i) => (
+                    <tr key={row.name} style={{ borderBottom: i < apuestasMatrix.length - 1 ? '1px solid var(--hairline2)' : undefined }}>
+                      <td className="font-bold py-2.5 pr-3 whitespace-nowrap sticky left-0" style={{ background: 'var(--surface)' }}>{row.name}</td>
+                      {row.cells.map((cell, j) => (
+                        <td key={j} className="py-2.5 px-2 text-center" style={{ color: cell ? 'var(--accent)' : 'var(--text-muted2)' }}>
+                          {cell ? cell : '·'}
+                        </td>
+                      ))}
+                      <td className="font-extrabold py-2.5 pl-3 text-right" style={{ color: 'var(--accent)' }}>{row.total}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          ))}
-          {!apuestas.length && (
-            <div className="py-8 text-center text-sm" style={{ color: 'var(--text-muted)' }}>Aún no hay apuestas resueltas</div>
           )}
         </div>
       )}

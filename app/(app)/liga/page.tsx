@@ -4,7 +4,6 @@ import type { IndividualStanding, PairStanding } from '@/lib/types'
 import { formatDate, getJornadaReservaStatus } from '@/lib/types'
 import LigaTabs from '@/components/LigaTabs'
 import type { JornadaViewModel } from '@/components/JornadasAccordion'
-import { getSeasonBettingRanking } from '@/lib/betting-queries'
 
 const MEDALS = ['🥇', '🥈', '🥉', '4º']
 
@@ -24,14 +23,12 @@ export default async function LigaPage() {
   // jornada de una temporada anterior en la BD, aparecía mezclada y
   // nunca se actualizaba al editar la temporada actual).
   const [
-    { data: { user } },
     { data: activeSeasonRow },
     { data: players },
     { data: allBetResults },
     { data: biggestBet },
     { data: pastSeasons },
   ] = await Promise.all([
-    supabase.auth.getUser(),
     supabase.from('seasons').select('id, name, min_matches').eq('status', 'active').order('created_at', { ascending: false }).limit(1).maybeSingle(),
     supabase.from('profiles').select('id, name'),
     supabase.from('betting_round_results').select('round_id, player_id, rank, chips_net, point_bonus, player:profiles(id, name)'),
@@ -166,17 +163,23 @@ export default async function LigaPage() {
     pts: p.points,
   }))
 
-  // Única fuente para el ranking de apuestas de esta temporada — la
-  // usan tanto Clasificación → Apuestas como el índice de la pestaña
-  // Apuestas (antes uno se calculaba all-time y el otro por temporada,
-  // a partir de las mismas filas de betting_round_results).
-  const seasonRanking = seasonId ? await getSeasonBettingRanking(supabase, seasonId) : []
-  const clasificacionApuestasRows = seasonRanking.map((r, i) => ({
-    medal: MEDALS[i] ?? `${i + 1}º`, name: r.name, wins: r.firsts, pts: r.points,
-  }))
-  const bettingRanking = seasonRanking.map(r => ({
-    player_id: r.player_id, name: r.name, chips_total: r.total_prizes - r.total_bet, total_bonus: r.points, rounds: r.markets_bet,
-  }))
+  // Clasificación → Apuestas: un jugador por fila, una jornada por
+  // columna con los puntos que ganó esa jornada (en blanco si esa
+  // jornada aún no se ha liquidado), y el sumatorio al final. Se
+  // construye directamente de betting_round_results, sin ranking
+  // aparte — así nunca hay dos fuentes distintas para lo mismo.
+  const orderedRounds = (rounds ?? []).map(r => ({ id: r.id, roundNumber: r.round_number }))
+  const apuestasRoundLabels = orderedRounds.map(r => `J${r.roundNumber}`)
+  const clasificacionApuestasMatrix = ((players as { id: string; name: string }[] | null) ?? [])
+    .map(p => {
+      const cells = orderedRounds.map(r => {
+        const result = ((allBetResults ?? []) as BetRow[]).find(b => b.round_id === r.id && b.player_id === p.id)
+        return result ? result.point_bonus : null
+      })
+      const total = cells.reduce<number>((s, c) => s + (c ?? 0), 0)
+      return { name: p.name, cells, total }
+    })
+    .sort((a, b) => b.total - a.total)
 
   // Nostradamus: racha de jornadas seguidas quedando 1º, en orden cronológico
   // (reutilizamos la fecha de cada jornada ya cargada, sin otra consulta).
@@ -260,13 +263,12 @@ export default async function LigaPage() {
           isLeagueComplete={isLeagueComplete}
           clasificacionIndividual={individualRows}
           clasificacionParejas={pairRows}
-          clasificacionApuestas={clasificacionApuestasRows}
-          apuestasRanking={bettingRanking}
+          clasificacionApuestasMatrix={clasificacionApuestasMatrix}
+          clasificacionApuestasRoundLabels={apuestasRoundLabels}
           apuestasNostradamus={nostradamus}
           apuestasBiggestBet={bb ? { playerName: bb.player?.name ?? '?', chips: bb.chips, optionLabel: bb.option?.label ?? '', won: biggestBetWon } : null}
           apuestasRounds={apuestasRoundsView}
           apuestasHistoricalSeasons={apuestasHistoricalSeasons}
-          currentUserId={user?.id ?? ''}
         />
       </Suspense>
     </div>
