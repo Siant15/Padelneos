@@ -108,8 +108,6 @@ export default function PwaSetup() {
     }
   }
 
-  if (permission === 'unsupported') return null
-
   return (
     <div className="rounded-2xl p-4 flex flex-col gap-3 mt-4" style={{ background: 'var(--surface)', boxShadow: '0 3px 10px rgba(0,0,0,0.04)' }}>
       <h2 className="font-heading text-sm font-bold">📱 Móvil</h2>
@@ -133,7 +131,13 @@ export default function PwaSetup() {
         </div>
       )}
 
-      {permission === 'granted' && !pushOk ? (
+      {permission === 'unsupported' ? (
+        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+          {ios && !standalone
+            ? '🔔 Las notificaciones en iPhone solo funcionan una vez instalada la app (botón de arriba). Después, ábrela desde el icono y vuelve aquí para activarlas.'
+            : '🔔 Este navegador no admite notificaciones.'}
+        </p>
+      ) : permission === 'granted' && !pushOk ? (
         <p className="text-xs" style={{ color: 'var(--green)' }}>✓ Notificaciones activadas en este dispositivo</p>
       ) : (
         <button

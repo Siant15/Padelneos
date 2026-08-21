@@ -22,6 +22,10 @@ export default function TemporadaPage() {
   const [generating, setGenerating] = useState(false)
   const [generateError, setGenerateError] = useState('')
   const [generateOk, setGenerateOk] = useState(false)
+  const [roundsWithoutMatch, setRoundsWithoutMatch] = useState<{ id: string; round_number: number }[]>([])
+  const [pairing, setPairing] = useState(false)
+  const [pairingError, setPairingError] = useState('')
+  const [pairingOk, setPairingOk] = useState(false)
 
   const [form, setForm] = useState({
     name: `Liga Pádel ${new Date().getFullYear()}`,
@@ -63,12 +67,59 @@ export default function TemporadaPage() {
 
           const { data: existingRounds } = await supabase
             .from('rounds')
-            .select('round_number')
+            .select('id, round_number, match:matches(id)')
             .eq('season_id', current.id)
           setExistingRoundNumbers((existingRounds ?? []).map(r => r.round_number))
+          setRoundsWithoutMatch(
+            (existingRounds ?? [])
+              .filter(r => !r.match)
+              .map(r => ({ id: r.id, round_number: r.round_number }))
+          )
         }
       })
   }, [])
+
+  // Con exactamente 4 jugadores solo hay 3 formas de repartirlos en 2
+  // parejas: rota esas 3 combinaciones segun el numero de jornada.
+  // La usan tanto la generacion de jornadas nuevas como el arreglo de
+  // jornadas ya creadas (p.ej. antes de tener a los 4 jugadores).
+  function pairingForRound(players: Profile[], roundNumber: number) {
+    const pairings = [
+      [players[0].id, players[1].id, players[2].id, players[3].id],
+      [players[0].id, players[2].id, players[1].id, players[3].id],
+      [players[0].id, players[3].id, players[1].id, players[2].id],
+    ]
+    const [team1_p1_id, team1_p2_id, team2_p1_id, team2_p2_id] = pairings[(roundNumber - 1) % 3]
+    return { team1_p1_id, team1_p2_id, team2_p1_id, team2_p2_id }
+  }
+
+  async function handleAssignMissingPairs() {
+    setPairing(true)
+    setPairingError('')
+    setPairingOk(false)
+
+    const { data: players, error: playersError } = await supabase.from('profiles').select('*').order('created_at')
+    if (playersError || players?.length !== 4) {
+      setPairing(false)
+      setPairingError('Esto solo funciona con exactamente 4 jugadores registrados (ahora hay ' + (players?.length ?? 0) + ').')
+      return
+    }
+
+    const matchRows = roundsWithoutMatch.map(r => ({
+      round_id: r.id,
+      ...pairingForRound(players as Profile[], r.round_number),
+    }))
+
+    const { error } = await supabase.from('matches').insert(matchRows)
+    setPairing(false)
+    if (error) {
+      setPairingError('No se pudieron asignar las parejas: ' + error.message)
+      return
+    }
+    setRoundsWithoutMatch([])
+    setPairingOk(true)
+    setTimeout(() => setPairingOk(false), 3000)
+  }
 
   // Crea las jornadas que falten (fecha + responsable + parejas ya
   // asignadas rotando las 3 combinaciones posibles con 4 jugadores).
@@ -99,15 +150,7 @@ export default function TemporadaPage() {
 
     if (players.length === 4 && newRounds?.length) {
       const p = players as Profile[]
-      const pairings = [
-        [p[0].id, p[1].id, p[2].id, p[3].id],
-        [p[0].id, p[2].id, p[1].id, p[3].id],
-        [p[0].id, p[3].id, p[1].id, p[2].id],
-      ]
-      const matchRows = newRounds.map(r => {
-        const [team1_p1_id, team1_p2_id, team2_p1_id, team2_p2_id] = pairings[(r.round_number - 1) % 3]
-        return { round_id: r.id, team1_p1_id, team1_p2_id, team2_p1_id, team2_p2_id }
-      })
+      const matchRows = newRounds.map(r => ({ round_id: r.id, ...pairingForRound(p, r.round_number) }))
       const { error: matchesError } = await supabase.from('matches').insert(matchRows)
       if (matchesError) return { created: missing, error: 'Las jornadas se crearon, pero las parejas automáticas fallaron: ' + matchesError.message }
     }
@@ -280,6 +323,30 @@ export default function TemporadaPage() {
               </p>
               {generateError && (
                 <p className="text-xs mt-1.5" style={{ color: 'var(--red)' }}>⚠ {generateError}</p>
+              )}
+
+              {roundsWithoutMatch.length > 0 && (
+                <div className="mt-3 pt-3" style={{ borderTop: '1px dashed var(--hairline)' }}>
+                  <button
+                    type="button"
+                    onClick={handleAssignMissingPairs}
+                    disabled={pairing}
+                    className="w-full py-2.5 rounded-xl font-semibold text-sm transition hover:opacity-90 disabled:opacity-50"
+                    style={{ background: pairingOk ? 'var(--green)' : 'var(--yellow)', color: pairingOk ? '#fff' : 'var(--yellow-text)' }}
+                  >
+                    {pairing
+                      ? 'Asignando parejas...'
+                      : pairingOk
+                        ? '✓ Parejas asignadas'
+                        : `🤝 Asignar parejas a ${roundsWithoutMatch.length} jornada(s) sin partido`}
+                  </button>
+                  <p className="text-[11px] mt-1.5" style={{ color: 'var(--text-muted)' }}>
+                    {roundsWithoutMatch.length} jornada(s) se crearon sin las 4 parejas asignadas (p. ej. antes de tener a los 4 jugadores registrados). Esto las rellena rotando las 3 combinaciones posibles.
+                  </p>
+                  {pairingError && (
+                    <p className="text-xs mt-1.5" style={{ color: 'var(--red)' }}>⚠ {pairingError}</p>
+                  )}
+                </div>
               )}
             </div>
           )}
