@@ -1,5 +1,5 @@
 import { Suspense } from 'react'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getCachedUser } from '@/lib/supabase/server'
 import type { IndividualStanding, PairStanding } from '@/lib/types'
 import { formatDate, getJornadaReservaStatus } from '@/lib/types'
 import LigaTabs from '@/components/LigaTabs'
@@ -18,7 +18,7 @@ function playerName(player: BetRow['player']): string | undefined {
 
 export default async function LigaPage() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getCachedUser()
   const userId = user?.id ?? ''
 
   // Wave 1: todo lo que no depende de nada más, en paralelo. El Calendario
@@ -53,8 +53,9 @@ export default async function LigaPage() {
   const matchIds = (rounds ?? []).map(r => (r.match as { id: string } | null)?.id).filter(Boolean) as string[]
   const roundIds = (rounds ?? []).map(r => r.id)
 
-  // Wave 2: depende de los ids que acabamos de sacar en la wave 1, también en paralelo.
-  const [{ data: allStats }, { data: individual }, { data: pairs }, { data: marketsByRound }] = await Promise.all([
+  // Wave 2: depende de los ids que acabamos de sacar en la wave 1, también en paralelo
+  // (incluye round_settlements, que antes se pedía suelta después de esta tanda).
+  const [{ data: allStats }, { data: individual }, { data: pairs }, { data: marketsByRound }, { data: settlements }] = await Promise.all([
     matchIds.length
       ? supabase.from('match_stats').select('*, player:profiles(id, name)').in('match_id', matchIds)
       : Promise.resolve({ data: [] }),
@@ -67,6 +68,9 @@ export default async function LigaPage() {
     roundIds.length
       ? supabase.from('betting_markets').select('round_id, resolved').in('round_id', roundIds)
       : Promise.resolve({ data: [] as { round_id: string; resolved: boolean }[] }),
+    roundIds.length
+      ? supabase.from('round_settlements').select('round_id').is('voided_at', null).in('round_id', roundIds)
+      : Promise.resolve({ data: [] as { round_id: string }[] }),
   ])
 
   // ─── Calendario ───────────────────────────────────────────
@@ -182,9 +186,6 @@ export default async function LigaPage() {
   // completa de todas ellas (dataset pequeño en esta liga) para que el
   // selector de "Ver otras jornadas" cambie de jornada sin navegar ni
   // volver a pedir nada al servidor.
-  const { data: settlements } = roundIds.length
-    ? await supabase.from('round_settlements').select('round_id').is('voided_at', null).in('round_id', roundIds)
-    : { data: [] as { round_id: string }[] }
   const settledRoundIds = new Set((settlements ?? []).map(s => s.round_id))
 
   // Toda jornada de la temporada activa cae en una de tres categorías:
@@ -209,8 +210,9 @@ export default async function LigaPage() {
     !settledRoundIds.has(r.id) && !openRoundRefs.some(o => o.id === r.id)
   )
 
+  const playerList = (players as { id: string; name: string }[] | null) ?? []
   const settledEntries: ApuestasRoundEntry[] = await Promise.all(
-    settledRoundRefs.map(async r => ({ kind: 'settled' as const, roundId: r.id, roundNumber: r.round_number, acta: await getRoundActa(supabase, r.id) }))
+    settledRoundRefs.map(async r => ({ kind: 'settled' as const, roundId: r.id, roundNumber: r.round_number, acta: await getRoundActa(supabase, r.id, playerList) }))
   )
 
   const openEntries: ApuestasRoundEntry[] = userId ? await Promise.all(

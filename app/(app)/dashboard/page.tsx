@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getCachedUser } from '@/lib/supabase/server'
 import type { IndividualStanding, PairStanding, Round } from '@/lib/types'
 import { formatDate } from '@/lib/types'
 import Link from 'next/link'
@@ -20,7 +20,7 @@ function heatColor(heat: number): string {
 
 export default async function DashboardPage() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getCachedUser()
 
   const [{ data: profile }, { data: season }] = await Promise.all([
     user ? supabase.from('profiles').select('name, avatar_url').eq('id', user.id).maybeSingle() : Promise.resolve({ data: null }),
@@ -34,7 +34,7 @@ export default async function DashboardPage() {
 
   const seasonId = season?.[0]?.id
 
-  const [{ data: standings }, { data: nextRound }, { data: topPairData }, { data: seasonRoundDates }] = await Promise.all([
+  const [{ data: standings }, { data: nextRound }, { data: topPairData }, { data: seasonRoundDates }, seasonRankingEarly] = await Promise.all([
     seasonId
       ? supabase.from('individual_standings').select('*').eq('season_id', seasonId).order('total_points', { ascending: false }).order('sport_points', { ascending: false })
       : Promise.resolve({ data: [] as IndividualStanding[] }),
@@ -54,6 +54,7 @@ export default async function DashboardPage() {
     seasonId
       ? supabase.from('rounds').select('scheduled_date').eq('season_id', seasonId).neq('status', 'played').order('round_number', { ascending: true })
       : Promise.resolve({ data: [] as { scheduled_date: string | null }[] }),
+    seasonId ? getSeasonBettingRanking(supabase, seasonId) : Promise.resolve([]),
   ])
 
   const allStandings = (standings as IndividualStanding[] | null) ?? []
@@ -74,11 +75,11 @@ export default async function DashboardPage() {
 
   // Zona 1 y 2 de apuestas de Inicio: mismas consultas que usa
   // Liga → Apuestas (lib/betting-queries.ts), nada de saldos ni
-  // rankings calculados aparte.
-  const [bettingContext, seasonRanking] = await Promise.all([
-    round && user ? getRoundBettingContext(supabase, round.id, user.id) : Promise.resolve(null),
-    seasonId ? getSeasonBettingRanking(supabase, seasonId) : Promise.resolve([]),
-  ])
+  // rankings calculados aparte. bettingContext depende del id de
+  // `round` (resuelto arriba), así que no puede unirse a esa misma
+  // tanda — pero seasonRanking sí, y ya se adelantó ahí.
+  const bettingContext = round && user ? await getRoundBettingContext(supabase, round.id, user.id) : null
+  const seasonRanking = seasonRankingEarly
   const topBettor = seasonRanking[0]
 
   return (

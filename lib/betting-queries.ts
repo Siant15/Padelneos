@@ -148,8 +148,12 @@ export type RoundActa = {
   standings: ActaStandingsLine
 }
 
-export async function getRoundActa(supabase: SupabaseClient, roundId: string): Promise<RoundActa> {
-  const [{ data: round }, { data: markets }, { data: settlement }, { data: entries }, { data: results }, { data: players }] = await Promise.all([
+// `preloadedPlayers` evita repetir la consulta a `profiles` (siempre la
+// misma lista para toda la temporada) cuando el llamador ya la tiene —
+// relevante porque Liga → Apuestas llama a esta función una vez por
+// cada jornada liquidada.
+export async function getRoundActa(supabase: SupabaseClient, roundId: string, preloadedPlayers?: { id: string; name: string }[]): Promise<RoundActa> {
+  const [{ data: round }, { data: markets }, { data: settlement }, { data: entries }, { data: results }, playersResult] = await Promise.all([
     supabase.from('rounds')
       .select(`id, round_number, scheduled_date, scheduled_time, club, status, match:matches(
         id, set1_t1, set1_t2, set2_t1, set2_t2, set3_t1, set3_t2, winner,
@@ -164,8 +168,9 @@ export async function getRoundActa(supabase: SupabaseClient, roundId: string): P
     supabase.from('round_settlements').select('id').eq('round_id', roundId).is('voided_at', null).maybeSingle(),
     supabase.from('market_settlement_entries').select('*').eq('round_id', roundId),
     supabase.from('betting_round_results').select('*, player:profiles(id, name)').eq('round_id', roundId).order('rank'),
-    supabase.from('profiles').select('id, name').order('created_at'),
+    preloadedPlayers ? Promise.resolve({ data: preloadedPlayers }) : supabase.from('profiles').select('id, name').order('created_at'),
   ])
+  const players = playersResult.data
 
   if (!round) {
     return { round: null, pair1Label: null, pair2Label: null, scoreLabel: null, isSettled: false, markets: [], standings: [] }
