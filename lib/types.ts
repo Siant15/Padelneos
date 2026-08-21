@@ -192,20 +192,28 @@ export type PairStanding = {
 // derrota=0 por jugador; el bonus de apuestas ya acumulado se mantiene
 // fijo, porque las apuestas futuras no se pueden predecir) — para que la
 // simulación no contradiga la clasificación real que ya se muestra.
-export type DinnerRiskTier = { level: 1 | 2 | 3 | 4; label: string; emoji: string; colorVar: string; probability: number }
+export type DinnerRiskTier = { level: 1 | 2 | 3 | 4 | 5 | 6; label: string; emoji: string; color: string; probability: number }
 
+// 6 niveles en vez de 4: con solo 4, dos jugadores con una diferencia
+// real de puntos podían caer en el mismo cajón (p. ej. 41% y 59% son
+// claramente distintos, pero ambos son "menos de 65%"). Los colores van
+// de azul (tranquilo) a rojo (paga seguro), como el termómetro original.
 export const DINNER_RISK_TIERS: Omit<DinnerRiskTier, 'probability'>[] = [
-  { level: 1, label: 'Tranquilo', emoji: '😌', colorVar: 'var(--heat-low)' },
-  { level: 2, label: 'Vigilando', emoji: '👀', colorVar: 'var(--heat-mid)' },
-  { level: 3, label: 'En peligro', emoji: '😬', colorVar: 'var(--heat-high)' },
-  { level: 4, label: 'Va a pagar la cena', emoji: '🍽️', colorVar: 'var(--heat-max)' },
+  { level: 1, label: 'Tranquilo', emoji: '😌', color: 'oklch(0.6 0.13 220)' },
+  { level: 2, label: 'Relajado', emoji: '🙂', color: 'oklch(0.66 0.13 190)' },
+  { level: 3, label: 'Vigilando', emoji: '👀', color: 'oklch(0.72 0.13 150)' },
+  { level: 4, label: 'En peligro', emoji: '😬', color: 'oklch(0.74 0.15 100)' },
+  { level: 5, label: 'Muy expuesto', emoji: '😰', color: 'oklch(0.75 0.15 70)' },
+  { level: 6, label: 'Va a pagar la cena', emoji: '🍽️', color: 'oklch(0.62 0.19 30)' },
 ]
 
 function dinnerRiskTierFor(probability: number): DinnerRiskTier {
   const tier = probability < 0.15 ? DINNER_RISK_TIERS[0]
-    : probability < 0.4 ? DINNER_RISK_TIERS[1]
-    : probability < 0.65 ? DINNER_RISK_TIERS[2]
-    : DINNER_RISK_TIERS[3]
+    : probability < 0.3 ? DINNER_RISK_TIERS[1]
+    : probability < 0.45 ? DINNER_RISK_TIERS[2]
+    : probability < 0.6 ? DINNER_RISK_TIERS[3]
+    : probability < 0.75 ? DINNER_RISK_TIERS[4]
+    : DINNER_RISK_TIERS[5]
   return { ...tier, probability }
 }
 

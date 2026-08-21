@@ -243,7 +243,7 @@ export default async function DashboardPage() {
                     {risk && (
                       <span
                         className="flex items-center justify-center w-[34px] h-[26px] rounded-full text-[14px]"
-                        style={{ background: risk.colorVar }}
+                        style={{ background: risk.color }}
                         title={risk.label}
                         aria-label={`Riesgo de pagar la cena: ${risk.label}`}
                       >

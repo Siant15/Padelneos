@@ -5,9 +5,11 @@ import { DINNER_RISK_TIERS } from '@/lib/types'
 
 const DESCRIPTIONS: Record<number, string> = {
   1: 'Muy improbable que acabe pagando con las jornadas que quedan.',
-  2: 'Tiene una posibilidad real, pero no es lo más probable.',
-  3: 'En bastantes de los resultados posibles termina pagando.',
-  4: 'En la mayoría de los resultados posibles, paga.',
+  2: 'Poco probable, pero no descartable del todo.',
+  3: 'Tiene una posibilidad real, aunque no es lo más probable.',
+  4: 'En una parte considerable de los resultados posibles, paga.',
+  5: 'En la mayoría de los resultados posibles, paga.',
+  6: 'En casi todos los resultados posibles, paga.',
 }
 
 // La escala se calcula simulando todas las combinaciones de resultados
@@ -34,8 +36,8 @@ export default function DinnerRiskInfo() {
           className="absolute right-0 top-6 z-10 w-64 rounded-xl p-3 text-left normal-case"
           style={{ background: 'var(--surface)', boxShadow: '0 6px 20px rgba(0,0,0,0.14)', border: '1px solid var(--border)' }}
         >
-          <p className="text-[11px] font-bold mb-2" style={{ color: 'var(--text-muted2)' }}>
-            Probabilidad de acabar 3º o 4º (quien paga la cena), simulando todos los resultados posibles de las jornadas que faltan:
+          <p className="text-[11px] mb-2" style={{ color: 'var(--text)' }}>
+            <strong>Cómo se calcula:</strong> se simulan todas las combinaciones posibles de resultados de las jornadas que quedan (cada una solo puede caer para una de las dos parejas ya fijadas en el calendario). En cada combinación se suman los puntos que ganaría cada jugador a los que ya tiene, y se mira en qué porcentaje de esas combinaciones acaba 3º o 4º de la tabla (quien paga la cena).
           </p>
           <div className="flex flex-col gap-1.5">
             {DINNER_RISK_TIERS.map(t => (
