@@ -37,7 +37,7 @@ export default function DinnerRiskInfo() {
           style={{ background: 'var(--surface)', boxShadow: '0 6px 20px rgba(0,0,0,0.14)', border: '1px solid var(--border)' }}
         >
           <p className="text-[11px] mb-2" style={{ color: 'var(--text)' }}>
-            <strong>Cómo se calcula:</strong> se simulan todas las combinaciones posibles de resultados de las jornadas que quedan (cada una solo puede caer para una de las dos parejas ya fijadas en el calendario). En cada combinación se suman los puntos que ganaría cada jugador a los que ya tiene, y se mira en qué porcentaje de esas combinaciones acaba 3º o 4º de la tabla (quien paga la cena).
+            <strong>Cómo se calcula:</strong> se parte de los puntos que ya tiene cada jugador con los partidos ya jugados (si Edu ya le ganó a Santi, eso ya cuenta) y se simulan todas las combinaciones posibles de resultados de las jornadas que quedan (cada una solo puede caer para una de las dos parejas ya fijadas en el calendario — una revancha en la vuelta no anula nada, simplemente suma sus propios puntos). En cada combinación se mira quién acaba 3º o 4º de la tabla, y el % de combinaciones en las que le toca a cada jugador es lo que fija su nivel.
           </p>
           <div className="flex flex-col gap-1.5">
             {DINNER_RISK_TIERS.map(t => (
