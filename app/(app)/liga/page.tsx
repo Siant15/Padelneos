@@ -4,6 +4,8 @@ import type { IndividualStanding, PairStanding } from '@/lib/types'
 import { formatDate, getJornadaReservaStatus } from '@/lib/types'
 import LigaTabs from '@/components/LigaTabs'
 import type { JornadaViewModel } from '@/components/JornadasAccordion'
+import { getRoundActa, getRoundBettingContext } from '@/lib/betting-queries'
+import type { FinishedActaEntry, ActiveRoundData } from '@/components/ApuestasTab'
 
 const MEDALS = ['🥇', '🥈', '🥉', '4º']
 
@@ -16,6 +18,8 @@ function playerName(player: BetRow['player']): string | undefined {
 
 export default async function LigaPage() {
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  const userId = user?.id ?? ''
 
   // Wave 1: todo lo que no depende de nada más, en paralelo. El Calendario
   // solo debe mostrar las jornadas de la temporada ACTIVA (antes se
@@ -26,17 +30,10 @@ export default async function LigaPage() {
     { data: activeSeasonRow },
     { data: players },
     { data: allBetResults },
-    { data: biggestBet },
-    { data: pastSeasons },
   ] = await Promise.all([
     supabase.from('seasons').select('id, name, min_matches').eq('status', 'active').order('created_at', { ascending: false }).limit(1).maybeSingle(),
     supabase.from('profiles').select('id, name'),
     supabase.from('betting_round_results').select('round_id, player_id, rank, chips_net, point_bonus, player:profiles(id, name)'),
-    supabase.from('bets').select('chips, player:profiles(name), option:betting_options(id, label, market:betting_markets(winning_option_id, resolved))').order('chips', { ascending: false }).limit(1).maybeSingle(),
-    // Temporadas ya cerradas: se guardan siempre como histórico, para
-    // poder seguir viendo y consultando sus apuestas por jornada aunque
-    // ya no sean la temporada activa.
-    supabase.from('seasons').select('id, name').eq('status', 'finished').order('created_at', { ascending: false }),
   ])
 
   const seasonId = activeSeasonRow?.id
@@ -55,7 +52,6 @@ export default async function LigaPage() {
 
   const matchIds = (rounds ?? []).map(r => (r.match as { id: string } | null)?.id).filter(Boolean) as string[]
   const roundIds = (rounds ?? []).map(r => r.id)
-  const roundById = new Map((rounds ?? []).map(r => [r.id, r]))
 
   // Wave 2: depende de los ids que acabamos de sacar en la wave 1, también en paralelo.
   const [{ data: allStats }, { data: individual }, { data: pairs }, { data: marketsByRound }] = await Promise.all([
@@ -181,67 +177,50 @@ export default async function LigaPage() {
     })
     .sort((a, b) => b.total - a.total)
 
-  // Nostradamus: racha de jornadas seguidas quedando 1º, en orden cronológico
-  // (reutilizamos la fecha de cada jornada ya cargada, sin otra consulta).
-  let nostradamus: { name: string; count: number } | null = null
-  for (const p of (players as { id: string; name: string }[] | null) ?? []) {
-    const resultsForPlayer = ((allBetResults ?? []) as BetRow[])
-      .filter(r => r.player_id === p.id)
-      .map(r => ({ rank: r.rank, roundNumber: roundById.get(r.round_id)?.round_number ?? 0 }))
-      .sort((a, b) => a.roundNumber - b.roundNumber)
-    let streak = 0
-    for (const r of resultsForPlayer) {
-      if (r.rank === 1) streak++
-      else streak = 0
-    }
-    if (streak >= 2 && (!nostradamus || streak > nostradamus.count)) {
-      nostradamus = { name: p.name, count: streak }
+  // ─── Apuestas (acta de la jornada) ────────────────────────
+  // Jornadas ya liquidadas de la temporada activa: se precalcula el acta
+  // completa de todas ellas (dataset pequeño en esta liga) para que el
+  // selector de "Ver otras jornadas" cambie de jornada sin navegar ni
+  // volver a pedir nada al servidor.
+  const { data: settlements } = roundIds.length
+    ? await supabase.from('round_settlements').select('round_id').is('voided_at', null).in('round_id', roundIds)
+    : { data: [] as { round_id: string }[] }
+  const settledRoundIds = new Set((settlements ?? []).map(s => s.round_id))
+
+  const finishedRoundRefs = (rounds ?? [])
+    .filter(r => settledRoundIds.has(r.id))
+    .sort((a, b) => a.round_number - b.round_number)
+
+  const apuestasFinishedRounds: FinishedActaEntry[] = await Promise.all(
+    finishedRoundRefs.map(async r => ({ roundId: r.id, roundNumber: r.round_number, acta: await getRoundActa(supabase, r.id) }))
+  )
+
+  // Jornada activa: la próxima no jugada que ya tenga preguntas de apuestas.
+  const activeCandidate = (rounds ?? []).find(r => r.status === 'scheduled' && (marketsByRound ?? []).some(m => m.round_id === r.id))
+  let apuestasActiveRound: ActiveRoundData = null
+  if (activeCandidate && userId) {
+    const ctx = await getRoundBettingContext(supabase, activeCandidate.id, userId)
+    const templateIds = [...new Set(ctx.markets.map(m => m.template_id).filter((id): id is string => !!id))]
+    const { data: jackpots } = templateIds.length
+      ? await supabase.from('jackpots').select('template_id, chips').eq('season_id', seasonId ?? '').in('template_id', templateIds)
+      : { data: [] as { template_id: string; chips: number }[] }
+    const jackpotByTemplate: Record<string, number> = {}
+    for (const j of jackpots ?? []) jackpotByTemplate[j.template_id] = j.chips
+
+    const activeMatch = activeCandidate.match as { team1_p1?: { name: string }; team1_p2?: { name: string }; team2_p1?: { name: string }; team2_p2?: { name: string } } | null
+    apuestasActiveRound = {
+      roundId: activeCandidate.id,
+      roundNumber: activeCandidate.round_number,
+      pair1Label: activeMatch ? `${activeMatch.team1_p1?.name ?? '?'} / ${activeMatch.team1_p2?.name ?? '?'}` : null,
+      pair2Label: activeMatch ? `${activeMatch.team2_p1?.name ?? '?'} / ${activeMatch.team2_p2?.name ?? '?'}` : null,
+      scheduledDate: activeCandidate.scheduled_date,
+      scheduledTime: activeCandidate.scheduled_time,
+      club: activeCandidate.club,
+      markets: ctx.markets,
+      chipsLeft: ctx.chipsLeft,
+      jackpotByTemplate,
     }
   }
-
-  type BiggestBet = { chips: number; player: { name: string } | null; option: { id: string; label: string; market: { winning_option_id: string | null; resolved: boolean } | null } | null }
-  const bb = biggestBet as BiggestBet | null
-  const biggestBetWon = bb?.option?.market?.resolved ? bb.option.id === bb.option.market.winning_option_id : null
-
-  const apuestasRoundsView = (rounds ?? [])
-    .slice()
-    .sort((a, b) => a.round_number - b.round_number)
-    .map(r => {
-      const marketsForRound = (marketsByRound ?? []).filter(m => m.round_id === r.id)
-      const status = !marketsForRound.length
-        ? { label: 'Sin apuestas aún', color: 'var(--text-muted2)' }
-        : marketsForRound.every(m => m.resolved)
-          ? { label: 'Resuelta', color: 'var(--green)' }
-          : { label: 'Activa', color: 'var(--orange)' }
-      return { id: r.id, roundNumber: r.round_number, statusLabel: status.label, statusColor: status.color }
-    })
-
-  // ─── Apuestas históricas (temporadas ya cerradas) ─────────
-  const pastSeasonIds = (pastSeasons ?? []).map(s => s.id)
-  const { data: pastRounds } = pastSeasonIds.length
-    ? await supabase.from('rounds').select('id, round_number, season_id').in('season_id', pastSeasonIds).order('round_number', { ascending: true })
-    : { data: [] as { id: string; round_number: number; season_id: string }[] }
-
-  const pastRoundIds = (pastRounds ?? []).map(r => r.id)
-  const { data: pastMarketsByRound } = pastRoundIds.length
-    ? await supabase.from('betting_markets').select('round_id, resolved').in('round_id', pastRoundIds)
-    : { data: [] as { round_id: string; resolved: boolean }[] }
-
-  const apuestasHistoricalSeasons = (pastSeasons ?? []).map(s => ({
-    seasonId: s.id,
-    seasonName: s.name,
-    rounds: (pastRounds ?? [])
-      .filter(r => r.season_id === s.id)
-      .map(r => {
-        const marketsForRound = (pastMarketsByRound ?? []).filter(m => m.round_id === r.id)
-        const status = !marketsForRound.length
-          ? { label: 'Sin apuestas', color: 'var(--text-muted2)' }
-          : marketsForRound.every(m => m.resolved)
-            ? { label: 'Resuelta', color: 'var(--green)' }
-            : { label: 'Activa', color: 'var(--orange)' }
-        return { id: r.id, roundNumber: r.round_number, statusLabel: status.label, statusColor: status.color }
-      }),
-  })).filter(s => s.rounds.length > 0)
 
   // ─── Estado de la liga (para las acciones contextuales de Calendario) ──
   const activeSeasonForTabs = activeSeasonRow
@@ -265,10 +244,9 @@ export default async function LigaPage() {
           clasificacionParejas={pairRows}
           clasificacionApuestasMatrix={clasificacionApuestasMatrix}
           clasificacionApuestasRoundLabels={apuestasRoundLabels}
-          apuestasNostradamus={nostradamus}
-          apuestasBiggestBet={bb ? { playerName: bb.player?.name ?? '?', chips: bb.chips, optionLabel: bb.option?.label ?? '', won: biggestBetWon } : null}
-          apuestasRounds={apuestasRoundsView}
-          apuestasHistoricalSeasons={apuestasHistoricalSeasons}
+          userId={userId}
+          apuestasFinishedRounds={apuestasFinishedRounds}
+          apuestasActiveRound={apuestasActiveRound}
         />
       </Suspense>
     </div>
