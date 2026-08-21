@@ -2,12 +2,6 @@ import { NextResponse } from 'next/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import webpush from 'web-push'
 
-webpush.setVapidDetails(
-  process.env.VAPID_SUBJECT!,
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
-  process.env.VAPID_PRIVATE_KEY!
-)
-
 // Mensajes "picantes" según la posición en la clasificación, para el
 // aviso de las 18:00. Nunca los mismos dos veces seguidas sería ideal,
 // pero con 4 jugadores y un cron diario no merece la pena la complejidad.
@@ -26,6 +20,15 @@ export async function GET(request: Request) {
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
   }
+
+  if (!process.env.VAPID_SUBJECT || !process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) {
+    return NextResponse.json({ error: 'Faltan variables VAPID en el entorno' }, { status: 500 })
+  }
+  webpush.setVapidDetails(
+    process.env.VAPID_SUBJECT,
+    process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
+    process.env.VAPID_PRIVATE_KEY
+  )
 
   const type = new URL(request.url).searchParams.get('type')
   if (type !== 'morning' && type !== 'evening') {
