@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import JornadasAccordion, { type JornadaViewModel } from '@/components/JornadasAccordion'
 import ClasificacionTabs from '@/components/ClasificacionTabs'
+import MiniCalendar from '@/components/MiniCalendar'
 
 type IndividualRow = { medal: string; name: string; pj: number; pg: number; pe: number; pp: number; apuestas: number; total: number }
 type PairRow = { name: string; pj: number; pg: number; pe: number; pp: number; pts: number }
@@ -65,9 +66,12 @@ export default function LigaTabs({
       </div>
 
       {section === 'calendario' && (
-        !calendarioItems.length
-          ? <p className="text-sm" style={{ color: 'var(--text-muted)' }}>No hay jornadas creadas todavía.</p>
-          : <JornadasAccordion items={calendarioItems} />
+        <div className="flex flex-col gap-3.5">
+          {!!calendarioItems.length && <MiniCalendar matchDates={calendarioItems.map(j => j.rawDate)} />}
+          {!calendarioItems.length
+            ? <p className="text-sm" style={{ color: 'var(--text-muted)' }}>No hay jornadas creadas todavía.</p>
+            : <JornadasAccordion items={calendarioItems} />}
+        </div>
       )}
 
       {section === 'clasificacion' && (
@@ -148,27 +152,31 @@ export default function LigaTabs({
             <h2 className="font-heading text-sm font-bold mb-2.5">Por jornada</h2>
             {!apuestasRounds.length ? (
               <div className="rounded-2xl p-4 text-sm" style={{ background: 'var(--surface)', color: 'var(--text-muted)', boxShadow: '0 3px 10px rgba(0,0,0,0.04)' }}>
-                Aún no hay jornadas creadas, así que no hay mercados de apuestas todavía.
+                Aún no hay jornadas creadas, así que no hay apuestas todavía.
                 <br />
                 Ve a <Link href="/admin" className="font-bold" style={{ color: 'var(--accent)' }}>Admin</Link> para crear la liga y la primera jornada.
               </div>
             ) : (
-              <div className="flex flex-col gap-2">
-                {apuestasRounds.map(r => (
-                  <Link
-                    key={r.id}
-                    href={`/apuestas/${r.id}`}
-                    className="flex items-center justify-between rounded-2xl px-4 py-3 transition hover:opacity-90"
-                    style={{ background: 'var(--surface)', boxShadow: '0 3px 10px rgba(0,0,0,0.04)' }}
-                  >
-                    <span className="text-[13px] font-bold">Jornada {r.roundNumber}</span>
-                    <div className="flex items-center gap-2 text-xs">
-                      <span style={{ color: r.statusColor }}>{r.statusLabel}</span>
-                      <span style={{ color: 'var(--text-muted2)' }}>→</span>
-                    </div>
-                  </Link>
-                ))}
-              </div>
+              <>
+                <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+                  {apuestasRounds
+                    .slice()
+                    .sort((a, b) => a.roundNumber - b.roundNumber)
+                    .map(r => (
+                      <Link
+                        key={r.id}
+                        href={`/apuestas/${r.id}`}
+                        className="shrink-0 rounded-xl px-3.5 py-2 font-bold text-[13px] transition hover:opacity-90"
+                        style={{ background: 'var(--surface)', border: `1px solid ${r.statusColor}`, color: r.statusColor }}
+                      >
+                        J{r.roundNumber}
+                      </Link>
+                    ))}
+                </div>
+                <p className="text-[11px] mt-1.5" style={{ color: 'var(--text-muted)' }}>
+                  Toca una jornada para ver o hacer tus apuestas.
+                </p>
+              </>
             )}
           </section>
 

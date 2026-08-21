@@ -107,6 +107,7 @@ export default async function LigaPage() {
     return {
       id: round.id,
       numLabel: String(round.round_number),
+      rawDate: round.scheduled_date,
       dateLabel: formatDate(round.scheduled_date),
       timeLabel: effectiveTime,
       hasCustomTime: !!round.scheduled_time,
@@ -204,8 +205,7 @@ export default async function LigaPage() {
 
   const apuestasRoundsView = (rounds ?? [])
     .slice()
-    .sort((a, b) => b.scheduled_date.localeCompare(a.scheduled_date))
-    .slice(0, 10)
+    .sort((a, b) => a.scheduled_date.localeCompare(b.scheduled_date))
     .map(r => {
       const marketsForRound = (marketsByRound ?? []).filter(m => m.round_id === r.id)
       const status = !marketsForRound.length

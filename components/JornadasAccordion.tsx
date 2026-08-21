@@ -6,6 +6,7 @@ import Link from 'next/link'
 export type JornadaViewModel = {
   id: string
   numLabel: string
+  rawDate: string
   dateLabel: string
   timeLabel: string
   hasCustomTime: boolean
