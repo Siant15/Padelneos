@@ -55,8 +55,11 @@ export async function proxy(request: NextRequest) {
   // proxy la bloquea por falta de sesión de servidor, el enlace del email nunca funciona.
   // /api/cron/* lo llama el cron de Vercel sin sesión de usuario; se
   // autoriza a sí mismo comprobando CRON_SECRET dentro de la propia ruta.
+  // /api/signup lo llama alguien que TODAVÍA no tiene cuenta (por
+  // definición no puede haber sesión); se autoriza con el código de
+  // invitación dentro de la propia ruta.
   const isPublicPath = request.nextUrl.pathname === '/' || request.nextUrl.pathname === '/reset-password' ||
-    request.nextUrl.pathname.startsWith('/api/cron/')
+    request.nextUrl.pathname.startsWith('/api/cron/') || request.nextUrl.pathname === '/api/signup'
 
   if (!user && !isAuthPage && !isPublicPath) {
     const redirect = NextResponse.redirect(new URL('/login', request.url))

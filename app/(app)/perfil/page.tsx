@@ -90,7 +90,12 @@ export default function PerfilPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
       setUserId(user.id)
-      const { data } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle()
+
+      const [{ data }, { data: season }] = await Promise.all([
+        supabase.from('profiles').select('*').eq('id', user.id).maybeSingle(),
+        supabase.from('seasons').select('id').eq('status', 'active').order('created_at', { ascending: false }).limit(1).maybeSingle(),
+      ])
+
       if (data) {
         setForm({
           name: data.name ?? '',
@@ -104,14 +109,6 @@ export default function PerfilPage() {
         // precargamos el nombre desde el email para no dejar el campo vacío.
         setForm(f => ({ ...f, name: user.email?.split('@')[0] ?? '' }))
       }
-
-      const { data: season } = await supabase
-        .from('seasons')
-        .select('id')
-        .eq('status', 'active')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
 
       if (season) {
         const { data: standing } = await supabase

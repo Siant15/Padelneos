@@ -30,7 +30,7 @@ export default function PwaSetup() {
   const [installEvent, setInstallEvent] = useState<BeforeInstallPromptEvent | null>(null)
   const [standalone, setStandalone] = useState(false)
   const [ios, setIos] = useState(false)
-  const [showIosHelp, setShowIosHelp] = useState(false)
+  const [showHelp, setShowHelp] = useState(false)
   const [permission, setPermission] = useState<NotificationPermission | 'unsupported'>('default')
   const [subscribing, setSubscribing] = useState(false)
   const [pushError, setPushError] = useState('')
@@ -55,7 +55,7 @@ export default function PwaSetup() {
 
   async function handleInstall() {
     if (!installEvent) {
-      setShowIosHelp(true)
+      setShowHelp(true)
       return
     }
     await installEvent.prompt()
@@ -123,9 +123,11 @@ export default function PwaSetup() {
           >
             ➕ Instalar app en el móvil
           </button>
-          {showIosHelp && ios && (
+          {showHelp && (
             <p className="text-xs mt-2" style={{ color: 'var(--text-muted)' }}>
-              En iPhone: toca 📤 Compartir en Safari → &quot;Añadir a pantalla de inicio&quot;.
+              {ios
+                ? 'En iPhone: toca 📤 Compartir en Safari → "Añadir a pantalla de inicio".'
+                : 'Tu navegador no ofrece el diálogo automático ahora. Busca "Instalar app" o "Añadir a pantalla de inicio" en el menú ⋮ del navegador.'}
             </p>
           )}
         </div>

@@ -56,7 +56,15 @@ export default function LoginForm() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, email, password, inviteCode }),
       })
-      const body = await res.json()
+
+      let body: { error?: string }
+      try {
+        body = await res.json()
+      } catch {
+        setError(`El servidor no respondió correctamente (código ${res.status}). Inténtalo otra vez en un momento.`)
+        setLoading(false)
+        return
+      }
 
       if (!res.ok) {
         setError(body.error ?? 'No se pudo crear la cuenta')
