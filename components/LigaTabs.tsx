@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { type JornadaViewModel } from '@/components/JornadasAccordion'
 import ClasificacionTabs from '@/components/ClasificacionTabs'
 import CalendarioTab from '@/components/CalendarioTab'
-import ApuestasTab, { type FinishedActaEntry, type ActiveRoundData } from '@/components/ApuestasTab'
+import ApuestasTab, { type ApuestasRoundEntry } from '@/components/ApuestasTab'
 
 type PlayerLite = { id: string; name: string }
 type ActiveSeasonInfo = { id: string; name: string; minMatches: number }
@@ -33,8 +33,7 @@ export default function LigaTabs({
   clasificacionApuestasMatrix,
   clasificacionApuestasRoundLabels,
   userId,
-  apuestasFinishedRounds,
-  apuestasActiveRound,
+  apuestasRounds,
 }: {
   activeSeason: ActiveSeasonInfo | null
   players: PlayerLite[]
@@ -45,8 +44,7 @@ export default function LigaTabs({
   clasificacionApuestasMatrix: ApuestasMatrixRow[]
   clasificacionApuestasRoundLabels: string[]
   userId: string
-  apuestasFinishedRounds: FinishedActaEntry[]
-  apuestasActiveRound: ActiveRoundData
+  apuestasRounds: ApuestasRoundEntry[]
 }) {
   const searchParams = useSearchParams()
   const initial = searchParams.get('tab') as Section | null
@@ -102,14 +100,14 @@ export default function LigaTabs({
       )}
 
       {section === 'apuestas' && (
-        !apuestasFinishedRounds.length && !apuestasActiveRound ? (
+        !apuestasRounds.length ? (
           <div className="rounded-2xl p-4 text-sm" style={{ background: 'var(--surface)', color: 'var(--text-muted)', boxShadow: '0 3px 10px rgba(0,0,0,0.04)' }}>
             Aún no hay jornadas creadas, así que no hay apuestas todavía.
             <br />
             Ve a la pestaña <Link href="/liga?tab=calendario" className="font-bold" style={{ color: 'var(--accent)' }}>Calendario</Link> para crear la liga.
           </div>
         ) : (
-          <ApuestasTab userId={userId} finishedRounds={apuestasFinishedRounds} activeRound={apuestasActiveRound} />
+          <ApuestasTab userId={userId} rounds={apuestasRounds} />
         )
       )}
     </div>

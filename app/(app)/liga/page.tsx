@@ -5,7 +5,7 @@ import { formatDate, getJornadaReservaStatus } from '@/lib/types'
 import LigaTabs from '@/components/LigaTabs'
 import type { JornadaViewModel } from '@/components/JornadasAccordion'
 import { getRoundActa, getRoundBettingContext } from '@/lib/betting-queries'
-import type { FinishedActaEntry, ActiveRoundData } from '@/components/ApuestasTab'
+import type { ApuestasRoundEntry } from '@/components/ApuestasTab'
 
 const MEDALS = ['🥇', '🥈', '🥉', '4º']
 
@@ -187,40 +187,69 @@ export default async function LigaPage() {
     : { data: [] as { round_id: string }[] }
   const settledRoundIds = new Set((settlements ?? []).map(s => s.round_id))
 
-  const finishedRoundRefs = (rounds ?? [])
-    .filter(r => settledRoundIds.has(r.id))
-    .sort((a, b) => a.round_number - b.round_number)
-
-  const apuestasFinishedRounds: FinishedActaEntry[] = await Promise.all(
-    finishedRoundRefs.map(async r => ({ roundId: r.id, roundNumber: r.round_number, acta: await getRoundActa(supabase, r.id) }))
-  )
-
-  // Jornada activa: la próxima no jugada que ya tenga preguntas de apuestas.
-  const activeCandidate = (rounds ?? []).find(r => r.status === 'scheduled' && (marketsByRound ?? []).some(m => m.round_id === r.id))
-  let apuestasActiveRound: ActiveRoundData = null
-  if (activeCandidate && userId) {
-    const ctx = await getRoundBettingContext(supabase, activeCandidate.id, userId)
-    const templateIds = [...new Set(ctx.markets.map(m => m.template_id).filter((id): id is string => !!id))]
-    const { data: jackpots } = templateIds.length
-      ? await supabase.from('jackpots').select('template_id, chips').eq('season_id', seasonId ?? '').in('template_id', templateIds)
-      : { data: [] as { template_id: string; chips: number }[] }
-    const jackpotByTemplate: Record<string, number> = {}
-    for (const j of jackpots ?? []) jackpotByTemplate[j.template_id] = j.chips
-
-    const activeMatch = activeCandidate.match as { team1_p1?: { name: string }; team1_p2?: { name: string }; team2_p1?: { name: string }; team2_p2?: { name: string } } | null
-    apuestasActiveRound = {
-      roundId: activeCandidate.id,
-      roundNumber: activeCandidate.round_number,
-      pair1Label: activeMatch ? `${activeMatch.team1_p1?.name ?? '?'} / ${activeMatch.team1_p2?.name ?? '?'}` : null,
-      pair2Label: activeMatch ? `${activeMatch.team2_p1?.name ?? '?'} / ${activeMatch.team2_p2?.name ?? '?'}` : null,
-      scheduledDate: activeCandidate.scheduled_date,
-      scheduledTime: activeCandidate.scheduled_time,
-      club: activeCandidate.club,
-      markets: ctx.markets,
-      chipsLeft: ctx.chipsLeft,
-      jackpotByTemplate,
+  // Toda jornada de la temporada activa cae en una de tres categorías:
+  // liquidada (acta de solo lectura), abierta para apostar (aunque no sea
+  // la más próxima — puede haber varias con mercados ya creados), o
+  // pendiente (jugada pero sin liquidar, o todavía sin preguntas). Así
+  // "Ver otras jornadas" puede saltar a cualquier J1..J9, no solo a las
+  // ya liquidadas.
+  const matchLabels = (r: { match: unknown }) => {
+    const m = r.match as { team1_p1?: { name: string }; team1_p2?: { name: string }; team2_p1?: { name: string }; team2_p2?: { name: string } } | null
+    return {
+      pair1Label: m ? `${m.team1_p1?.name ?? '?'} / ${m.team1_p2?.name ?? '?'}` : null,
+      pair2Label: m ? `${m.team2_p1?.name ?? '?'} / ${m.team2_p2?.name ?? '?'}` : null,
     }
   }
+
+  const settledRoundRefs = (rounds ?? []).filter(r => settledRoundIds.has(r.id))
+  const openRoundRefs = (rounds ?? []).filter(r =>
+    !settledRoundIds.has(r.id) && r.status === 'scheduled' && (marketsByRound ?? []).some(m => m.round_id === r.id)
+  )
+  const pendingRoundRefs = (rounds ?? []).filter(r =>
+    !settledRoundIds.has(r.id) && !openRoundRefs.some(o => o.id === r.id)
+  )
+
+  const settledEntries: ApuestasRoundEntry[] = await Promise.all(
+    settledRoundRefs.map(async r => ({ kind: 'settled' as const, roundId: r.id, roundNumber: r.round_number, acta: await getRoundActa(supabase, r.id) }))
+  )
+
+  const openEntries: ApuestasRoundEntry[] = userId ? await Promise.all(
+    openRoundRefs.map(async r => {
+      const ctx = await getRoundBettingContext(supabase, r.id, userId)
+      const templateIds = [...new Set(ctx.markets.map(m => m.template_id).filter((id): id is string => !!id))]
+      const { data: jackpots } = templateIds.length
+        ? await supabase.from('jackpots').select('template_id, chips').eq('season_id', seasonId ?? '').in('template_id', templateIds)
+        : { data: [] as { template_id: string; chips: number }[] }
+      const jackpotByTemplate: Record<string, number> = {}
+      for (const j of jackpots ?? []) jackpotByTemplate[j.template_id] = j.chips
+      return {
+        kind: 'open' as const,
+        roundId: r.id,
+        roundNumber: r.round_number,
+        ...matchLabels(r),
+        scheduledDate: r.scheduled_date,
+        scheduledTime: r.scheduled_time,
+        club: r.club,
+        markets: ctx.markets,
+        chipsLeft: ctx.chipsLeft,
+        jackpotByTemplate,
+      }
+    })
+  ) : []
+
+  const pendingEntries: ApuestasRoundEntry[] = pendingRoundRefs.map(r => ({
+    kind: 'pending' as const,
+    roundId: r.id,
+    roundNumber: r.round_number,
+    ...matchLabels(r),
+    scheduledDate: r.scheduled_date,
+    scheduledTime: r.scheduled_time,
+    club: r.club,
+    reason: r.status === 'played' ? 'awaiting_settlement' as const : 'no_questions' as const,
+  }))
+
+  const apuestasRounds: ApuestasRoundEntry[] = [...settledEntries, ...openEntries, ...pendingEntries]
+    .sort((a, b) => a.roundNumber - b.roundNumber)
 
   // ─── Estado de la liga (para las acciones contextuales de Calendario) ──
   const activeSeasonForTabs = activeSeasonRow
@@ -245,8 +274,7 @@ export default async function LigaPage() {
           clasificacionApuestasMatrix={clasificacionApuestasMatrix}
           clasificacionApuestasRoundLabels={apuestasRoundLabels}
           userId={userId}
-          apuestasFinishedRounds={apuestasFinishedRounds}
-          apuestasActiveRound={apuestasActiveRound}
+          apuestasRounds={apuestasRounds}
         />
       </Suspense>
     </div>
