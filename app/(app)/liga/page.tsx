@@ -138,7 +138,9 @@ export default async function LigaPage() {
     medal: MEDALS[i] ?? `${i + 1}º`,
     name: s.name,
     pj: s.matches_played,
-    deportivo: s.sport_points,
+    pg: s.wins,
+    pe: s.draws,
+    pp: s.losses,
     apuestas: s.betting_bonus,
     total: s.total_points,
   }))
@@ -147,6 +149,8 @@ export default async function LigaPage() {
     name: `${p.p1_name} / ${p.p2_name}`,
     pj: p.matches_played,
     pg: p.wins,
+    pe: p.draws,
+    pp: p.losses,
     pts: p.points,
   }))
 

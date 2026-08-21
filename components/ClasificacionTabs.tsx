@@ -2,8 +2,8 @@
 
 import { useState } from 'react'
 
-type IndividualRow = { medal: string; name: string; pj: number; deportivo: number; apuestas: number; total: number }
-type PairRow = { name: string; pj: number; pg: number; pts: number }
+type IndividualRow = { medal: string; name: string; pj: number; pg: number; pe: number; pp: number; apuestas: number; total: number }
+type PairRow = { name: string; pj: number; pg: number; pe: number; pp: number; pts: number }
 type ApuestasRow = { medal: string; name: string; wins: number; pts: number }
 
 const SEGMENTS = [
@@ -41,18 +41,23 @@ export default function ClasificacionTabs({ individual, parejas, apuestas }: {
 
       {seg === 'individual' && (
         <div className="rounded-2xl px-3 py-1.5" style={{ background: 'var(--surface)', boxShadow: '0 3px 10px rgba(0,0,0,0.04)' }}>
-          <div className="grid text-[10px] font-extrabold py-2" style={{ gridTemplateColumns: '1.6fr 0.6fr 0.7fr 0.7fr 0.8fr', color: 'var(--text-muted2)', borderBottom: '1px solid var(--hairline)' }}>
-            <span>JUGADOR</span><span>PJ</span><span>DEP</span><span>APU</span><span>TOTAL</span>
+          <p className="text-[11px] pt-2 px-0.5" style={{ color: 'var(--text-muted)' }}>
+            🏅 Cada partido reparte <strong style={{ color: 'var(--text)' }}>victoria = 2 pts, empate = 1 pt, derrota = 0 pts</strong> por jugador.
+          </p>
+          <div className="grid text-[9.5px] font-extrabold py-2 mt-1" style={{ gridTemplateColumns: '1.4fr 0.4fr 0.4fr 0.4fr 0.4fr 0.5fr 0.6fr', color: 'var(--text-muted2)', borderBottom: '1px solid var(--hairline)' }}>
+            <span>JUGADOR</span><span>PJ</span><span>PG</span><span>PE</span><span>PP</span><span>APU</span><span>PTS</span>
           </div>
           {individual.map((row, i) => (
             <div
               key={row.name}
               className="grid text-xs items-center py-2.5"
-              style={{ gridTemplateColumns: '1.6fr 0.6fr 0.7fr 0.7fr 0.8fr', borderBottom: i < individual.length - 1 ? '1px solid var(--hairline2)' : undefined }}
+              style={{ gridTemplateColumns: '1.4fr 0.4fr 0.4fr 0.4fr 0.4fr 0.5fr 0.6fr', borderBottom: i < individual.length - 1 ? '1px solid var(--hairline2)' : undefined }}
             >
               <span className="font-bold">{row.medal} {row.name}</span>
               <span>{row.pj}</span>
-              <span>{row.deportivo}</span>
+              <span>{row.pg}</span>
+              <span>{row.pe}</span>
+              <span>{row.pp}</span>
               <span>{row.apuestas}</span>
               <span className="font-extrabold" style={{ color: 'var(--accent)' }}>{row.total}</span>
             </div>
@@ -65,18 +70,23 @@ export default function ClasificacionTabs({ individual, parejas, apuestas }: {
 
       {seg === 'parejas' && (
         <div className="rounded-2xl px-3 py-1.5" style={{ background: 'var(--surface)', boxShadow: '0 3px 10px rgba(0,0,0,0.04)' }}>
-          <div className="grid text-[10px] font-extrabold py-2" style={{ gridTemplateColumns: '1.8fr 0.6fr 0.6fr 0.8fr', color: 'var(--text-muted2)', borderBottom: '1px solid var(--hairline)' }}>
-            <span>PAREJA</span><span>PJ</span><span>PG</span><span>PTS</span>
+          <p className="text-[11px] pt-2 px-0.5" style={{ color: 'var(--text-muted)' }}>
+            🎾 Todas las parejas posibles entre los jugadores registrados.
+          </p>
+          <div className="grid text-[10px] font-extrabold py-2 mt-1" style={{ gridTemplateColumns: '1.5fr 0.45fr 0.45fr 0.45fr 0.45fr 0.6fr', color: 'var(--text-muted2)', borderBottom: '1px solid var(--hairline)' }}>
+            <span>PAREJA</span><span>PJ</span><span>PG</span><span>PE</span><span>PP</span><span>PTS</span>
           </div>
           {parejas.map((row, i) => (
             <div
               key={row.name}
               className="grid text-xs items-center py-2.5"
-              style={{ gridTemplateColumns: '1.8fr 0.6fr 0.6fr 0.8fr', borderBottom: i < parejas.length - 1 ? '1px solid var(--hairline2)' : undefined }}
+              style={{ gridTemplateColumns: '1.5fr 0.45fr 0.45fr 0.45fr 0.45fr 0.6fr', borderBottom: i < parejas.length - 1 ? '1px solid var(--hairline2)' : undefined }}
             >
               <span className="font-bold">{row.name}</span>
               <span>{row.pj}</span>
               <span>{row.pg}</span>
+              <span>{row.pe}</span>
+              <span>{row.pp}</span>
               <span className="font-extrabold" style={{ color: 'var(--accent)' }}>{row.pts}</span>
             </div>
           ))}

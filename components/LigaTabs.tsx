@@ -6,8 +6,8 @@ import Link from 'next/link'
 import JornadasAccordion, { type JornadaViewModel } from '@/components/JornadasAccordion'
 import ClasificacionTabs from '@/components/ClasificacionTabs'
 
-type IndividualRow = { medal: string; name: string; pj: number; deportivo: number; apuestas: number; total: number }
-type PairRow = { name: string; pj: number; pg: number; pts: number }
+type IndividualRow = { medal: string; name: string; pj: number; pg: number; pe: number; pp: number; apuestas: number; total: number }
+type PairRow = { name: string; pj: number; pg: number; pe: number; pp: number; pts: number }
 type ApuestasRankRow = { medal: string; name: string; wins: number; pts: number }
 type BettingTotalRow = { player_id: string; name: string; chips_total: number; total_bonus: number; rounds: number }
 type BiggestBetView = { playerName: string; chips: number; optionLabel: string; won: boolean | null }

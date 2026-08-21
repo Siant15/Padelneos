@@ -6,20 +6,33 @@ import ConfirmCourtButton from '@/components/ConfirmCourtButton'
 
 const MEDALS = ['🥇', '🥈', '🥉', '4º']
 
+// Riesgo de cena por posición: cuanto más abajo en la clasificación,
+// más alto el % (y el color pasa de azul a rojo).
+const HEAT_BY_RANK = [10, 30, 65, 90]
+function heatColor(heat: number): string {
+  if (heat < 25) return 'var(--heat-low)'
+  if (heat < 55) return 'var(--heat-mid)'
+  if (heat < 80) return 'var(--heat-high)'
+  return 'var(--heat-max)'
+}
+
 export default async function DashboardPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  const { data: season } = await supabase
-    .from('seasons')
-    .select('id, match_time, default_club')
-    .eq('status', 'active')
-    .order('created_at', { ascending: false })
-    .limit(1)
+  const [{ data: profile }, { data: season }] = await Promise.all([
+    user ? supabase.from('profiles').select('name').eq('id', user.id).maybeSingle() : Promise.resolve({ data: null }),
+    supabase
+      .from('seasons')
+      .select('id, match_time, default_club')
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(1),
+  ])
 
   const seasonId = season?.[0]?.id
 
-  const [{ data: standings }, { data: nextRound }, { data: topPairData }] = await Promise.all([
+  const [{ data: standings }, { data: nextRound }, { data: topPairData }, { data: seasonRoundDates }] = await Promise.all([
     seasonId
       ? supabase.from('individual_standings').select('*').eq('season_id', seasonId).order('total_points', { ascending: false }).order('sport_points', { ascending: false })
       : Promise.resolve({ data: [] as IndividualStanding[] }),
@@ -36,16 +49,26 @@ export default async function DashboardPage() {
     seasonId
       ? supabase.from('pair_standings').select('*').eq('season_id', seasonId).order('points', { ascending: false }).order('wins', { ascending: false }).limit(1).maybeSingle()
       : Promise.resolve({ data: null as PairStanding | null }),
+    seasonId
+      ? supabase.from('rounds').select('scheduled_date').eq('season_id', seasonId).order('scheduled_date', { ascending: true })
+      : Promise.resolve({ data: [] as { scheduled_date: string }[] }),
   ])
 
   const allStandings = (standings as IndividualStanding[] | null) ?? []
   const topIndividual = allStandings.slice(0, 4)
-  const dinnerPayers = allStandings.length >= 3 ? allStandings.slice(-2).reverse() : []
   const topPair = (topPairData as PairStanding | null)?.matches_played ? (topPairData as PairStanding) : null
   const round = nextRound as Round | null
   const match = round?.match as { team1_p1?: { name: string }; team1_p2?: { name: string }; team2_p1?: { name: string }; team2_p2?: { name: string } } | undefined
   const effectiveTime = (round?.scheduled_time ?? season?.[0]?.match_time)?.slice(0, 5)
   const effectiveClub = round?.club ?? season?.[0]?.default_club
+
+  const today = new Date().toISOString().slice(0, 10)
+  const remainingDates = (seasonRoundDates ?? []).filter(r => r.scheduled_date >= today)
+  const remainingJornadas = remainingDates.length
+  const lastDate = (seasonRoundDates ?? []).at(-1)?.scheduled_date
+  const remainingMonths = lastDate
+    ? Math.max(1, Math.round((new Date(lastDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24 * 30)))
+    : 0
 
   return (
     <div className="flex flex-col">
@@ -54,8 +77,19 @@ export default async function DashboardPage() {
         className="px-5 pt-4 pb-3 text-white"
         style={{ background: 'linear-gradient(135deg, oklch(0.44 0.1 155), oklch(0.38 0.09 160))', borderRadius: '0 0 24px 24px' }}
       >
-        <div className="font-heading text-[17px] font-extrabold">👋 ¡Hola!</div>
-        <div className="text-xs opacity-90 mt-0.5">4 jugadores · 9 jornadas · ~4 meses</div>
+        <div className="font-heading text-[17px] font-extrabold">👋 ¡Hola{profile?.name ? ` ${profile.name}` : ''}!</div>
+        {seasonId && (
+          <div className="flex gap-2 flex-wrap mt-2.5">
+            <span className="text-xs font-bold px-3 py-1.5 rounded-full" style={{ background: 'rgba(255,255,255,0.18)' }}>
+              ⏳ Quedan {remainingJornadas} jornada{remainingJornadas === 1 ? '' : 's'}
+            </span>
+            {remainingMonths > 0 && (
+              <span className="text-xs font-bold px-3 py-1.5 rounded-full" style={{ background: 'rgba(255,255,255,0.18)' }}>
+                📆 ~{remainingMonths} mes{remainingMonths === 1 ? '' : 'es'} para terminar
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="px-5 pt-4 pb-6 flex flex-col gap-4">
@@ -156,16 +190,34 @@ export default async function DashboardPage() {
         <div>
           <div className="font-heading text-sm font-bold mb-2">🏆 Clasificación individual</div>
           <div className="rounded-[18px] px-3.5" style={{ background: 'var(--surface)', boxShadow: '0 4px 14px rgba(0,0,0,0.04)' }}>
-            {topIndividual.map((row, i) => (
-              <div
-                key={row.player_id}
-                className="flex justify-between items-center py-2.5"
-                style={{ borderBottom: i < topIndividual.length - 1 ? '1px solid var(--hairline)' : undefined }}
-              >
-                <span className="text-[13px] font-bold">{MEDALS[i]} {row.name}</span>
-                <span className="text-[13px] font-extrabold" style={{ color: 'var(--accent)' }}>{row.total_points} pts</span>
+            {!!topIndividual.length && (
+              <div className="flex justify-between items-center pt-2" style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--text-muted2)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                <span>Jugador</span>
+                <span className="flex gap-4"><span>Pts</span><span>🌡️ Cena</span></span>
               </div>
-            ))}
+            )}
+            {topIndividual.map((row, i) => {
+              const heat = HEAT_BY_RANK[i] ?? HEAT_BY_RANK[HEAT_BY_RANK.length - 1]
+              return (
+                <div
+                  key={row.player_id}
+                  className="flex justify-between items-center py-2.5"
+                  style={{ borderBottom: i < topIndividual.length - 1 ? '1px solid var(--hairline)' : undefined }}
+                >
+                  <span className="text-[13px] font-bold">{MEDALS[i]} {row.name}</span>
+                  <div className="flex items-center gap-4">
+                    <span className="text-[13px] font-extrabold w-6 text-right" style={{ color: 'var(--accent)' }}>{row.total_points}</span>
+                    <span
+                      className="flex items-center justify-center w-[26px] h-[26px] rounded-full text-white font-extrabold text-[12.5px]"
+                      style={{ background: heatColor(heat) }}
+                      title="Riesgo de pagar la cena"
+                    >
+                      {Math.max(1, Math.round(heat / 10))}
+                    </span>
+                  </div>
+                </div>
+              )
+            })}
             {!topIndividual.length && (
               <div className="py-6 text-center text-sm" style={{ color: 'var(--text-muted)' }}>
                 Aún no hay partidos jugados
@@ -180,19 +232,6 @@ export default async function DashboardPage() {
             <p className="text-xs font-bold mb-1" style={{ color: 'var(--accent)' }}>👑 Pareja de oro de la temporada</p>
             <p className="text-xs">
               <strong>{topPair.p1_name} / {topPair.p2_name}</strong> · {topPair.wins}-{topPair.losses} en {topPair.matches_played} partidos
-            </p>
-          </div>
-        )}
-
-        {/* Termómetro de la cena */}
-        {dinnerPayers.length === 2 && (
-          <div
-            className="rounded-2xl px-3.5 py-3"
-            style={{ background: 'var(--orange-bg)', color: '#7A5A1E' }}
-          >
-            <p className="text-xs font-bold mb-1">🌡️ Si la liga acabase hoy...</p>
-            <p className="text-xs">
-              Pagarían la cena: <strong>{dinnerPayers[0].name}</strong> y <strong>{dinnerPayers[1].name}</strong>
             </p>
           </div>
         )}
