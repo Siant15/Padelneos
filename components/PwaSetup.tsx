@@ -112,7 +112,18 @@ export default function PwaSetup() {
     <div className="rounded-2xl p-4 flex flex-col gap-3 mt-4" style={{ background: 'var(--surface)', boxShadow: '0 3px 10px rgba(0,0,0,0.04)' }}>
       <h2 className="font-heading text-sm font-bold">📱 Móvil</h2>
 
-      {!standalone && (
+      {!standalone && ios && (
+        <div className="rounded-xl p-3" style={{ background: 'var(--surface2)' }}>
+          <p className="text-xs font-bold mb-1.5" style={{ color: 'var(--accent)' }}>En iPhone, instálala así (Apple no deja hacerlo con un botón):</p>
+          <ol className="text-xs space-y-1" style={{ color: 'var(--text)' }}>
+            <li>1. Toca 📤 <strong>Compartir</strong> en la barra de Safari</li>
+            <li>2. Baja y elige <strong>&quot;Añadir a pantalla de inicio&quot;</strong></li>
+            <li>3. Toca <strong>&quot;Añadir&quot;</strong> arriba a la derecha</li>
+          </ol>
+        </div>
+      )}
+
+      {!standalone && !ios && (
         <div>
           <button
             onClick={handleInstall}
@@ -122,10 +133,8 @@ export default function PwaSetup() {
             ➕ Instalar app en el móvil
           </button>
           {showHelp && (
-            <p className="text-xs mt-2" style={{ color: 'var(--text-muted)' }}>
-              {ios
-                ? 'En iPhone: toca 📤 Compartir en Safari → "Añadir a pantalla de inicio".'
-                : 'Tu navegador no ofrece el diálogo automático ahora. Busca "Instalar app" o "Añadir a pantalla de inicio" en el menú ⋮ del navegador.'}
+            <p className="text-xs mt-2 font-bold" style={{ color: 'var(--orange)' }}>
+              Tu navegador no ofrece el diálogo automático ahora. Busca &quot;Instalar app&quot; o &quot;Añadir a pantalla de inicio&quot; en el menú ⋮ del navegador.
             </p>
           )}
         </div>

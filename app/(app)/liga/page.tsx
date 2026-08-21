@@ -1,10 +1,10 @@
 import { Suspense } from 'react'
-import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import type { IndividualStanding, PairStanding, Profile } from '@/lib/types'
-import { formatDate } from '@/lib/types'
+import type { IndividualStanding, PairStanding } from '@/lib/types'
+import { formatDate, getJornadaReservaStatus } from '@/lib/types'
 import LigaTabs from '@/components/LigaTabs'
 import type { JornadaViewModel } from '@/components/JornadasAccordion'
+import { getSeasonBettingRanking } from '@/lib/betting-queries'
 
 const MEDALS = ['🥇', '🥈', '🥉', '4º']
 
@@ -29,12 +29,17 @@ export default async function LigaPage() {
     { data: players },
     { data: allBetResults },
     { data: biggestBet },
+    { data: pastSeasons },
   ] = await Promise.all([
     supabase.auth.getUser(),
-    supabase.from('seasons').select('id, match_time, default_club').eq('status', 'active').order('created_at', { ascending: false }).limit(1).maybeSingle(),
+    supabase.from('seasons').select('id, name, min_matches').eq('status', 'active').order('created_at', { ascending: false }).limit(1).maybeSingle(),
     supabase.from('profiles').select('id, name'),
     supabase.from('betting_round_results').select('round_id, player_id, rank, chips_net, point_bonus, player:profiles(id, name)'),
     supabase.from('bets').select('chips, player:profiles(name), option:betting_options(id, label, market:betting_markets(winning_option_id, resolved))').order('chips', { ascending: false }).limit(1).maybeSingle(),
+    // Temporadas ya cerradas: se guardan siempre como histórico, para
+    // poder seguir viendo y consultando sus apuestas por jornada aunque
+    // ya no sean la temporada activa.
+    supabase.from('seasons').select('id, name').eq('status', 'finished').order('created_at', { ascending: false }),
   ])
 
   const seasonId = activeSeasonRow?.id
@@ -49,7 +54,7 @@ export default async function LigaPage() {
         team2_p1:profiles!team2_p1_id(id, name),
         team2_p2:profiles!team2_p2_id(id, name)
       )
-    `).eq('season_id', seasonId ?? '00000000-0000-0000-0000-000000000000').order('scheduled_date', { ascending: true })
+    `).eq('season_id', seasonId ?? '00000000-0000-0000-0000-000000000000').order('round_number', { ascending: true })
 
   const matchIds = (rounds ?? []).map(r => (r.match as { id: string } | null)?.id).filter(Boolean) as string[]
   const roundIds = (rounds ?? []).map(r => r.id)
@@ -94,8 +99,15 @@ export default async function LigaPage() {
 
     const isNext = nextRound?.id === round.id
     const played = round.status === 'played'
-    const effectiveTime = (round.scheduled_time ?? activeSeasonRow?.match_time)?.slice(0, 5) ?? ''
-    const effectiveClub = round.club ?? activeSeasonRow?.default_club ?? ''
+    const effectiveTime = round.scheduled_time?.slice(0, 5) ?? ''
+    const effectiveClub = round.club ?? ''
+
+    const reservaStatus = getJornadaReservaStatus(round)
+    const statusView = {
+      pendiente: { label: '⏳ Pendiente de reserva', bg: 'var(--orange-bg)', color: 'var(--orange)' },
+      reservada: { label: '📅 Reservada', bg: 'var(--tint)', color: 'var(--text-muted2)' },
+      finalizada: { label: '✔ Finalizada', bg: 'var(--green-bg)', color: 'var(--green)' },
+    }[reservaStatus]
 
     let scoreLabel = ''
     if (match && match.set1_t1 !== null) {
@@ -106,22 +118,21 @@ export default async function LigaPage() {
 
     return {
       id: round.id,
+      roundNumber: round.round_number,
       numLabel: String(round.round_number),
       rawDate: round.scheduled_date,
-      dateLabel: formatDate(round.scheduled_date),
+      dateLabel: round.scheduled_date ? formatDate(round.scheduled_date) : 'Por confirmar',
       timeLabel: effectiveTime,
-      hasCustomTime: !!round.scheduled_time,
       clubLabel: effectiveClub,
-      hasCustomClub: !!round.club,
       pairALabel: match ? `${match.team1_p1?.name ?? '?'} / ${match.team1_p2?.name ?? '?'}` : 'Por confirmar',
       pairBLabel: match ? `${match.team2_p1?.name ?? '?'} / ${match.team2_p2?.name ?? '?'}` : '',
       responsableName: round.court_booker?.name ?? 'Sin asignar',
-      reservaConfirmed: round.court_confirmed,
+      reservaStatus,
       played,
       isNext,
-      statusLabel: played ? '✔ Jugada' : (isNext ? '⏳ Próxima' : '📅 Programada'),
-      tagBg: played ? 'var(--green-bg)' : (isNext ? 'var(--orange-bg)' : 'var(--tint)'),
-      tagColor: played ? 'var(--green)' : (isNext ? 'var(--orange)' : 'var(--text-muted2)'),
+      statusLabel: statusView.label,
+      tagBg: statusView.bg,
+      tagColor: statusView.color,
       scoreLabel,
       winnerLabel: match?.winner === 'team1'
         ? `${match.team1_p1?.name} / ${match.team1_p2?.name}`
@@ -155,31 +166,17 @@ export default async function LigaPage() {
     pts: p.points,
   }))
 
-  const betTotalsForSeason: Record<string, { name: string; wins: number; pts: number }> = {}
-  for (const r of (allBetResults ?? []) as BetRow[]) {
-    const round = roundById.get(r.round_id)
-    if (!seasonId || round?.season_id !== seasonId) continue
-    const name = playerName(r.player) ?? '?'
-    if (!betTotalsForSeason[r.player_id]) betTotalsForSeason[r.player_id] = { name, wins: 0, pts: 0 }
-    if (r.rank === 1) betTotalsForSeason[r.player_id].wins++
-    betTotalsForSeason[r.player_id].pts += r.point_bonus
-  }
-  const clasificacionApuestasRows = Object.values(betTotalsForSeason)
-    .sort((a, b) => b.pts - a.pts)
-    .map((r, i) => ({ medal: MEDALS[i] ?? `${i + 1}º`, name: r.name, wins: r.wins, pts: r.pts }))
-
-  // ─── Apuestas (índice) ────────────────────────────────────
-  type BettingTotal = { player_id: string; name: string; chips_total: number; total_bonus: number; rounds: number }
-  const bettingTotals: Record<string, BettingTotal> = {}
-  for (const r of (allBetResults ?? []) as BetRow[]) {
-    if (!bettingTotals[r.player_id]) {
-      bettingTotals[r.player_id] = { player_id: r.player_id, name: playerName(r.player) ?? '?', chips_total: 0, total_bonus: 0, rounds: 0 }
-    }
-    bettingTotals[r.player_id].chips_total += r.chips_net
-    bettingTotals[r.player_id].total_bonus += r.point_bonus
-    bettingTotals[r.player_id].rounds++
-  }
-  const bettingRanking = Object.values(bettingTotals).sort((a, b) => b.chips_total - a.chips_total)
+  // Única fuente para el ranking de apuestas de esta temporada — la
+  // usan tanto Clasificación → Apuestas como el índice de la pestaña
+  // Apuestas (antes uno se calculaba all-time y el otro por temporada,
+  // a partir de las mismas filas de betting_round_results).
+  const seasonRanking = seasonId ? await getSeasonBettingRanking(supabase, seasonId) : []
+  const clasificacionApuestasRows = seasonRanking.map((r, i) => ({
+    medal: MEDALS[i] ?? `${i + 1}º`, name: r.name, wins: r.firsts, pts: r.points,
+  }))
+  const bettingRanking = seasonRanking.map(r => ({
+    player_id: r.player_id, name: r.name, chips_total: r.total_prizes - r.total_bet, total_bonus: r.points, rounds: r.markets_bet,
+  }))
 
   // Nostradamus: racha de jornadas seguidas quedando 1º, en orden cronológico
   // (reutilizamos la fecha de cada jornada ya cargada, sin otra consulta).
@@ -187,8 +184,8 @@ export default async function LigaPage() {
   for (const p of (players as { id: string; name: string }[] | null) ?? []) {
     const resultsForPlayer = ((allBetResults ?? []) as BetRow[])
       .filter(r => r.player_id === p.id)
-      .map(r => ({ rank: r.rank, date: roundById.get(r.round_id)?.scheduled_date ?? '' }))
-      .sort((a, b) => a.date.localeCompare(b.date))
+      .map(r => ({ rank: r.rank, roundNumber: roundById.get(r.round_id)?.round_number ?? 0 }))
+      .sort((a, b) => a.roundNumber - b.roundNumber)
     let streak = 0
     for (const r of resultsForPlayer) {
       if (r.rank === 1) streak++
@@ -205,7 +202,7 @@ export default async function LigaPage() {
 
   const apuestasRoundsView = (rounds ?? [])
     .slice()
-    .sort((a, b) => a.scheduled_date.localeCompare(b.scheduled_date))
+    .sort((a, b) => a.round_number - b.round_number)
     .map(r => {
       const marketsForRound = (marketsByRound ?? []).filter(m => m.round_id === r.id)
       const status = !marketsForRound.length
@@ -216,21 +213,51 @@ export default async function LigaPage() {
       return { id: r.id, roundNumber: r.round_number, statusLabel: status.label, statusColor: status.color }
     })
 
+  // ─── Apuestas históricas (temporadas ya cerradas) ─────────
+  const pastSeasonIds = (pastSeasons ?? []).map(s => s.id)
+  const { data: pastRounds } = pastSeasonIds.length
+    ? await supabase.from('rounds').select('id, round_number, season_id').in('season_id', pastSeasonIds).order('round_number', { ascending: true })
+    : { data: [] as { id: string; round_number: number; season_id: string }[] }
+
+  const pastRoundIds = (pastRounds ?? []).map(r => r.id)
+  const { data: pastMarketsByRound } = pastRoundIds.length
+    ? await supabase.from('betting_markets').select('round_id, resolved').in('round_id', pastRoundIds)
+    : { data: [] as { round_id: string; resolved: boolean }[] }
+
+  const apuestasHistoricalSeasons = (pastSeasons ?? []).map(s => ({
+    seasonId: s.id,
+    seasonName: s.name,
+    rounds: (pastRounds ?? [])
+      .filter(r => r.season_id === s.id)
+      .map(r => {
+        const marketsForRound = (pastMarketsByRound ?? []).filter(m => m.round_id === r.id)
+        const status = !marketsForRound.length
+          ? { label: 'Sin apuestas', color: 'var(--text-muted2)' }
+          : marketsForRound.every(m => m.resolved)
+            ? { label: 'Resuelta', color: 'var(--green)' }
+            : { label: 'Activa', color: 'var(--orange)' }
+        return { id: r.id, roundNumber: r.round_number, statusLabel: status.label, statusColor: status.color }
+      }),
+  })).filter(s => s.rounds.length > 0)
+
+  // ─── Estado de la liga (para las acciones contextuales de Calendario) ──
+  const activeSeasonForTabs = activeSeasonRow
+    ? { id: activeSeasonRow.id, name: activeSeasonRow.name, minMatches: activeSeasonRow.min_matches }
+    : null
+  const finalRound = (rounds ?? []).find(r => r.round_number === activeSeasonRow?.min_matches)
+  const isLeagueComplete = !!finalRound && finalRound.status === 'played'
+
   return (
     <div className="px-5 pt-5 pb-6">
       <div className="flex items-center justify-between mb-4">
         <h1 className="font-heading text-[22px] font-extrabold">🎾 Liga</h1>
-        <Link
-          href="/admin"
-          className="text-xs font-bold px-3 py-1.5 rounded-xl transition hover:opacity-90"
-          style={{ background: 'var(--tint)', color: '#555' }}
-        >
-          ⚙️ Gestionar
-        </Link>
       </div>
       <Suspense fallback={null}>
         <LigaTabs
+          activeSeason={activeSeasonForTabs}
+          players={(players as { id: string; name: string }[] | null) ?? []}
           calendarioItems={calendarioItems}
+          isLeagueComplete={isLeagueComplete}
           clasificacionIndividual={individualRows}
           clasificacionParejas={pairRows}
           clasificacionApuestas={clasificacionApuestasRows}
@@ -238,6 +265,7 @@ export default async function LigaPage() {
           apuestasNostradamus={nostradamus}
           apuestasBiggestBet={bb ? { playerName: bb.player?.name ?? '?', chips: bb.chips, optionLabel: bb.option?.label ?? '', won: biggestBetWon } : null}
           apuestasRounds={apuestasRoundsView}
+          apuestasHistoricalSeasons={apuestasHistoricalSeasons}
           currentUserId={user?.id ?? ''}
         />
       </Suspense>

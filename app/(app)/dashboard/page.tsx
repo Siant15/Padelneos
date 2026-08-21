@@ -3,16 +3,18 @@ import type { IndividualStanding, PairStanding, Round } from '@/lib/types'
 import { formatDate } from '@/lib/types'
 import Link from 'next/link'
 import ConfirmCourtButton from '@/components/ConfirmCourtButton'
+import { getRoundBettingContext, getSeasonBettingRanking } from '@/lib/betting-queries'
 
 const MEDALS = ['🥇', '🥈', '🥉', '4º']
 
 // Riesgo de cena por posición: cuanto más abajo en la clasificación,
 // más alto el % (y el color pasa de azul a rojo).
-const HEAT_BY_RANK = [10, 30, 65, 90]
+// Los 4 puestos suman 100% entre todos.
+const HEAT_BY_RANK = [10, 20, 30, 40]
 function heatColor(heat: number): string {
-  if (heat < 25) return 'var(--heat-low)'
-  if (heat < 55) return 'var(--heat-mid)'
-  if (heat < 80) return 'var(--heat-high)'
+  if (heat <= 10) return 'var(--heat-low)'
+  if (heat <= 20) return 'var(--heat-mid)'
+  if (heat <= 30) return 'var(--heat-high)'
   return 'var(--heat-max)'
 }
 
@@ -24,7 +26,7 @@ export default async function DashboardPage() {
     user ? supabase.from('profiles').select('name, avatar_url').eq('id', user.id).maybeSingle() : Promise.resolve({ data: null }),
     supabase
       .from('seasons')
-      .select('id, match_time, default_club')
+      .select('id')
       .eq('status', 'active')
       .order('created_at', { ascending: false })
       .limit(1),
@@ -42,7 +44,7 @@ export default async function DashboardPage() {
         .select('*, court_booker:profiles!court_booker_id(id, name), match:matches(*, team1_p1:profiles!team1_p1_id(id, name), team1_p2:profiles!team1_p2_id(id, name), team2_p1:profiles!team2_p1_id(id, name), team2_p2:profiles!team2_p2_id(id, name))')
         .eq('season_id', seasonId)
         .eq('status', 'scheduled')
-        .order('scheduled_date', { ascending: true })
+        .order('round_number', { ascending: true })
         .limit(1)
         .maybeSingle()
       : Promise.resolve({ data: null as Round | null }),
@@ -50,8 +52,8 @@ export default async function DashboardPage() {
       ? supabase.from('pair_standings').select('*').eq('season_id', seasonId).order('points', { ascending: false }).order('wins', { ascending: false }).limit(1).maybeSingle()
       : Promise.resolve({ data: null as PairStanding | null }),
     seasonId
-      ? supabase.from('rounds').select('scheduled_date').eq('season_id', seasonId).order('scheduled_date', { ascending: true })
-      : Promise.resolve({ data: [] as { scheduled_date: string }[] }),
+      ? supabase.from('rounds').select('scheduled_date').eq('season_id', seasonId).neq('status', 'played').order('round_number', { ascending: true })
+      : Promise.resolve({ data: [] as { scheduled_date: string | null }[] }),
   ])
 
   const allStandings = (standings as IndividualStanding[] | null) ?? []
@@ -59,16 +61,25 @@ export default async function DashboardPage() {
   const topPair = (topPairData as PairStanding | null)?.matches_played ? (topPairData as PairStanding) : null
   const round = nextRound as Round | null
   const match = round?.match as { team1_p1?: { name: string }; team1_p2?: { name: string }; team2_p1?: { name: string }; team2_p2?: { name: string } } | undefined
-  const effectiveTime = (round?.scheduled_time ?? season?.[0]?.match_time)?.slice(0, 5)
-  const effectiveClub = round?.club ?? season?.[0]?.default_club
+  const effectiveTime = round?.scheduled_time?.slice(0, 5)
+  const effectiveClub = round?.club
 
   const today = new Date().toISOString().slice(0, 10)
-  const remainingDates = (seasonRoundDates ?? []).filter(r => r.scheduled_date >= today)
-  const remainingJornadas = remainingDates.length
-  const lastDate = (seasonRoundDates ?? []).at(-1)?.scheduled_date
+  const remainingJornadas = (seasonRoundDates ?? []).length
+  const futureDates = (seasonRoundDates ?? []).map(r => r.scheduled_date).filter((d): d is string => !!d && d >= today)
+  const lastDate = futureDates.at(-1)
   const remainingMonths = lastDate
     ? Math.max(1, Math.round((new Date(lastDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24 * 30)))
     : 0
+
+  // Zona 1 y 2 de apuestas de Inicio: mismas consultas que usa
+  // Liga → Apuestas (lib/betting-queries.ts), nada de saldos ni
+  // rankings calculados aparte.
+  const [bettingContext, seasonRanking] = await Promise.all([
+    round && user ? getRoundBettingContext(supabase, round.id, user.id) : Promise.resolve(null),
+    seasonId ? getSeasonBettingRanking(supabase, seasonId) : Promise.resolve([]),
+  ])
+  const topBettor = seasonRanking[0]
 
   return (
     <div className="flex flex-col">
@@ -114,17 +125,12 @@ export default async function DashboardPage() {
               📅 Próximo partido · Jornada {round.round_number}
             </div>
             <div className="font-heading text-[17px] font-bold mt-1 capitalize">
-              {formatDate(round.scheduled_date)}{effectiveTime && ` · ${effectiveTime}`}
-              {round.scheduled_time && (
-                <span className="ml-1.5 text-[10px] font-bold px-2 py-0.5 rounded-full align-middle" style={{ background: 'var(--orange-bg)', color: 'var(--orange)' }}>
-                  hora especial
-                </span>
-              )}
+              {round.scheduled_date ? formatDate(round.scheduled_date) : 'Fecha por confirmar'}{effectiveTime && ` · ${effectiveTime}`}
             </div>
 
             {effectiveClub && (
               <div className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
-                📍 {effectiveClub}{round.club && ' (club especial)'}
+                📍 {effectiveClub}
               </div>
             )}
 
@@ -164,38 +170,53 @@ export default async function DashboardPage() {
                 📝 Registrar resultado
               </Link>
               <Link
-                href={`/admin/jornadas/${round.id}/mercados`}
+                href={`/apuestas/${round.id}`}
                 className="flex-1 text-center text-xs font-bold py-2 rounded-xl transition hover:opacity-90"
                 style={{ background: 'var(--surface2)', color: 'var(--accent)' }}
               >
-                🎰 Apuestas
+                🎰 Apuestas{bettingContext && bettingContext.openMarketsCount > 0 ? ` · ${bettingContext.chipsLeft}/100` : ''}
               </Link>
             </div>
           </div>
         ) : !season?.length ? (
           <Link
-            href="/admin/temporada"
+            href="/liga"
             className="block rounded-[20px] p-4 text-center transition hover:opacity-90"
             style={{ background: 'var(--orange-bg)', color: '#7A5A1E' }}
           >
             <p className="font-heading font-bold text-sm">⚡ Aún no has creado la liga</p>
-            <p className="text-xs mt-1">Toca aquí para elegir fecha de inicio, día y hora fija de los partidos.</p>
+            <p className="text-xs mt-1">Toca aquí para configurarla desde Calendario.</p>
           </Link>
         ) : (
           <div className="rounded-[20px] p-4 text-sm text-center" style={{ background: 'var(--surface)', color: 'var(--text-muted)', border: '2px solid var(--border)' }}>
             No hay próximas jornadas programadas.{' '}
-            <Link href="/admin/jornadas/nueva" className="font-bold" style={{ color: 'var(--accent)' }}>Crea la primera →</Link>
+            <Link href="/liga" className="font-bold" style={{ color: 'var(--accent)' }}>Ir a Calendario →</Link>
           </div>
         )}
 
-        {/* CTA apuestas */}
-        <Link
-          href="/liga?tab=apuestas"
-          className="font-heading rounded-2xl py-3.5 font-extrabold text-sm flex items-center justify-center gap-2 transition hover:opacity-90"
-          style={{ background: 'var(--yellow)', color: 'var(--yellow-text)' }}
-        >
-          💰 Ir al mercado de apuestas
-        </Link>
+        {/* Saldo de la jornada + ranking acumulado de apuestas */}
+        {seasonId && (
+          <Link
+            href="/liga?tab=apuestas"
+            className="rounded-2xl py-3 px-4 flex items-center justify-between gap-3 transition hover:opacity-90"
+            style={{ background: 'var(--yellow)', color: 'var(--yellow-text)' }}
+          >
+            <div>
+              <p className="font-heading font-extrabold text-sm">💰 Apuestas</p>
+              <p className="text-xs mt-0.5">
+                {bettingContext && bettingContext.openMarketsCount > 0
+                  ? `Te quedan ${bettingContext.chipsLeft}/100 fichas esta jornada`
+                  : 'Ir al mercado de apuestas'}
+              </p>
+            </div>
+            {topBettor && (
+              <div className="text-right shrink-0">
+                <p className="text-[10px] font-bold uppercase tracking-wide opacity-80">Va primero</p>
+                <p className="text-xs font-extrabold">{topBettor.name} · {topBettor.points}pt</p>
+              </div>
+            )}
+          </Link>
+        )}
 
         {/* Clasificación individual top 4 */}
         <div>
@@ -219,11 +240,11 @@ export default async function DashboardPage() {
                   <div className="flex items-center gap-4">
                     <span className="text-[13px] font-extrabold w-6 text-right" style={{ color: 'var(--accent)' }}>{row.total_points}</span>
                     <span
-                      className="flex items-center justify-center w-[26px] h-[26px] rounded-full text-white font-extrabold text-[12.5px]"
+                      className="flex items-center justify-center w-[34px] h-[26px] rounded-full text-white font-extrabold text-[10.5px]"
                       style={{ background: heatColor(heat) }}
                       title="Riesgo de pagar la cena"
                     >
-                      {Math.max(1, Math.round(heat / 10))}
+                      {heat}%
                     </span>
                   </div>
                 </div>

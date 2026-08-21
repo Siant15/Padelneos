@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import type { MatchStat, Profile } from '@/lib/types'
 import Link from 'next/link'
+import MetricsInfoButton from '@/components/MetricsInfoButton'
 
 export default async function EstadisticasPage() {
   const supabase = await createClient()
@@ -38,10 +39,10 @@ export default async function EstadisticasPage() {
     seasonRoundIds.length
       ? supabase
         .from('matches')
-        .select('winner, team1_p1_id, team1_p2_id, team2_p1_id, team2_p2_id, round:rounds(scheduled_date)')
+        .select('winner, team1_p1_id, team1_p2_id, team2_p1_id, team2_p2_id, round:rounds(round_number)')
         .in('round_id', seasonRoundIds)
         .not('winner', 'is', null)
-        .order('scheduled_date', { referencedTable: 'rounds', ascending: true })
+        .order('round_number', { referencedTable: 'rounds', ascending: true })
       : Promise.resolve({ data: [] as { winner: string; team1_p1_id: string; team1_p2_id: string; team2_p1_id: string; team2_p2_id: string }[] }),
   ])
 
@@ -173,7 +174,10 @@ export default async function EstadisticasPage() {
 
       {/* Totales por jugador */}
       <section>
-        <h2 className="font-heading text-sm font-bold mb-2.5">Totales acumulados</h2>
+        <div className="flex items-center gap-2 mb-2.5">
+          <h2 className="font-heading text-sm font-bold">Totales acumulados</h2>
+          <MetricsInfoButton />
+        </div>
         {!rows.length ? (
           <div className="rounded-2xl p-4 text-sm" style={{ background: 'var(--surface)', color: 'var(--text-muted)', boxShadow: '0 3px 10px rgba(0,0,0,0.04)' }}>
             Aquí todavía no hay ni un ace registrado. En cuanto juguéis la primera jornada, esto se llena de motes y récords.

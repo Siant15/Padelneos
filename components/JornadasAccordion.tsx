@@ -5,17 +5,16 @@ import Link from 'next/link'
 
 export type JornadaViewModel = {
   id: string
+  roundNumber: number
   numLabel: string
-  rawDate: string
+  rawDate: string | null
   dateLabel: string
   timeLabel: string
-  hasCustomTime: boolean
   clubLabel: string
-  hasCustomClub: boolean
   pairALabel: string
   pairBLabel: string
   responsableName: string
-  reservaConfirmed: boolean
+  reservaStatus: 'pendiente' | 'reservada' | 'finalizada'
   played: boolean
   isNext: boolean
   statusLabel: string
@@ -54,7 +53,6 @@ export default function JornadasAccordion({ items }: { items: JornadaViewModel[]
               <div>
                 <div className="text-[13px] font-extrabold capitalize">
                   Jornada {j.numLabel} · {j.dateLabel}{j.timeLabel && ` · ${j.timeLabel}`}
-                  {j.hasCustomTime && <span className="ml-1 text-[10px] font-bold" style={{ color: 'var(--orange)' }}>⏰</span>}
                 </div>
                 <div className="text-xs mt-0.5" style={{ color: 'var(--text-muted2)' }}>
                   {j.pairALabel}{j.pairBLabel && ` vs ${j.pairBLabel}`}
@@ -73,9 +71,9 @@ export default function JornadasAccordion({ items }: { items: JornadaViewModel[]
                 className="mt-2.5 pt-2.5 text-xs flex flex-col gap-1.5"
                 style={{ borderTop: '1px dashed #EEE', color: '#555' }}
               >
-                <div>🏟️ Reserva: {j.responsableName} — {j.reservaConfirmed ? 'confirmada ✅' : 'pendiente ⏳'}</div>
+                <div>🏟️ Reserva: {j.responsableName}</div>
                 {j.clubLabel && (
-                  <div>📍 Club: {j.clubLabel}{j.hasCustomClub && ' (especial)'}</div>
+                  <div>📍 Club: {j.clubLabel}</div>
                 )}
 
                 {j.played && (
@@ -99,8 +97,8 @@ export default function JornadasAccordion({ items }: { items: JornadaViewModel[]
                   <>
                     {j.isNext && (
                       <div>
-                        💰 Mercado de apuestas abierto — ver pestaña{' '}
-                        <Link href="/liga?tab=apuestas" className="font-bold" style={{ color: 'var(--accent)' }}>Apuestas</Link>.
+                        💰 Mercado de apuestas abierto —{' '}
+                        <Link href={`/apuestas/${j.id}`} className="font-bold" style={{ color: 'var(--accent)' }}>apostar en esta jornada</Link>.
                       </div>
                     )}
                     <div className="flex gap-2 mt-1">
@@ -119,7 +117,7 @@ export default function JornadasAccordion({ items }: { items: JornadaViewModel[]
                         📝 Resultado
                       </Link>
                       <Link
-                        href={`/admin/jornadas/${j.id}/mercados`}
+                        href={`/apuestas/${j.id}`}
                         className="flex-1 text-center text-xs font-bold py-2 rounded-xl"
                         style={{ background: 'var(--surface2)', color: 'var(--accent)' }}
                       >

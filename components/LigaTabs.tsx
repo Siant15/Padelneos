@@ -3,9 +3,12 @@
 import { useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import JornadasAccordion, { type JornadaViewModel } from '@/components/JornadasAccordion'
+import { type JornadaViewModel } from '@/components/JornadasAccordion'
 import ClasificacionTabs from '@/components/ClasificacionTabs'
-import MiniCalendar from '@/components/MiniCalendar'
+import CalendarioTab from '@/components/CalendarioTab'
+
+type PlayerLite = { id: string; name: string }
+type ActiveSeasonInfo = { id: string; name: string; minMatches: number }
 
 type IndividualRow = { medal: string; name: string; pj: number; pg: number; pe: number; pp: number; apuestas: number; total: number }
 type PairRow = { name: string; pj: number; pg: number; pe: number; pp: number; pts: number }
@@ -13,6 +16,7 @@ type ApuestasRankRow = { medal: string; name: string; wins: number; pts: number 
 type BettingTotalRow = { player_id: string; name: string; chips_total: number; total_bonus: number; rounds: number }
 type BiggestBetView = { playerName: string; chips: number; optionLabel: string; won: boolean | null }
 type ApuestasRoundRow = { id: string; roundNumber: number; statusLabel: string; statusColor: string }
+type ApuestasHistoricalSeason = { seasonId: string; seasonName: string; rounds: ApuestasRoundRow[] }
 
 const SECTIONS = [
   { key: 'calendario', label: '📅 Calendario' },
@@ -23,7 +27,10 @@ const SECTIONS = [
 type Section = typeof SECTIONS[number]['key']
 
 export default function LigaTabs({
+  activeSeason,
+  players,
   calendarioItems,
+  isLeagueComplete,
   clasificacionIndividual,
   clasificacionParejas,
   clasificacionApuestas,
@@ -31,9 +38,13 @@ export default function LigaTabs({
   apuestasNostradamus,
   apuestasBiggestBet,
   apuestasRounds,
+  apuestasHistoricalSeasons,
   currentUserId,
 }: {
+  activeSeason: ActiveSeasonInfo | null
+  players: PlayerLite[]
   calendarioItems: JornadaViewModel[]
+  isLeagueComplete: boolean
   clasificacionIndividual: IndividualRow[]
   clasificacionParejas: PairRow[]
   clasificacionApuestas: ApuestasRankRow[]
@@ -41,6 +52,7 @@ export default function LigaTabs({
   apuestasNostradamus: { name: string; count: number } | null
   apuestasBiggestBet: BiggestBetView | null
   apuestasRounds: ApuestasRoundRow[]
+  apuestasHistoricalSeasons: ApuestasHistoricalSeason[]
   currentUserId: string
 }) {
   const searchParams = useSearchParams()
@@ -66,12 +78,12 @@ export default function LigaTabs({
       </div>
 
       {section === 'calendario' && (
-        <div className="flex flex-col gap-3.5">
-          {!!calendarioItems.length && <MiniCalendar matchDates={calendarioItems.map(j => j.rawDate)} />}
-          {!calendarioItems.length
-            ? <p className="text-sm" style={{ color: 'var(--text-muted)' }}>No hay jornadas creadas todavía.</p>
-            : <JornadasAccordion items={calendarioItems} />}
-        </div>
+        <CalendarioTab
+          activeSeason={activeSeason}
+          players={players}
+          items={calendarioItems}
+          isLeagueComplete={isLeagueComplete}
+        />
       )}
 
       {section === 'clasificacion' && (
@@ -154,7 +166,7 @@ export default function LigaTabs({
               <div className="rounded-2xl p-4 text-sm" style={{ background: 'var(--surface)', color: 'var(--text-muted)', boxShadow: '0 3px 10px rgba(0,0,0,0.04)' }}>
                 Aún no hay jornadas creadas, así que no hay apuestas todavía.
                 <br />
-                Ve a <Link href="/admin" className="font-bold" style={{ color: 'var(--accent)' }}>Admin</Link> para crear la liga y la primera jornada.
+                Ve a la pestaña <Link href="/liga?tab=calendario" className="font-bold" style={{ color: 'var(--accent)' }}>Calendario</Link> para crear la liga.
               </div>
             ) : (
               <>
@@ -180,11 +192,58 @@ export default function LigaTabs({
             )}
           </section>
 
+          {apuestasHistoricalSeasons.length > 0 && (
+            <HistoricalApuestas seasons={apuestasHistoricalSeasons} />
+          )}
+
           <div className="rounded-2xl px-3.5 py-3 text-xs" style={{ background: 'var(--surface2)', color: 'oklch(0.35 0.08 155)' }}>
             ⚖️ Menos fichas en el resultado ganador = mayor premio. No puedes apostar en contra de ti mismo.
           </div>
         </div>
       )}
     </div>
+  )
+}
+
+// Apuestas de temporadas ya cerradas: se guardan siempre, para poder
+// seguir consultando sus jornadas y mercados aunque ya no sean la
+// temporada activa.
+function HistoricalApuestas({ seasons }: { seasons: ApuestasHistoricalSeason[] }) {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <section>
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="flex items-center justify-between w-full"
+      >
+        <h2 className="font-heading text-sm font-bold">📜 Histórico</h2>
+        <span className="text-xs font-bold" style={{ color: 'var(--text-muted)' }}>{open ? '▲ ocultar' : '▼ ver'}</span>
+      </button>
+      {open && (
+        <div className="flex flex-col gap-3 mt-2.5">
+          {seasons.map(s => (
+            <div key={s.seasonId}>
+              <p className="text-xs font-bold mb-1.5" style={{ color: 'var(--text-muted)' }}>{s.seasonName}</p>
+              <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+                {s.rounds
+                  .slice()
+                  .sort((a, b) => a.roundNumber - b.roundNumber)
+                  .map(r => (
+                    <Link
+                      key={r.id}
+                      href={`/apuestas/${r.id}`}
+                      className="shrink-0 rounded-xl px-3.5 py-2 font-bold text-[13px] transition hover:opacity-90"
+                      style={{ background: 'var(--surface)', border: `1px solid ${r.statusColor}`, color: r.statusColor }}
+                    >
+                      J{r.roundNumber}
+                    </Link>
+                  ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
   )
 }

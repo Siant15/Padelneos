@@ -16,8 +16,6 @@ export default function EditarJornadaPage() {
   const [saved, setSaved] = useState(false)
   const [saveError, setSaveError] = useState('')
   const [hasResult, setHasResult] = useState(false)
-  const [seasonMatchTime, setSeasonMatchTime] = useState('')
-  const [seasonDefaultClub, setSeasonDefaultClub] = useState('')
 
   const [form, setForm] = useState({
     scheduled_date: '',
@@ -35,17 +33,14 @@ export default function EditarJornadaPage() {
   useEffect(() => {
     Promise.all([
       supabase.from('profiles').select('*').order('name'),
-      supabase.from('rounds').select('*, match:matches(*), season:seasons(match_time, default_club)').eq('id', roundId).single(),
+      supabase.from('rounds').select('*, match:matches(*)').eq('id', roundId).single(),
     ]).then(([{ data: p }, { data: r }]) => {
       setPlayers((p as Profile[]) ?? [])
       if (r) {
         const m = (r.match as { id: string; team1_p1_id: string; team1_p2_id: string; team2_p1_id: string; team2_p2_id: string; winner: string | null } | null)
-        const season = (Array.isArray(r.season) ? r.season[0] : r.season) as { match_time: string | null; default_club: string | null } | null
         setHasResult(!!m?.winner)
-        setSeasonMatchTime(season?.match_time?.slice(0, 5) ?? '')
-        setSeasonDefaultClub(season?.default_club ?? '')
         setForm({
-          scheduled_date: r.scheduled_date,
+          scheduled_date: r.scheduled_date ?? '',
           scheduled_time: r.scheduled_time?.slice(0, 5) ?? '',
           club: r.club ?? '',
           court_booker_id: r.court_booker_id ?? '',
@@ -74,7 +69,7 @@ export default function EditarJornadaPage() {
     setSaveError('')
 
     const { error: roundError } = await supabase.from('rounds').update({
-      scheduled_date: form.scheduled_date,
+      scheduled_date: form.scheduled_date || null,
       scheduled_time: form.scheduled_time || null,
       club: form.club || null,
       court_booker_id: form.court_booker_id || null,
@@ -119,7 +114,7 @@ export default function EditarJornadaPage() {
 
     setSaved(true)
     setLoading(false)
-    setTimeout(() => { setSaved(false); router.push('/admin'); router.refresh() }, 1500)
+    setTimeout(() => { setSaved(false); router.push('/liga'); router.refresh() }, 1500)
   }
 
   return (
@@ -130,19 +125,23 @@ export default function EditarJornadaPage() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        <Field label="Fecha">
-          <input type="date" required value={form.scheduled_date}
+        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+          Mientras falte día, hora o club, esta jornada aparece como &quot;Pendiente de reserva&quot;.
+        </p>
+
+        <Field label="Día">
+          <input type="date" value={form.scheduled_date}
             onChange={e => setForm(f => ({ ...f, scheduled_date: e.target.value }))}
             style={inputStyle} />
         </Field>
 
-        <Field label={`Hora (opcional, si no se pone se usa la habitual${seasonMatchTime ? ` de las ${seasonMatchTime}` : ''})`}>
+        <Field label="Hora">
           <input type="time" value={form.scheduled_time}
             onChange={e => setForm(f => ({ ...f, scheduled_time: e.target.value }))}
             style={inputStyle} />
         </Field>
 
-        <Field label={`Club (opcional, si no se pone se usa el habitual${seasonDefaultClub ? `: ${seasonDefaultClub}` : ''})`}>
+        <Field label="Club">
           <input type="text" value={form.club}
             onChange={e => setForm(f => ({ ...f, club: e.target.value }))}
             placeholder="Ej: Club Padel Indoor"

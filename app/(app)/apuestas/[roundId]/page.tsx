@@ -1,50 +1,35 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import BettingMarketsBoard from '@/components/BettingMarketsBoard'
-import type { BettingMarket, Profile } from '@/lib/types'
-
-const CHIPS_PER_ROUND = 100
+import AddQuestionPicker from '@/components/AddQuestionPicker'
+import type { Profile } from '@/lib/types'
+import { getRoundBettingContext } from '@/lib/betting-queries'
+import { CHIPS_PER_ROUND } from '@/lib/betting'
 
 export default async function ApuestasPage({ params }: { params: Promise<{ roundId: string }> }) {
   const { roundId } = await params
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  const { data: round } = await supabase
-    .from('rounds')
-    .select('id, round_number, scheduled_date, scheduled_time, status, season:seasons(match_time)')
-    .eq('id', roundId)
-    .single()
+  const ctx = await getRoundBettingContext(supabase, roundId, user?.id ?? '')
+  if (!ctx.round) notFound()
+  const round = ctx.round
+  const markets = ctx.markets
 
-  if (!round) notFound()
+  const templateIds = [...new Set(markets.map(m => m.template_id).filter((id): id is string => !!id))]
+  const [{ data: jackpots }, { data: catalog }, { data: bettingResults }] = await Promise.all([
+    templateIds.length
+      ? supabase.from('jackpots').select('template_id, chips').eq('season_id', round.season_id ?? '').in('template_id', templateIds)
+      : Promise.resolve({ data: [] as { template_id: string; chips: number }[] }),
+    supabase.from('betting_question_templates').select('*').eq('active', true).order('text'),
+    supabase.from('betting_round_results').select('*, player:profiles(id, name)').eq('round_id', roundId).order('rank'),
+  ])
 
-  // Las apuestas se pueden hacer hasta la hora del partido: si no hay un
-  // cierre manual en un mercado concreto, el corte por defecto es la hora
-  // concreta de esta jornada (si se puso una) o si no la hora habitual
-  // de la temporada.
-  const season = (Array.isArray(round.season) ? round.season[0] : round.season) as { match_time: string | null } | null
-  const matchDateTime = `${round.scheduled_date}T${round.scheduled_time ?? season?.match_time ?? '23:59:59'}`
+  const jackpotByTemplate: Record<string, number> = {}
+  for (const j of jackpots ?? []) jackpotByTemplate[j.template_id] = j.chips
 
-  const { data: markets } = await supabase
-    .from('betting_markets')
-    .select('*, options:betting_options!market_id(*, player:profiles(id, name)), bets(*)')
-    .eq('round_id', roundId)
-    .order('created_at')
-
-  // Fichas ya apostadas por el usuario en esta jornada
-  const chipsUsed = (markets as BettingMarket[] | null)?.reduce((sum, m) => {
-    const myBets = m.bets?.filter(b => b.player_id === user?.id) ?? []
-    return sum + myBets.reduce((s, b) => s + b.chips, 0)
-  }, 0) ?? 0
-
-  const chipsLeft = CHIPS_PER_ROUND - chipsUsed
-
-  // Resultados de apuestas si la jornada está jugada
-  const { data: bettingResults } = await supabase
-    .from('betting_round_results')
-    .select('*, player:profiles(id, name)')
-    .eq('round_id', roundId)
-    .order('rank')
+  const usedTemplateIds = new Set(templateIds)
+  const availableFromCatalog = (catalog ?? []).filter(t => !usedTemplateIds.has(t.id))
 
   return (
     <div className="px-5 pt-5 pb-6 flex flex-col gap-3.5">
@@ -61,30 +46,28 @@ export default async function ApuestasPage({ params }: { params: Promise<{ round
             className="text-xs font-bold px-3 py-1.5 rounded-xl"
             style={{
               background: 'var(--tint)',
-              color: chipsLeft > 20 ? 'var(--green)' : chipsLeft > 0 ? 'var(--orange)' : 'var(--red)',
+              color: ctx.chipsLeft > 20 ? 'var(--green)' : ctx.chipsLeft > 0 ? 'var(--orange)' : 'var(--red)',
             }}
           >
-            🎰 {chipsLeft}/{CHIPS_PER_ROUND}
+            🎰 {ctx.chipsLeft}/{CHIPS_PER_ROUND}
           </div>
         )}
       </div>
 
-      {/* Resultados finales si ya están resueltos */}
-      {bettingResults && bettingResults.length > 0 && (
+      {/* Resultados finales si ya están liquidados */}
+      {ctx.isSettled && bettingResults && bettingResults.length > 0 && (
         <div className="rounded-2xl p-4" style={{ background: 'var(--surface)', boxShadow: '0 3px 10px rgba(0,0,0,0.04)' }}>
           <p className="text-xs font-extrabold mb-3" style={{ color: 'var(--text-muted2)' }}>RESULTADO APUESTAS</p>
           <div className="space-y-2">
-            {bettingResults.map((r, i) => (
+            {bettingResults.map(r => (
               <div key={r.id} className="flex items-center justify-between text-sm">
                 <div className="flex items-center gap-2">
-                  <span style={{ color: 'var(--text-muted)' }}>{i + 1}.</span>
+                  <span style={{ color: 'var(--text-muted)' }}>{r.rank}.</span>
                   <span className="font-bold">{(r.player as Profile)?.name}</span>
                   {r.player_id === user?.id && <span className="text-xs" style={{ color: 'var(--accent)' }}>(tú)</span>}
                 </div>
                 <div className="flex items-center gap-3">
-                  <span style={{ color: r.chips_net >= 0 ? 'var(--green)' : 'var(--red)' }}>
-                    {r.chips_net >= 0 ? '+' : ''}{r.chips_net} fichas
-                  </span>
+                  <span style={{ color: 'var(--text-muted2)' }}>{r.chips_final} fichas</span>
                   {r.point_bonus > 0 && (
                     <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: 'var(--accent)', color: '#fff' }}>
                       +{r.point_bonus} pt
@@ -94,30 +77,33 @@ export default async function ApuestasPage({ params }: { params: Promise<{ round
               </div>
             ))}
           </div>
+          <p className="text-[11px] mt-3" style={{ color: 'var(--text-muted2)' }}>
+            100 iniciales − apostadas + recibidas = fichas finales.
+          </p>
         </div>
       )}
 
       {/* Mercados */}
-      {!markets?.length ? (
+      {!markets.length ? (
         <div
           className="rounded-2xl p-6 text-center text-sm"
           style={{ background: 'var(--surface)', color: 'var(--text-muted)', boxShadow: '0 3px 10px rgba(0,0,0,0.04)' }}
         >
           Aún no hay apuestas para esta jornada.
-          <br />
-          Créalos desde{' '}
-          <a href={`/admin/jornadas/${roundId}/mercados`} className="font-bold" style={{ color: 'var(--accent)' }}>
-            Admin → Apuestas
-          </a>.
         </div>
       ) : (
         <BettingMarketsBoard
-          markets={markets as BettingMarket[]}
+          markets={markets}
           userId={user?.id ?? ''}
-          chipsLeft={chipsLeft}
+          chipsLeft={ctx.chipsLeft}
           roundStatus={round.status}
-          matchDateTime={matchDateTime}
+          round={round}
+          jackpotByTemplate={jackpotByTemplate}
         />
+      )}
+
+      {round.status === 'scheduled' && !ctx.isSettled && availableFromCatalog.length > 0 && (
+        <AddQuestionPicker roundId={roundId} templates={availableFromCatalog} />
       )}
 
       <div
@@ -125,6 +111,10 @@ export default async function ApuestasPage({ params }: { params: Promise<{ round
         style={{ background: 'var(--surface2)', color: 'oklch(0.35 0.08 155)' }}
       >
         ⚖️ Menos fichas en el resultado ganador = mayor premio. No puedes apostar en contra de ti mismo.
+        {' '}
+        <a href={`/admin/jornadas/${roundId}/mercados`} className="font-bold" style={{ color: 'var(--accent)' }}>
+          Gestionar / resolver preguntas →
+        </a>
       </div>
     </div>
   )

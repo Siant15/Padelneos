@@ -25,7 +25,7 @@ export default function NavBar() {
       {/* Bottom nav fija */}
       <nav
         className="fixed bottom-0 left-0 right-0 z-40 flex items-stretch"
-        style={{ background: 'var(--surface)', borderTop: '1px solid var(--tint)', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+        style={{ background: 'var(--surface)', borderTop: '1px solid var(--tint)', paddingBottom: 'env(safe-area-inset-bottom, 0px)', minHeight: 68 }}
       >
         {NAV.map(({ href, label, icon, extraPrefixes }) => {
           const active = pathname === href || pathname.startsWith(href + '/') ||
@@ -35,11 +35,11 @@ export default function NavBar() {
               key={href}
               href={href}
               aria-current={active ? 'page' : undefined}
-              className="flex flex-col items-center gap-0.5 flex-1 py-2"
+              className="flex flex-col items-center justify-center gap-1 flex-1 py-3"
               style={{ color: active ? 'var(--accent)' : 'var(--text-muted2)' }}
             >
-              <span className="text-lg">{icon}</span>
-              <span className="text-[11px] font-bold text-center leading-tight" style={{ fontFamily: 'var(--font-body)' }}>{label}</span>
+              <span className="text-2xl">{icon}</span>
+              <span className="text-[13px] font-bold text-center leading-tight" style={{ fontFamily: 'var(--font-body)' }}>{label}</span>
             </Link>
           )
         })}

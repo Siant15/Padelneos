@@ -28,7 +28,7 @@ export type Round = {
   id: string
   season_id: string
   round_number: number
-  scheduled_date: string
+  scheduled_date: string | null
   scheduled_time: string | null
   club: string | null
   status: 'scheduled' | 'played' | 'cancelled'
@@ -73,18 +73,42 @@ export type MatchStat = {
   player?: Profile
 }
 
+export type BettingAnswerType = 'pair' | 'player' | 'yes_no' | 'sets_score' | 'exact_score' | 'custom_options'
+export type BettingCategory = 'automatic' | 'anecdotal'
+export type ResolutionKey = 'match_winner' | 'set1_winner' | 'set2_winner' | 'set3_winner' | 'third_set' | 'tiebreak' | 'comeback' | 'sets_score' | 'exact_score'
+
+export type BettingQuestionTemplate = {
+  id: string
+  text: string
+  category: BettingCategory
+  answer_type: BettingAnswerType
+  resolution_key: ResolutionKey | null
+  options: { label: string; value: string }[] | null
+  allow_none: boolean
+  auto_apply: boolean
+  active: boolean
+  created_at: string
+  created_by: string | null
+}
+
 export type BettingMarket = {
   id: string
   round_id: string
-  type: 'yes_no' | 'player_choice' | 'quantity'
+  // 'player_choice' y 'quantity' son valores heredados de jornadas
+  // creadas antes de las plantillas — se conservan por compatibilidad.
+  type: BettingAnswerType | 'player_choice' | 'quantity'
   description: string
   quantity_threshold: number | null
   closes_at: string | null
   resolved: boolean
+  voided: boolean
   winning_option_id: string | null
+  template_id: string | null
+  season_id: string | null
   created_at: string
   options?: BettingOption[]
   bets?: Bet[]
+  template?: BettingQuestionTemplate
 }
 
 export type BettingOption = {
@@ -94,6 +118,7 @@ export type BettingOption = {
   player_id: string | null
   value: string | null
   is_self_negative: boolean
+  is_none: boolean
   created_at: string
   player?: Profile
 }
@@ -111,12 +136,25 @@ export type BettingRoundResult = {
   id: string
   round_id: string
   player_id: string
+  opening_chips: number
+  chips_bet: number
   chips_net: number
-  chips_total: number
+  chips_final: number
+  chips_won: number
+  correct_count: number
+  markets_bet_count: number
   point_bonus: number
   rank: number
   created_at: string
   player?: Profile
+}
+
+export type Jackpot = {
+  id: string
+  template_id: string
+  season_id: string
+  chips: number
+  updated_at: string
 }
 
 export type IndividualStanding = {
@@ -157,6 +195,15 @@ export function formatTime(timeStr: string): string {
   return timeStr.slice(0, 5)
 }
 
+// Marcador válido de un set de pádel: 6-0..6-4, 7-5 o 7-6 (con tie-break).
+export function isValidSetScore(a: number, b: number): boolean {
+  const hi = Math.max(a, b)
+  const lo = Math.min(a, b)
+  if (hi === 6 && lo <= 4) return true
+  if (hi === 7 && (lo === 5 || lo === 6)) return true
+  return false
+}
+
 export function getMatchScore(match: Match): string {
   if (!match.set1_t1 && match.set1_t1 !== 0) return '-'
   const sets = [
@@ -174,35 +221,12 @@ export function getPairName(match: Match, team: 'team1' | 'team2'): string {
   return `${match.team2_p1?.name ?? '?'} & ${match.team2_p2?.name ?? '?'}`
 }
 
-// ─── Calendario de temporada ───────────────────────────────────
-// Las ligas duran 3 meses (12 semanas) con 9 partidos, 1 por semana:
-// se juegan 3 semanas seguidas y se descansa 1, repitiendo el patrón
-// (semanas 4, 8 y 12 son descanso). Con matchIndex 1-9 devuelve en
-// qué semana (1-12) cae ese partido.
-export function getSeasonMatchWeek(matchIndex: number): number {
-  const n = matchIndex - 1
-  return Math.floor(n / 3) * 4 + (n % 3) + 1
-}
+// Estado de una jornada, calculado a partir de si tiene día+hora+club
+// y de si ya se ha jugado — nunca se elige a mano.
+export type JornadaReservaStatus = 'pendiente' | 'reservada' | 'finalizada'
 
-export function getSeasonMatchDate(startDate: string, matchIndex: number): string {
-  const week = getSeasonMatchWeek(matchIndex)
-  const d = new Date(startDate + 'T12:00:00')
-  d.setDate(d.getDate() + (week - 1) * 7)
-  return d.toISOString().slice(0, 10)
-}
-
-export type SeasonCalendarWeek = { week: number; date: string; matchIndex: number | null }
-
-export function getSeasonCalendar(startDate: string, totalMatches = 9): SeasonCalendarWeek[] {
-  const totalWeeks = Math.ceil(totalMatches / 3) * 4
-  const matchWeeks = new Map<number, number>()
-  for (let i = 1; i <= totalMatches; i++) matchWeeks.set(getSeasonMatchWeek(i), i)
-
-  const weeks: SeasonCalendarWeek[] = []
-  for (let week = 1; week <= totalWeeks; week++) {
-    const d = new Date(startDate + 'T12:00:00')
-    d.setDate(d.getDate() + (week - 1) * 7)
-    weeks.push({ week, date: d.toISOString().slice(0, 10), matchIndex: matchWeeks.get(week) ?? null })
-  }
-  return weeks
+export function getJornadaReservaStatus(round: { scheduled_date: string | null; scheduled_time: string | null; club: string | null; status: string }): JornadaReservaStatus {
+  if (round.status === 'played') return 'finalizada'
+  if (round.scheduled_date && round.scheduled_time && round.club) return 'reservada'
+  return 'pendiente'
 }

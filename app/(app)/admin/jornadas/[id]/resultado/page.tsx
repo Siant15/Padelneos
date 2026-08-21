@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter, useParams } from 'next/navigation'
 import type { Profile } from '@/lib/types'
+import { isValidSetScore } from '@/lib/types'
+import MetricsInfoButton from '@/components/MetricsInfoButton'
 
 type PairForm = { team1_p1_id: string; team1_p2_id: string; team2_p1_id: string; team2_p2_id: string }
 
@@ -15,15 +17,6 @@ type MatchStatus = {
   error: string | null
   needsThirdSet: boolean
   decidedInTwo: boolean
-}
-
-// Marcador válido de un set de pádel: 6-0..6-4, 7-5 o 7-6 (con tie-break)
-function isValidSetScore(a: number, b: number): boolean {
-  const hi = Math.max(a, b)
-  const lo = Math.min(a, b)
-  if (hi === 6 && lo <= 4) return true
-  if (hi === 7 && (lo === 5 || lo === 6)) return true
-  return false
 }
 
 function evaluateSets(sets: SetScore[]): MatchStatus {
@@ -257,6 +250,17 @@ export default function ResultadoPage() {
       return
     }
 
+    // Con el resultado ya guardado, las preguntas de apuestas automáticas
+    // (ganador, resultado por sets, marcador exacto, tie-break...) se
+    // resuelven solas; las anecdóticas se siguen resolviendo a mano
+    // desde Mercados/Acta.
+    const { error: autoResolveError } = await supabase.rpc('auto_resolve_round_markets', { p_round_id: roundId })
+    if (autoResolveError) {
+      setSaveError('Resultado guardado, pero fallaron las apuestas automáticas: ' + autoResolveError.message)
+      setLoading(false)
+      return
+    }
+
     setSaved(true)
     setLoading(false)
     router.refresh()
@@ -460,7 +464,10 @@ export default function ResultadoPage() {
 
           {/* Stats individuales */}
           <div className="rounded-xl p-4" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
-            <p className="text-sm font-semibold mb-4">Estadísticas individuales</p>
+            <div className="flex items-center gap-2 mb-4">
+              <p className="text-sm font-semibold">Estadísticas individuales</p>
+              <MetricsInfoButton />
+            </div>
             <div className="space-y-5">
               {players.map(player => {
                 const st = stats[player.id] ?? { aces: 0, double_faults: 0, bolas_por_3: 0, smash_al_cristal: 0 }
@@ -521,10 +528,10 @@ export default function ResultadoPage() {
                 style={{ background: '#25D366', color: '#fff' }}>
                 📤 Compartir resultado
               </button>
-              <button type="button" onClick={() => router.push('/admin')}
+              <button type="button" onClick={() => router.push('/liga')}
                 className="w-full py-2 text-sm font-semibold text-center"
                 style={{ color: 'var(--text-muted)' }}>
-                Volver a Admin
+                Volver a la Liga
               </button>
             </div>
           ) : (
