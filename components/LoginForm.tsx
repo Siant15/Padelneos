@@ -28,14 +28,19 @@ export default function LoginForm() {
     setLoading(true)
     setError('')
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email, password })
 
-    if (error) {
-      setError('Email o contraseña incorrectos')
-      setLoading(false)
-    } else {
+      if (error) {
+        setError('Email o contraseña incorrectos')
+        setLoading(false)
+        return
+      }
       router.push('/dashboard')
       router.refresh()
+    } catch {
+      setError('No se pudo conectar. Comprueba tu conexión e inténtalo otra vez.')
+      setLoading(false)
     }
   }
 
@@ -45,28 +50,33 @@ export default function LoginForm() {
     setError('')
     setInfo('')
 
-    const res = await fetch('/api/signup', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, email, password, inviteCode }),
-    })
-    const body = await res.json()
+    try {
+      const res = await fetch('/api/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, password, inviteCode }),
+      })
+      const body = await res.json()
 
-    if (!res.ok) {
-      setError(body.error ?? 'No se pudo crear la cuenta')
+      if (!res.ok) {
+        setError(body.error ?? 'No se pudo crear la cuenta')
+        setLoading(false)
+        return
+      }
+
+      const { error } = await supabase.auth.signInWithPassword({ email, password })
+      if (error) {
+        setInfo('Cuenta creada. Ve a "Iniciar sesión" para entrar.')
+        setLoading(false)
+        return
+      }
+
+      router.push('/dashboard')
+      router.refresh()
+    } catch {
+      setError('No se pudo conectar. Comprueba tu conexión e inténtalo otra vez.')
       setLoading(false)
-      return
     }
-
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) {
-      setInfo('Cuenta creada. Ve a "Iniciar sesión" para entrar.')
-      setLoading(false)
-      return
-    }
-
-    router.push('/dashboard')
-    router.refresh()
   }
 
   async function handleForgotPassword(e: React.FormEvent) {
@@ -75,16 +85,21 @@ export default function LoginForm() {
     setError('')
     setInfo('')
 
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
-    })
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      })
 
-    setLoading(false)
-    if (error) {
-      setError('No se pudo enviar el email: ' + error.message)
-      return
+      setLoading(false)
+      if (error) {
+        setError('No se pudo enviar el email: ' + error.message)
+        return
+      }
+      setInfo('Si ese email está registrado, te hemos enviado un enlace para cambiar la contraseña.')
+    } catch {
+      setLoading(false)
+      setError('No se pudo conectar. Comprueba tu conexión e inténtalo otra vez.')
     }
-    setInfo('Si ese email está registrado, te hemos enviado un enlace para cambiar la contraseña.')
   }
 
   const handleSubmit = mode === 'login' ? handleLogin : mode === 'signup' ? handleSignup : handleForgotPassword
