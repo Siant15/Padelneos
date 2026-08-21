@@ -24,6 +24,7 @@ export default function PerfilPage() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [avatarError, setAvatarError] = useState('')
+  const [stats, setStats] = useState({ matches_played: 0, wins: 0, total_points: 0 })
 
   async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -102,6 +103,25 @@ export default function PerfilPage() {
         // precargamos el nombre desde el email para no dejar el campo vacío.
         setForm(f => ({ ...f, name: user.email?.split('@')[0] ?? '' }))
       }
+
+      const { data: season } = await supabase
+        .from('seasons')
+        .select('id')
+        .eq('status', 'active')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (season) {
+        const { data: standing } = await supabase
+          .from('individual_standings')
+          .select('matches_played, wins, total_points')
+          .eq('season_id', season.id)
+          .eq('player_id', user.id)
+          .maybeSingle()
+        if (standing) setStats(standing)
+      }
+
       setLoading(false)
     }
     load()
@@ -159,6 +179,12 @@ export default function PerfilPage() {
           {uploadingAvatar ? 'Subiendo...' : '📷 Cambiar foto'}
         </span>
         {avatarError && <p className="text-xs mt-1" style={{ color: 'var(--red)' }}>⚠ {avatarError}</p>}
+      </div>
+
+      <div className="grid grid-cols-3 gap-2.5 mb-5">
+        <StatCard value={stats.matches_played} label="Partidos" />
+        <StatCard value={stats.wins} label="Victorias" />
+        <StatCard value={stats.total_points} label="Puntos" accent />
       </div>
 
       <form
@@ -287,6 +313,18 @@ export default function PerfilPage() {
       >
         Salir
       </button>
+    </div>
+  )
+}
+
+function StatCard({ value, label, accent }: { value: number; label: string; accent?: boolean }) {
+  return (
+    <div
+      className="rounded-2xl p-3.5 text-center"
+      style={{ background: 'var(--surface)', boxShadow: '0 3px 10px rgba(0,0,0,0.04)' }}
+    >
+      <div className="font-heading font-extrabold text-lg" style={{ color: accent ? 'var(--accent)' : 'var(--text)' }}>{value}</div>
+      <div className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>{label}</div>
     </div>
   )
 }
