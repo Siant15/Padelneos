@@ -51,8 +51,8 @@ async function resolveRoundPayouts(supabase: ReturnType<typeof createClient>, ro
     .eq('resolved', true)
     .not('winning_option_id', 'is', null)
 
-  if (fetchError) return 'No se pudieron leer los mercados: ' + fetchError.message
-  if (!markets?.length) return 'No hay mercados resueltos todavía.'
+  if (fetchError) return 'No se pudieron leer las apuestas: ' + fetchError.message
+  if (!markets?.length) return 'No hay apuestas resueltas todavía.'
 
   const playerNets: Record<string, number> = {}
   for (const m of markets as MarketWithAll[]) {
@@ -106,7 +106,7 @@ export default function MercadosPage() {
       supabase.from('profiles').select('*').order('name'),
       supabase.from('rounds').select('status, round_number, season_id').eq('id', roundId).single(),
     ])
-    setLoadError(marketsError ? 'No se pudieron cargar los mercados: ' + marketsError.message : '')
+    setLoadError(marketsError ? 'No se pudieron cargar las apuestas: ' + marketsError.message : '')
     setMarkets((m as MarketWithAll[]) ?? [])
     setPlayers((p as Profile[]) ?? [])
     setRoundStatus(r?.status ?? '')
@@ -137,12 +137,12 @@ export default function MercadosPage() {
       .eq('round_id', previousRoundId)
 
     if (prevError) {
-      setCopyError('No se pudieron leer los mercados de la jornada anterior: ' + prevError.message)
+      setCopyError('No se pudieron leer las apuestas de la jornada anterior: ' + prevError.message)
       setCopying(false)
       return
     }
     if (!prevMarkets?.length) {
-      setCopyError('La jornada anterior no tenía mercados.')
+      setCopyError('La jornada anterior no tenía apuestas.')
       setCopying(false)
       return
     }
@@ -182,26 +182,26 @@ export default function MercadosPage() {
   }
 
   async function deleteMarket(marketId: string) {
-    if (!confirm('¿Borrar este mercado? Se perderán las apuestas hechas en él.')) return
+    if (!confirm('¿Borrar esta apuesta? Se perderán las fichas jugadas en ella.')) return
     setDeleting(marketId)
     const { error } = await supabase.from('betting_markets').delete().eq('id', marketId)
     setDeleting(null)
     if (error) {
-      setLoadError('No se pudo borrar el mercado: ' + error.message)
+      setLoadError('No se pudo borrar la apuesta: ' + error.message)
       return
     }
     await loadData()
   }
 
   async function resolveMarket(market: MarketWithAll, winningOptionId: string) {
-    if (!confirm('¿Seguro? Una vez resuelto el mercado no se puede deshacer desde aquí.')) return
+    if (!confirm('¿Seguro? Una vez resuelta la apuesta no se puede deshacer desde aquí.')) return
     setResolving(market.id)
     setResolveError('')
     const { error } = await supabase.from('betting_markets').update({
       resolved: true,
       winning_option_id: winningOptionId,
     }).eq('id', market.id)
-    if (error) setResolveError('No se pudo resolver el mercado: ' + error.message)
+    if (error) setResolveError('No se pudo resolver la apuesta: ' + error.message)
     await loadData()
     setResolving(null)
   }
@@ -227,13 +227,13 @@ export default function MercadosPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <button onClick={() => router.back()} className="text-sm" style={{ color: 'var(--text-muted)' }}>← Volver</button>
-          <h1 className="text-xl font-bold">Mercados 🎰</h1>
+          <h1 className="text-xl font-bold">Apuestas 🎰</h1>
         </div>
         <button
           onClick={() => setShowNewForm(v => !v)}
           className="text-xs px-3 py-1.5 rounded-lg font-semibold"
           style={{ background: 'var(--accent)', color: '#fff' }}>
-          {showNewForm ? '✕ Cancelar' : '+ Mercado'}
+          {showNewForm ? '✕ Cancelar' : '+ Apuesta'}
         </button>
       </div>
 
@@ -258,7 +258,7 @@ export default function MercadosPage() {
 
       {!markets.length && previousRoundId && (
         <div className="rounded-xl p-4" style={{ background: 'var(--surface2)', border: '1px solid var(--accent)' }}>
-          <p className="text-sm font-semibold mb-1">📋 ¿Mismos mercados que la jornada anterior?</p>
+          <p className="text-sm font-semibold mb-1">📋 ¿Mismas apuestas que la jornada anterior?</p>
           <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>
             Copia las preguntas de la jornada pasada para no escribirlas otra vez. Si alguna no la quieres esta semana, la borras después con un tap.
           </p>
@@ -268,15 +268,15 @@ export default function MercadosPage() {
             disabled={copying}
             className="w-full py-2.5 rounded-lg font-semibold text-sm transition hover:opacity-90 disabled:opacity-50"
             style={{ background: 'var(--accent)', color: '#fff' }}>
-            {copying ? 'Copiando...' : '📋 Copiar mercados de la jornada anterior'}
+            {copying ? 'Copiando...' : '📋 Copiar apuestas de la jornada anterior'}
           </button>
         </div>
       )}
 
-      {/* Mercados existentes */}
+      {/* Apuestas existentes */}
       {!markets.length ? (
         <div className="rounded-xl p-5 text-center text-sm" style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
-          No hay mercados todavía. Crea el primero.
+          No hay apuestas todavía. Crea la primera.
         </div>
       ) : (
         <div className="space-y-4">
@@ -297,7 +297,7 @@ export default function MercadosPage() {
       {allResolved && roundStatus === 'played' && (
         <div className="rounded-xl p-4" style={{ background: 'var(--surface)', border: '1px solid var(--green)' }}>
           <p className="text-sm font-semibold mb-1" style={{ color: 'var(--green)' }}>
-            ✓ Todos los mercados resueltos
+            ✓ Todas las apuestas resueltas
           </p>
           <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>
             Calcula los premios finales y asigna los puntos de clasificación.
@@ -348,7 +348,7 @@ function MarketCard({ market, resolving, deleting, onResolve, onDelete }: {
             <button
               onClick={onDelete}
               disabled={deleting}
-              aria-label="Borrar mercado"
+              aria-label="Borrar apuesta"
               className="text-xs px-1.5 disabled:opacity-40"
               style={{ color: 'var(--red)' }}>
               {deleting ? '...' : '🗑️'}
@@ -423,7 +423,6 @@ function NewMarketForm({ roundId, players, onSaved }: {
   const [type, setType] = useState<'yes_no' | 'player_choice' | 'quantity'>('yes_no')
   const [description, setDescription] = useState('')
   const [quantityOptions, setQuantityOptions] = useState(['0', '1', '2', '3+'])
-  const [isNegativeOutcome, setIsNegativeOutcome] = useState(false)
   const [closesAt, setClosesAt] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -449,7 +448,7 @@ function NewMarketForm({ roundId, players, onSaved }: {
       .single()
 
     if (marketError || !market) {
-      setError('No se pudo crear el mercado: ' + (marketError?.message ?? 'error desconocido'))
+      setError('No se pudo crear la apuesta: ' + (marketError?.message ?? 'error desconocido'))
       setSaving(false)
       return
     }
@@ -462,14 +461,15 @@ function NewMarketForm({ roundId, players, onSaved }: {
         { market_id: market.id, label: 'No', value: 'no' },
       ]
     } else if (type === 'player_choice') {
-      options = players.map(p => ({ market_id: market.id, label: p.name, player_id: p.id, is_self_negative: isNegativeOutcome }))
+      // Nadie puede apostar por sí mismo en una pregunta sobre jugadores.
+      options = players.map(p => ({ market_id: market.id, label: p.name, player_id: p.id, is_self_negative: true }))
     } else {
       options = quantityOptions.filter(o => o.trim()).map(o => ({ market_id: market.id, label: o, value: o }))
     }
 
     const { error: optionsError } = await supabase.from('betting_options').insert(options)
     if (optionsError) {
-      setError('El mercado se creó pero las opciones fallaron: ' + optionsError.message)
+      setError('La apuesta se creó pero las opciones fallaron: ' + optionsError.message)
       setSaving(false)
       return
     }
@@ -480,7 +480,7 @@ function NewMarketForm({ roundId, players, onSaved }: {
 
   return (
     <div className="rounded-xl p-4" style={{ background: 'var(--surface2)', border: '1px solid var(--accent)' }}>
-      <p className="text-sm font-semibold mb-4">Nuevo mercado</p>
+      <p className="text-sm font-semibold mb-4">Nueva apuesta</p>
 
       <div className="space-y-3">
         <div>
@@ -537,17 +537,9 @@ function NewMarketForm({ roundId, players, onSaved }: {
         </div>
 
         {type === 'player_choice' && (
-          <label className="flex items-start gap-2 text-xs cursor-pointer" style={{ color: 'var(--text-muted)' }}>
-            <input
-              type="checkbox"
-              checked={isNegativeOutcome}
-              onChange={e => setIsNegativeOutcome(e.target.checked)}
-              className="mt-0.5"
-            />
-            <span>
-              Es un resultado negativo (ej. dobles faltas, errores). Si lo marcas, ningún jugador podrá apostar por sí mismo en esta pregunta.
-            </span>
-          </label>
+          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+            🚫 Nadie podrá apostar por sí mismo en esta pregunta.
+          </p>
         )}
 
         {/* Vista previa de opciones */}
@@ -589,7 +581,7 @@ function NewMarketForm({ roundId, players, onSaved }: {
         <button onClick={handleCreate} disabled={saving || !description.trim()}
           className="w-full py-2.5 rounded-lg font-semibold text-sm transition hover:opacity-90 disabled:opacity-40"
           style={{ background: 'var(--accent)', color: '#fff' }}>
-          {saving ? 'Creando...' : 'Crear mercado'}
+          {saving ? 'Creando...' : 'Crear apuesta'}
         </button>
       </div>
     </div>

@@ -123,7 +123,7 @@ export default async function DashboardPage() {
                 className="flex-1 text-center text-xs font-bold py-2 rounded-xl transition hover:opacity-90"
                 style={{ background: 'var(--surface2)', color: 'var(--accent)' }}
               >
-                🎰 Mercados
+                🎰 Apuestas
               </Link>
             </div>
           </div>

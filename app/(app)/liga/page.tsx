@@ -205,7 +205,7 @@ export default async function LigaPage() {
     .map(r => {
       const marketsForRound = (marketsByRound ?? []).filter(m => m.round_id === r.id)
       const status = !marketsForRound.length
-        ? { label: 'Sin mercados aún', color: 'var(--text-muted2)' }
+        ? { label: 'Sin apuestas aún', color: 'var(--text-muted2)' }
         : marketsForRound.every(m => m.resolved)
           ? { label: 'Resuelta', color: 'var(--green)' }
           : { label: 'Activa', color: 'var(--orange)' }

@@ -122,7 +122,7 @@ export default function JornadasAccordion({ items }: { items: JornadaViewModel[]
                         className="flex-1 text-center text-xs font-bold py-2 rounded-xl"
                         style={{ background: 'var(--surface2)', color: 'var(--accent)' }}
                       >
-                        🎰 Mercados
+                        🎰 Apuestas
                       </Link>
                     </div>
                   </>

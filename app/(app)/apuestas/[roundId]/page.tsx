@@ -53,7 +53,7 @@ export default async function ApuestasPage({ params }: { params: Promise<{ round
         style={{ background: 'var(--surface)', boxShadow: '0 3px 10px rgba(0,0,0,0.04)' }}
       >
         <div>
-          <div className="text-[11px] font-extrabold" style={{ color: 'var(--accent)' }}>MERCADO · JORNADA {round.round_number}</div>
+          <div className="text-[11px] font-extrabold" style={{ color: 'var(--accent)' }}>APUESTAS · JORNADA {round.round_number}</div>
           <div className="text-xs mt-0.5" style={{ color: 'var(--text-muted2)' }}>100 fichas/jugador</div>
         </div>
         {round.status === 'scheduled' && (
@@ -103,11 +103,11 @@ export default async function ApuestasPage({ params }: { params: Promise<{ round
           className="rounded-2xl p-6 text-center text-sm"
           style={{ background: 'var(--surface)', color: 'var(--text-muted)', boxShadow: '0 3px 10px rgba(0,0,0,0.04)' }}
         >
-          Aún no hay mercados de apuestas para esta jornada.
+          Aún no hay apuestas para esta jornada.
           <br />
           Créalos desde{' '}
           <a href={`/admin/jornadas/${roundId}/mercados`} className="font-bold" style={{ color: 'var(--accent)' }}>
-            Admin → Mercados
+            Admin → Apuestas
           </a>.
         </div>
       ) : (

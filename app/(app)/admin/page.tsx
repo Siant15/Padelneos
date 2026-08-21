@@ -23,7 +23,7 @@ export default async function AdminPage() {
       <div>
         <h1 className="font-heading text-[22px] font-extrabold">🎾 Gestión de la liga</h1>
         <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
-          Cualquier jugador puede crear la liga, las jornadas y los mercados desde aquí.
+          Cualquier jugador puede crear la liga, las jornadas y las apuestas desde aquí.
         </p>
       </div>
 
