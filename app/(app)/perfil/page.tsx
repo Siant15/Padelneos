@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
+import PwaSetup from '@/components/PwaSetup'
 
 export default function PerfilPage() {
   const supabase = createClient()
@@ -305,6 +306,8 @@ export default function PerfilPage() {
           {passwordSaving ? 'Guardando...' : passwordSaved ? '✓ Contraseña actualizada' : 'Cambiar contraseña'}
         </button>
       </form>
+
+      <PwaSetup />
 
       <button
         onClick={handleLogout}

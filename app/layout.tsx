@@ -25,6 +25,10 @@ export const metadata: Metadata = {
     statusBarStyle: 'default',
     title: 'Liga Pádel',
   },
+  icons: {
+    icon: [{ url: '/icon-192.png', sizes: '192x192', type: 'image/png' }],
+    apple: [{ url: '/icon-192.png', sizes: '192x192', type: 'image/png' }],
+  },
 }
 
 export const viewport: Viewport = {

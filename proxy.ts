@@ -53,7 +53,10 @@ export async function proxy(request: NextRequest) {
   // /reset-password llega con un token de recuperación en la URL que solo el
   // cliente puede procesar (establece la sesión tras cargar la página); si el
   // proxy la bloquea por falta de sesión de servidor, el enlace del email nunca funciona.
-  const isPublicPath = request.nextUrl.pathname === '/' || request.nextUrl.pathname === '/reset-password'
+  // /api/cron/* lo llama el cron de Vercel sin sesión de usuario; se
+  // autoriza a sí mismo comprobando CRON_SECRET dentro de la propia ruta.
+  const isPublicPath = request.nextUrl.pathname === '/' || request.nextUrl.pathname === '/reset-password' ||
+    request.nextUrl.pathname.startsWith('/api/cron/')
 
   if (!user && !isAuthPage && !isPublicPath) {
     const redirect = NextResponse.redirect(new URL('/login', request.url))
