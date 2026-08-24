@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { Info } from 'lucide-react'
 import { DINNER_RISK_TIERS } from '@/lib/types'
 
 const DESCRIPTIONS: Record<number, string> = {
@@ -25,10 +26,10 @@ export default function DinnerRiskInfo() {
         onClick={() => setOpen(v => !v)}
         aria-label="Cómo se calcula el riesgo de pagar la cena"
         aria-expanded={open}
-        className="w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0"
-        style={{ background: 'var(--tint)', color: 'var(--text-muted2)' }}
+        className="flex items-center justify-center shrink-0"
+        style={{ color: 'var(--text-muted2)' }}
       >
-        i
+        <Info size={13} strokeWidth={2.2} />
       </button>
       {open && (
         <div
@@ -42,7 +43,7 @@ export default function DinnerRiskInfo() {
           <div className="flex flex-col gap-1.5">
             {DINNER_RISK_TIERS.map(t => (
               <div key={t.level} className="flex items-start gap-2 text-[11px]" style={{ color: 'var(--text)' }}>
-                <span aria-hidden>{t.emoji}</span>
+                <span aria-hidden className="w-2.5 h-2.5 rounded-full mt-0.5 shrink-0" style={{ background: t.color }} />
                 <span><strong>{t.label}</strong> — {DESCRIPTIONS[t.level]}</span>
               </div>
             ))}

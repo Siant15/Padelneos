@@ -1,13 +1,26 @@
 import { createClient, getCachedUser } from '@/lib/supabase/server'
-import type { IndividualStanding, PairStanding, Round } from '@/lib/types'
-import { formatDate, estimateDinnerRisk } from '@/lib/types'
+import type { Round } from '@/lib/types'
+import { formatDate } from '@/lib/types'
 import Link from 'next/link'
+import { Calendar, Clock, MapPin, ArrowUp, ArrowDown, Minus, Flame, Snowflake, Flag } from 'lucide-react'
 import ConfirmCourtButton from '@/components/ConfirmCourtButton'
 import DinnerRiskInfo from '@/components/DinnerRiskInfo'
-import { getRoundBettingContext, getSeasonBettingRanking } from '@/lib/betting-queries'
-import { getCachedActiveSeason, getCachedSeasonRounds, getCachedSeasonAggregates } from '@/lib/supabase/cached'
+import PiquesCarousel from '@/components/PiquesCarousel'
+import { getRoundBettingContext } from '@/lib/betting-queries'
+import { getCachedActiveSeason, getCachedSeasonRounds } from '@/lib/supabase/cached'
+import { getInicioData } from '@/lib/inicio-data'
+import { estimateDinnerRisk } from '@/lib/types'
 
-const MEDALS = ['🥇', '🥈', '🥉', '4º']
+const MEDALS = ['🥇', '🥈', '🥉']
+
+// 4 tonos (no 6): oscuro→claro→ámbar→coral, calculados sobre la misma
+// probabilidad de estimateDinnerRisk — solo cambia cómo se pinta aquí.
+function cenaColor(probability: number): string {
+  if (probability < 0.25) return 'oklch(0.5 0.11 155)'
+  if (probability < 0.5) return 'oklch(0.72 0.1 155)'
+  if (probability < 0.75) return 'oklch(0.8 0.14 95)'
+  return 'oklch(0.72 0.14 40)'
+}
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -19,28 +32,28 @@ export default async function DashboardPage() {
   ])
 
   const seasonId = activeSeasonRow?.id
-  // Temporada/jornadas/clasificaciones: iguales para los 4 jugadores,
-  // vienen de la caché compartida con Liga (lib/supabase/cached.ts) en
-  // vez de pedirse de cero en cada navegación entre pestañas.
   const rounds = seasonId ? await getCachedSeasonRounds(seasonId) : []
-  const matchIds = rounds.map(r => (r.match as { id: string } | null)?.id).filter(Boolean) as string[]
-  const roundIds = rounds.map(r => r.id)
 
-  const [{ individual, pairs }, seasonRankingEarly] = await Promise.all([
-    seasonId ? getCachedSeasonAggregates(seasonId, matchIds, roundIds) : Promise.resolve({ individual: [], pairs: [] }),
-    seasonId ? getSeasonBettingRanking(supabase, seasonId) : Promise.resolve([]),
-  ])
+  const { rows, piques } = seasonId ? await getInicioData(supabase, seasonId) : { rows: [], piques: [] }
 
   const nextRound = (rounds.find(r => r.status === 'scheduled') as Round | undefined) ?? null
-  const topPairData = (pairs as PairStanding[])[0] ?? null
-  const seasonRoundDates = rounds.filter(r => r.status !== 'played').map(r => ({ scheduled_date: r.scheduled_date }))
+  const round = nextRound
+  const match = round?.match as { team1_p1?: { name: string }; team1_p2?: { name: string }; team2_p1?: { name: string }; team2_p2?: { name: string } } | undefined
+  const effectiveTime = round?.scheduled_time?.slice(0, 5)
+  const effectiveClub = round?.club
 
-  const allStandings = (individual as IndividualStanding[] | null) ?? []
-  const topIndividual = allStandings.slice(0, 4)
+  const seasonRoundDates = rounds.filter(r => r.status !== 'played').map(r => r.scheduled_date)
+  const today = new Date().toISOString().slice(0, 10)
+  const remainingJornadas = seasonRoundDates.length
+  const futureDates = seasonRoundDates.filter((d): d is string => !!d && d >= today)
+  const lastDate = futureDates.at(-1)
+  const remainingMonths = lastDate
+    ? Math.max(1, Math.round((new Date(lastDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24 * 30)))
+    : 0
 
-  // Riesgo de cena: se simulan todas las combinaciones de resultados de
-  // las jornadas que quedan (las parejas de cada una ya están fijadas de
-  // antemano, así que no hay que adivinarlas).
+  // El riesgo de cena se calcula sobre los puntos actuales ya resueltos
+  // por getInicioData (sport+apuestas ya sumados en `points`) y los
+  // emparejamientos que quedan por jugar.
   const remainingPairings = rounds
     .filter(r => r.status === 'scheduled')
     .map(r => {
@@ -49,237 +62,248 @@ export default async function DashboardPage() {
       return { pair1: [m.team1_p1.id, m.team1_p2.id] as [string, string], pair2: [m.team2_p1.id, m.team2_p2.id] as [string, string] }
     })
     .filter((x): x is { pair1: [string, string]; pair2: [string, string] } => !!x)
+  const risk = estimateDinnerRisk(rows.map(r => ({ id: r.id, sportPoints: r.points, bettingBonus: 0 })), remainingPairings)
 
-  const dinnerRisk = estimateDinnerRisk(
-    allStandings.map(s => ({ id: s.player_id, sportPoints: s.sport_points, bettingBonus: s.betting_bonus })),
-    remainingPairings
-  )
-  const topPair = (topPairData as PairStanding | null)?.matches_played ? (topPairData as PairStanding) : null
-  const round = nextRound as Round | null
-  const match = round?.match as { team1_p1?: { name: string }; team1_p2?: { name: string }; team2_p1?: { name: string }; team2_p2?: { name: string } } | undefined
-  const effectiveTime = round?.scheduled_time?.slice(0, 5)
-  const effectiveClub = round?.club
-
-  const today = new Date().toISOString().slice(0, 10)
-  const remainingJornadas = (seasonRoundDates ?? []).length
-  const futureDates = (seasonRoundDates ?? []).map(r => r.scheduled_date).filter((d): d is string => !!d && d >= today)
-  const lastDate = futureDates.at(-1)
-  const remainingMonths = lastDate
-    ? Math.max(1, Math.round((new Date(lastDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24 * 30)))
-    : 0
-
-  // Zona 1 y 2 de apuestas de Inicio: mismas consultas que usa
-  // Liga → Apuestas (lib/betting-queries.ts), nada de saldos ni
-  // rankings calculados aparte. bettingContext depende del id de
-  // `round` (resuelto arriba), así que no puede unirse a esa misma
-  // tanda — pero seasonRanking sí, y ya se adelantó ahí.
   const bettingContext = round && user ? await getRoundBettingContext(supabase, round.id, user.id) : null
-  const seasonRanking = seasonRankingEarly
-  const topBettor = seasonRanking[0]
 
   return (
-    <div className="flex flex-col">
-      {/* Header degradado */}
-      <div
-        className="px-5 pt-4 pb-3 text-white flex items-center gap-4"
-        style={{ background: 'linear-gradient(135deg, oklch(0.44 0.1 155), oklch(0.38 0.09 160))', borderRadius: '0 0 24px 24px' }}
-      >
-        <div className="flex-1">
-          <div className="font-heading text-[17px] font-extrabold">👋 ¡Hola{profile?.name ? ` ${profile.name}` : ''}!</div>
-          {seasonId && (
-            <div className="flex gap-2 flex-wrap mt-2.5">
-              <span className="text-xs font-bold px-3 py-1.5 rounded-full" style={{ background: 'rgba(255,255,255,0.18)' }}>
-                ⏳ Quedan {remainingJornadas} jornada{remainingJornadas === 1 ? '' : 's'}
-              </span>
-              {remainingMonths > 0 && (
-                <span className="text-xs font-bold px-3 py-1.5 rounded-full" style={{ background: 'rgba(255,255,255,0.18)' }}>
-                  📆 ~{remainingMonths} mes{remainingMonths === 1 ? '' : 'es'} para terminar
-                </span>
-              )}
-            </div>
-          )}
-        </div>
-        {profile?.avatar_url && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={profile.avatar_url}
-            alt=""
-            className="rounded-lg object-cover shrink-0"
-            style={{ width: 56, height: 72 }}
-          />
+    <div className="flex flex-col px-5 pt-4 pb-6 gap-4">
+      {/* Saludo + duración de temporada */}
+      <div className="flex items-center justify-between">
+        <span className="font-heading text-lg font-bold">Hola, {profile?.name ?? '...'}</span>
+        {seasonId && (
+          <span className="text-xs font-bold" style={{ color: 'var(--accent)' }}>
+            {remainingJornadas} jornada{remainingJornadas === 1 ? '' : 's'}{remainingMonths > 0 ? ` · ~${remainingMonths} mes${remainingMonths === 1 ? '' : 'es'}` : ''}
+          </span>
         )}
       </div>
 
-      <div className="px-5 pt-4 pb-6 flex flex-col gap-4">
-        {/* Próximo partido */}
-        {round ? (
-          <div
-            className="rounded-[20px] p-4"
-            style={{ background: 'var(--surface)', boxShadow: '0 4px 14px oklch(0.42 0.1 155 / 0.1)', border: '2px solid var(--border)' }}
-          >
-            <div className="text-[11px] font-extrabold uppercase tracking-wide" style={{ color: 'var(--accent)' }}>
-              📅 Próximo partido · Jornada {round.round_number}
-            </div>
-            <div className="font-heading text-[17px] font-bold mt-1 capitalize">
-              {round.scheduled_date ? formatDate(round.scheduled_date) : 'Fecha por confirmar'}{effectiveTime && ` · ${effectiveTime}`}
-            </div>
+      {/* Próximo partido */}
+      {round ? (
+        <div
+          className="relative overflow-hidden rounded-[22px] p-4 text-white"
+          style={{ background: 'oklch(0.4 0.09 155)' }}
+        >
+          <CourtLines />
+          <div className="relative flex flex-col gap-3">
+            <p className="text-[11px] font-extrabold uppercase tracking-wide opacity-90">Próximo partido</p>
 
+            <div className="flex items-center gap-3 text-xs font-bold opacity-95">
+              <span className="flex items-center gap-1"><Calendar size={13} /> Jornada {round.round_number}</span>
+              {effectiveTime && <span className="flex items-center gap-1"><Clock size={13} /> {round.scheduled_date ? formatDate(round.scheduled_date).split(',')[0] : ''} · {effectiveTime}</span>}
+            </div>
             {effectiveClub && (
-              <div className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
-                📍 {effectiveClub}
-              </div>
+              <p className="text-xs flex items-center gap-1 -mt-1.5 opacity-90"><MapPin size={13} /> {effectiveClub}</p>
             )}
 
             {match && (
-              <div className="flex justify-between items-center mt-2.5 rounded-[14px] px-3 py-2.5" style={{ background: 'var(--surface2)' }}>
-                <span className="text-[13px] font-bold">{match.team1_p1?.name} / {match.team1_p2?.name}</span>
-                <span className="text-[11px] font-bold" style={{ color: 'var(--text-muted2)' }}>VS</span>
-                <span className="text-[13px] font-bold">{match.team2_p1?.name} / {match.team2_p2?.name}</span>
+              <div className="flex items-center justify-center gap-3 py-1">
+                <div className="flex-1 text-center">
+                  <p className="font-heading font-bold text-[15px] leading-tight">{match.team1_p1?.name}</p>
+                  <p className="font-heading font-bold text-[15px] leading-tight">{match.team1_p2?.name}</p>
+                </div>
+                <span
+                  className="flex items-center justify-center rounded-full text-[11px] font-extrabold shrink-0"
+                  style={{ width: 34, height: 34, background: 'rgba(255,255,255,0.16)' }}
+                >
+                  vs
+                </span>
+                <div className="flex-1 text-center">
+                  <p className="font-heading font-bold text-[15px] leading-tight">{match.team2_p1?.name}</p>
+                  <p className="font-heading font-bold text-[15px] leading-tight">{match.team2_p2?.name}</p>
+                </div>
               </div>
             )}
 
-            <div className="flex justify-between items-center mt-3">
-              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>🏟️ Reserva: {round.court_booker?.name ?? 'Sin asignar'}</span>
-              {round.court_confirmed ? (
-                <span className="text-[11px] font-extrabold px-2.5 py-1 rounded-full" style={{ background: 'var(--green-bg)', color: 'var(--green)' }}>
-                  ✅ Confirmada
-                </span>
-              ) : (
-                <span className="text-[11px] font-extrabold px-2.5 py-1 rounded-full" style={{ background: 'var(--orange-bg)', color: 'var(--orange)' }}>
-                  ⏳ Pendiente
-                </span>
-              )}
+            <div className="flex justify-center">
+              <span
+                className="text-[11px] font-extrabold px-3 py-1 rounded-full"
+                style={{
+                  background: round.court_confirmed ? 'rgba(255,255,255,0.16)' : 'oklch(0.85 0.15 95)',
+                  color: round.court_confirmed ? '#fff' : 'oklch(0.32 0.08 70)',
+                }}
+              >
+                {round.court_confirmed ? 'Reserva confirmada' : `Reserva pendiente · ${round.court_booker?.name ?? 'sin asignar'}`}
+              </span>
             </div>
 
             {!round.court_confirmed && round.court_booker_id === user?.id && (
-              <div className="mt-2.5">
-                <ConfirmCourtButton roundId={round.id} />
-              </div>
+              <ConfirmCourtButton roundId={round.id} />
             )}
 
-            <div className="mt-3 pt-3 flex gap-2" style={{ borderTop: '1px dashed var(--hairline)' }}>
+            <div className="flex gap-2 mt-1">
               <Link
-                href={`/admin/jornadas/${round.id}/resultado`}
-                className="flex-1 text-center text-xs font-bold py-2 rounded-xl transition hover:opacity-90"
-                style={{ background: 'var(--tint)', color: '#555' }}
+                href="/liga?tab=calendario"
+                className="flex-1 text-center text-sm font-bold py-2.5 rounded-xl transition hover:opacity-90"
+                style={{ background: '#fff', color: 'oklch(0.4 0.09 155)' }}
               >
-                📝 Registrar resultado
+                Ver jornada
               </Link>
               <Link
                 href={`/apuestas/${round.id}`}
-                className="flex-1 text-center text-xs font-bold py-2 rounded-xl transition hover:opacity-90"
-                style={{ background: 'var(--surface2)', color: 'var(--accent)' }}
+                className="flex-1 text-center text-sm font-bold py-2.5 rounded-xl transition hover:opacity-90 flex items-center justify-center gap-1.5"
+                style={{ background: 'rgba(255,255,255,0.16)', color: '#fff' }}
               >
-                🎰 Apuestas{bettingContext && bettingContext.openMarketsCount > 0 ? ` · ${bettingContext.chipsLeft}/100` : ''}
+                Apostar · {bettingContext?.chipsLeft ?? 100} fichas
               </Link>
             </div>
           </div>
-        ) : !seasonId ? (
-          <Link
-            href="/liga"
-            className="block rounded-[20px] p-4 text-center transition hover:opacity-90"
-            style={{ background: 'var(--orange-bg)', color: '#7A5A1E' }}
-          >
-            <p className="font-heading font-bold text-sm">⚡ Aún no has creado la liga</p>
-            <p className="text-xs mt-1">Toca aquí para configurarla desde Calendario.</p>
-          </Link>
-        ) : (
-          <div className="rounded-[20px] p-4 text-sm text-center" style={{ background: 'var(--surface)', color: 'var(--text-muted)', border: '2px solid var(--border)' }}>
-            No hay próximas jornadas programadas.{' '}
-            <Link href="/liga" className="font-bold" style={{ color: 'var(--accent)' }}>Ir a Calendario →</Link>
-          </div>
-        )}
-
-        {/* Saldo de la jornada + ranking acumulado de apuestas */}
-        {seasonId && (
-          <Link
-            href="/liga?tab=apuestas"
-            className="rounded-2xl py-3 px-4 flex items-center justify-between gap-3 transition hover:opacity-90"
-            style={{ background: 'var(--yellow)', color: 'var(--yellow-text)' }}
-          >
-            <div>
-              <p className="font-heading font-extrabold text-sm">💰 Apuestas</p>
-              <p className="text-xs mt-0.5">
-                {bettingContext && bettingContext.openMarketsCount > 0
-                  ? `Te quedan ${bettingContext.chipsLeft}/100 fichas esta jornada`
-                  : 'Ir al mercado de apuestas'}
-              </p>
-            </div>
-            {topBettor && (
-              <div className="text-right shrink-0">
-                <p className="text-[10px] font-bold uppercase tracking-wide opacity-80">Va primero</p>
-                <p className="text-xs font-extrabold">{topBettor.name} · {topBettor.points}pt</p>
-              </div>
-            )}
-          </Link>
-        )}
-
-        {/* Clasificación individual top 4 */}
-        <div>
-          <Link href="/liga?tab=clasificacion" className="font-heading text-sm font-bold mb-2 flex items-center gap-1 hover:opacity-80">
-            🏆 Clasificación individual <span style={{ color: 'var(--text-muted2)' }}>→</span>
-          </Link>
-          <div className="rounded-[18px] px-3.5" style={{ background: 'var(--surface)', boxShadow: '0 4px 14px rgba(0,0,0,0.04)' }}>
-            {!!topIndividual.length && (
-              <div className="flex justify-between items-center pt-2" style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--text-muted2)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                <span>Jugador</span>
-                <span className="flex items-center gap-4">
-                  <span>Pts</span>
-                  <span className="flex items-center gap-1">🌡️ Cena <DinnerRiskInfo /></span>
-                </span>
-              </div>
-            )}
-            {topIndividual.map((row, i) => {
-              const risk = dinnerRisk[row.player_id]
-              return (
-                <div
-                  key={row.player_id}
-                  className="flex justify-between items-center py-2.5"
-                  style={{ borderBottom: i < topIndividual.length - 1 ? '1px solid var(--hairline)' : undefined }}
-                >
-                  <span className="text-[13px] font-bold">{MEDALS[i]} {row.name}</span>
-                  <div className="flex items-center gap-4">
-                    <span className="text-[13px] font-extrabold w-6 text-right" style={{ color: 'var(--accent)' }}>{row.total_points}</span>
-                    {risk && (
-                      <span
-                        className="flex items-center justify-center w-[34px] h-[26px] rounded-full text-[14px]"
-                        style={{ background: risk.color }}
-                        title={risk.label}
-                        aria-label={`Riesgo de pagar la cena: ${risk.label}`}
-                      >
-                        {risk.emoji}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
-            {!topIndividual.length && (
-              <div className="py-6 text-center text-sm" style={{ color: 'var(--text-muted)' }}>
-                Aún no hay partidos jugados
-              </div>
-            )}
-          </div>
         </div>
-
-        {/* Pareja de oro */}
-        {topPair && (
-          <div className="rounded-2xl px-3.5 py-3" style={{ background: 'var(--surface2)' }}>
-            <p className="text-xs font-bold mb-1" style={{ color: 'var(--accent)' }}>👑 Pareja de oro de la temporada</p>
-            <p className="text-xs">
-              <strong>{topPair.p1_name} / {topPair.p2_name}</strong> · {topPair.wins}-{topPair.losses} en {topPair.matches_played} partidos
-            </p>
-          </div>
-        )}
-
-        {/* Footer nota */}
-        <div
-          className="rounded-2xl px-3.5 py-3 text-xs flex items-center gap-2"
+      ) : !seasonId ? (
+        <Link
+          href="/liga"
+          className="block rounded-[20px] p-4 text-center transition hover:opacity-90"
           style={{ background: 'var(--orange-bg)', color: '#7A5A1E' }}
         >
-          🍽️ Al terminar la liga, 1º y 2º cenan invitados por 3º y 4º.
+          <p className="font-heading font-bold text-sm">Aún no has creado la liga</p>
+          <p className="text-xs mt-1">Toca aquí para configurarla desde Calendario.</p>
+        </Link>
+      ) : (
+        <div className="rounded-[20px] p-4 text-sm text-center" style={{ background: 'var(--surface)', color: 'var(--text-muted)', border: '2px solid var(--border)' }}>
+          No hay próximas jornadas programadas.{' '}
+          <Link href="/liga" className="font-bold" style={{ color: 'var(--accent)' }}>Ir a Calendario →</Link>
+        </div>
+      )}
+
+      {/* Clasificación individual */}
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <Link href="/liga?tab=clasificacion" className="font-heading text-sm font-bold hover:opacity-80">Clasificación individual</Link>
+          <Link href="/liga?tab=clasificacion" className="text-xs font-bold" style={{ color: 'var(--accent)' }}>Ver todo →</Link>
+        </div>
+        <div className="rounded-[18px] px-3.5" style={{ background: 'var(--surface)', boxShadow: '0 4px 14px rgba(0,0,0,0.04)' }}>
+          {!!rows.length && (
+            <div className="grid items-center pt-2.5 pb-1.5" style={{ gridTemplateColumns: '1.5fr 0.6fr 1fr 0.8fr', fontSize: 10.5, fontWeight: 700, color: 'var(--text-muted2)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              <span>Jugador</span>
+              <span className="text-right">Pts</span>
+              <span className="text-center">Racha</span>
+              <span className="flex items-center justify-end gap-1">Cena <DinnerRiskInfo /></span>
+            </div>
+          )}
+          {rows.map((row, i) => {
+            const r = risk[row.id]
+            return (
+              <div
+                key={row.id}
+                className="grid items-center py-2.5"
+                style={{
+                  gridTemplateColumns: '1.5fr 0.6fr 1fr 0.8fr',
+                  borderBottom: i < rows.length - 1 ? '1px solid var(--hairline)' : undefined,
+                  background: row.id === user?.id ? 'var(--green-bg)' : undefined,
+                  marginLeft: -14, marginRight: -14, paddingLeft: 14, paddingRight: 14,
+                }}
+              >
+                <span className="text-[13px] font-bold flex items-center gap-1.5">
+                  <span
+                    className="flex items-center justify-center rounded-full text-[10px] font-extrabold shrink-0"
+                    style={{ width: 18, height: 18, background: row.rank <= 3 ? 'var(--tint)' : undefined }}
+                  >
+                    {MEDALS[row.rank - 1] ?? row.rank}
+                  </span>
+                  {row.name}
+                  <RankDelta delta={row.rankDelta} />
+                </span>
+                <span className="text-[13px] font-extrabold text-right" style={{ color: 'var(--accent)' }}>{row.points}</span>
+                <span className="flex items-center justify-center">
+                  <StreakBadge row={row} />
+                </span>
+                <span className="flex justify-end">
+                  {r && (
+                    <span
+                      className="rounded-full shrink-0"
+                      style={{ width: 16, height: 16, background: cenaColor(r.probability) }}
+                      title={r.label}
+                      aria-label={`Riesgo de pagar la cena: ${r.label}`}
+                    />
+                  )}
+                </span>
+              </div>
+            )
+          })}
+          {!rows.length && (
+            <div className="py-6 text-center text-sm" style={{ color: 'var(--text-muted)' }}>
+              Aún no hay partidos jugados
+            </div>
+          )}
+          {!!rows.length && (
+            <p className="text-[10.5px] pb-2.5" style={{ color: 'var(--text-muted2)' }}>Racha · últimos 3 partidos</p>
+          )}
         </div>
       </div>
+
+      {/* El pique de la jornada */}
+      {piques.length > 0 && (
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <span className="font-heading text-sm font-bold flex items-center gap-1.5">
+              <Flame size={15} style={{ color: 'var(--orange)' }} /> El pique de la jornada
+            </span>
+            <Link href="/piques" className="text-xs font-bold" style={{ color: 'var(--accent)' }}>Ver todos →</Link>
+          </div>
+          <PiquesCarousel piques={piques} />
+        </div>
+      )}
+
+      {/* Footer nota */}
+      <div
+        className="rounded-2xl px-3.5 py-3 text-xs flex items-center gap-2"
+        style={{ background: 'var(--orange-bg)', color: '#7A5A1E' }}
+      >
+        <Flag size={14} className="shrink-0" /> Al terminar la liga, 1º y 2º cenan invitados por 3º y 4º.
+      </div>
     </div>
+  )
+}
+
+function RankDelta({ delta }: { delta: number }) {
+  if (delta > 0) return <span className="flex items-center text-[11px] font-extrabold" style={{ color: 'var(--green)' }}><ArrowUp size={11} />{delta}</span>
+  if (delta < 0) return <span className="flex items-center text-[11px] font-extrabold" style={{ color: 'oklch(0.6 0.19 30)' }}><ArrowDown size={11} />{Math.abs(delta)}</span>
+  return <Minus size={11} style={{ color: 'var(--text-muted2)' }} />
+}
+
+function StreakBadge({ row }: { row: { activeStreak: { type: 'V' | 'D'; length: number } | null; results: ('V' | 'D')[] } }) {
+  if (row.activeStreak && row.activeStreak.length >= 3) {
+    const isWin = row.activeStreak.type === 'V'
+    return (
+      <span
+        className="flex items-center gap-1 text-[11px] font-extrabold px-2 py-1 rounded-full"
+        style={{ background: isWin ? 'var(--green-bg)' : 'oklch(0.95 0.04 55)', color: isWin ? 'var(--green)' : 'oklch(0.55 0.15 40)' }}
+      >
+        {isWin ? <Flame size={11} /> : <Snowflake size={11} />} {row.activeStreak.length}{row.activeStreak.type}
+      </span>
+    )
+  }
+  if (!row.results.length) return <span className="text-xs" style={{ color: 'var(--text-muted2)' }}>—</span>
+  return (
+    <span className="flex items-center gap-1">
+      {row.results.map((r, i) => (
+        <span
+          key={i}
+          className="flex items-center justify-center rounded-full text-[9px] font-extrabold"
+          style={{ width: 16, height: 16, background: r === 'V' ? 'var(--green-bg)' : 'oklch(0.95 0.04 55)', color: r === 'V' ? 'var(--green)' : 'oklch(0.55 0.15 40)' }}
+        >
+          {r}
+        </span>
+      ))}
+    </span>
+  )
+}
+
+// Líneas de pista de pádel, muy sutiles, detrás del contenido de la
+// tarjeta verde — puramente decorativo (aria-hidden).
+function CourtLines() {
+  return (
+    <svg
+      aria-hidden
+      viewBox="0 0 300 200"
+      className="absolute inset-0 w-full h-full"
+      style={{ opacity: 0.08 }}
+      preserveAspectRatio="none"
+    >
+      <rect x="10" y="10" width="280" height="180" fill="none" stroke="white" strokeWidth="2" />
+      <line x1="10" y1="100" x2="290" y2="100" stroke="white" strokeWidth="2" />
+      <line x1="150" y1="10" x2="150" y2="190" stroke="white" strokeWidth="1.5" />
+      <rect x="10" y="55" width="280" height="90" fill="none" stroke="white" strokeWidth="1.5" />
+    </svg>
   )
 }
