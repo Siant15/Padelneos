@@ -15,9 +15,9 @@ export default function NavBar() {
 
   return (
     <>
-      {/* Top bar fija */}
+      {/* Top bar fija — nunca más ancha que un móvil, ni siquiera en pantallas grandes */}
       <header
-        className="fixed top-0 left-0 right-0 z-40 flex items-center justify-between px-4"
+        className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-[480px] z-40 flex items-center justify-between px-4"
         style={{ height: 52, background: 'var(--surface)', borderBottom: '1px solid var(--tint)' }}
       >
         <span className="font-heading font-extrabold text-[15px] flex items-center gap-2">
@@ -30,9 +30,9 @@ export default function NavBar() {
         </Link>
       </header>
 
-      {/* Bottom nav fija */}
+      {/* Bottom nav fija — mismo ancho tope que la cabecera */}
       <nav
-        className="fixed bottom-0 left-0 right-0 z-40 flex items-stretch"
+        className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[480px] z-40 flex items-stretch"
         style={{ background: 'var(--surface)', borderTop: '1px solid var(--tint)', paddingBottom: 'env(safe-area-inset-bottom, 0px)', minHeight: 68 }}
       >
         {NAV.map(({ href, label, Icon, extraPrefixes }) => {
