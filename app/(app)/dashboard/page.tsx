@@ -84,7 +84,6 @@ export default async function DashboardPage() {
           className="relative overflow-hidden rounded-[22px] p-4 text-white"
           style={{ background: 'oklch(0.4 0.09 155)' }}
         >
-          <CourtLines />
           <div className="relative flex flex-col gap-3">
             <p className="text-[11px] font-extrabold uppercase tracking-wide opacity-90">Próximo partido</p>
 
@@ -286,24 +285,5 @@ function StreakBadge({ row }: { row: { activeStreak: { type: 'V' | 'D'; length: 
         </span>
       ))}
     </span>
-  )
-}
-
-// Líneas de pista de pádel, muy sutiles, detrás del contenido de la
-// tarjeta verde — puramente decorativo (aria-hidden).
-function CourtLines() {
-  return (
-    <svg
-      aria-hidden
-      viewBox="0 0 300 200"
-      className="absolute inset-0 w-full h-full"
-      style={{ opacity: 0.08 }}
-      preserveAspectRatio="none"
-    >
-      <rect x="10" y="10" width="280" height="180" fill="none" stroke="white" strokeWidth="2" />
-      <line x1="10" y1="100" x2="290" y2="100" stroke="white" strokeWidth="2" />
-      <line x1="150" y1="10" x2="150" y2="190" stroke="white" strokeWidth="1.5" />
-      <rect x="10" y="55" width="280" height="90" fill="none" stroke="white" strokeWidth="1.5" />
-    </svg>
   )
 }
