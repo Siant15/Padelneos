@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter, useParams } from 'next/navigation'
 import type { BettingMarket, BettingOption, BettingQuestionTemplate, Profile } from '@/lib/types'
 import AddQuestionPicker from '@/components/AddQuestionPicker'
+import { revalidateLigaData } from '@/lib/actions'
 
 type MarketWithAll = BettingMarket & {
   options: (BettingOption & { player?: Profile })[]
@@ -118,6 +119,7 @@ export default function MercadosPage() {
       setPayoutError('No se pudo liquidar la jornada: ' + error.message)
       return
     }
+    await revalidateLigaData()
     setPayoutsCalculated(true)
     setIsSettled(true)
     setTimeout(() => setPayoutsCalculated(false), 3000)

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter, useParams } from 'next/navigation'
 import type { Profile } from '@/lib/types'
+import { revalidateLigaData } from '@/lib/actions'
 
 export default function EditarJornadaPage() {
   const supabase = createClient()
@@ -112,19 +113,20 @@ export default function EditarJornadaPage() {
       if (newMatch) setForm(f => ({ ...f, matchId: newMatch.id }))
     }
 
+    await revalidateLigaData()
     setSaved(true)
     setLoading(false)
     setTimeout(() => { setSaved(false); router.push('/liga'); router.refresh() }, 1500)
   }
 
   return (
-    <div className="space-y-5 pb-4">
+    <div className="space-y-5 pb-4 overflow-x-hidden">
       <div className="flex items-center gap-3">
         <button onClick={() => router.back()} className="text-sm" style={{ color: 'var(--text-muted)' }}>← Volver</button>
         <h1 className="text-xl font-bold">Editar jornada</h1>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-4 min-w-0">
         <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
           Mientras falte día, hora o club, esta jornada aparece como &quot;Pendiente de reserva&quot;.
         </p>
@@ -266,7 +268,7 @@ function PlayerSelect({ value, onChange, players, exclude, label }: {
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div>
+    <div className="min-w-0">
       <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-muted)' }}>{label}</label>
       {children}
     </div>
@@ -275,6 +277,9 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 const inputStyle: React.CSSProperties = {
   width: '100%',
+  maxWidth: '100%',
+  minWidth: 0,
+  boxSizing: 'border-box',
   padding: '10px 12px',
   borderRadius: 10,
   background: 'var(--surface)',

@@ -6,6 +6,7 @@ import { useRouter, useParams } from 'next/navigation'
 import type { Profile } from '@/lib/types'
 import { isValidSetScore } from '@/lib/types'
 import MetricsInfoButton from '@/components/MetricsInfoButton'
+import { revalidateLigaData } from '@/lib/actions'
 
 type PairForm = { team1_p1_id: string; team1_p2_id: string; team2_p1_id: string; team2_p2_id: string }
 
@@ -261,6 +262,7 @@ export default function ResultadoPage() {
       return
     }
 
+    await revalidateLigaData()
     setSaved(true)
     setLoading(false)
     router.refresh()

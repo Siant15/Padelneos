@@ -26,7 +26,7 @@ export const getCachedActiveSeason = unstable_cache(
     return data
   },
   ['active-season'],
-  { revalidate: REVALIDATE_SECONDS }
+  { revalidate: REVALIDATE_SECONDS, tags: ['liga-data'] }
 )
 
 export const getCachedPlayers = unstable_cache(
@@ -35,7 +35,7 @@ export const getCachedPlayers = unstable_cache(
     return data ?? []
   },
   ['players'],
-  { revalidate: 60 }
+  { revalidate: 60, tags: ['liga-data'] }
 )
 
 export const getCachedSeasonRounds = unstable_cache(
@@ -58,7 +58,7 @@ export const getCachedSeasonRounds = unstable_cache(
     return data ?? []
   },
   ['season-rounds'],
-  { revalidate: REVALIDATE_SECONDS }
+  { revalidate: REVALIDATE_SECONDS, tags: ['liga-data'] }
 )
 
 export const getCachedSeasonAggregates = unstable_cache(
@@ -88,5 +88,5 @@ export const getCachedSeasonAggregates = unstable_cache(
     }
   },
   ['season-aggregates'],
-  { revalidate: REVALIDATE_SECONDS }
+  { revalidate: REVALIDATE_SECONDS, tags: ['liga-data'] }
 )

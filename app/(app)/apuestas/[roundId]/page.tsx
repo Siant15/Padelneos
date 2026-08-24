@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
+import Link from 'next/link'
 import BettingMarketsBoard from '@/components/BettingMarketsBoard'
 import AddQuestionPicker from '@/components/AddQuestionPicker'
 import ApuestasActa from '@/components/ApuestasActa'
@@ -21,6 +22,7 @@ export default async function ApuestasPage({ params }: { params: Promise<{ round
     const acta = await getRoundActa(supabase, roundId)
     return (
       <div className="px-5 pt-5 pb-6 flex flex-col gap-3.5">
+        <Link href="/liga?tab=apuestas" className="text-sm" style={{ color: 'var(--text-muted)' }}>← Volver</Link>
         <JornadaHeader
           roundNumber={round.round_number}
           pair1Label={acta.pair1Label}
@@ -51,6 +53,7 @@ export default async function ApuestasPage({ params }: { params: Promise<{ round
 
   return (
     <div className="px-5 pt-5 pb-6 flex flex-col gap-3.5">
+      <Link href="/liga?tab=apuestas" className="text-sm" style={{ color: 'var(--text-muted)' }}>← Volver</Link>
       <div
         className="rounded-2xl px-3.5 py-3 flex justify-between items-center"
         style={{ background: 'var(--surface)', boxShadow: '0 3px 10px rgba(0,0,0,0.04)' }}

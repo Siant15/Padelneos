@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
+import { revalidateLigaData } from '@/lib/actions'
 
 export default function ConfirmCourtButton({ roundId }: { roundId: string }) {
   const [loading, setLoading] = useState(false)
@@ -22,6 +23,7 @@ export default function ConfirmCourtButton({ roundId }: { roundId: string }) {
       setError('No se pudo confirmar: ' + error.message)
       return
     }
+    await revalidateLigaData()
     router.refresh()
   }
 
