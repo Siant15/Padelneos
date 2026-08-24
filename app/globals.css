@@ -39,6 +39,14 @@ body {
   box-sizing: border-box;
 }
 
+/* Safari en iOS hace zoom automático al enfocar un campo con
+   font-size menor de 16px — se sentía como que "la pantalla se
+   amplía" al tocar un input. La app es solo para móvil, así que se
+   fuerza 16px en todos los campos de texto, sin excepción. */
+input, select, textarea {
+  font-size: 16px !important;
+}
+
 h1, h2, h3, h4, .font-heading {
   font-family: var(--font-heading);
 }
