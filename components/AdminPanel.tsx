@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { addMember, changeMemberPassword, removeMember, type MemberRow } from '@/lib/admin-actions'
+import { addMember, changeMemberPassword, changeMemberEmail, removeMember, type MemberRow } from '@/lib/admin-actions'
 
 export default function AdminPanel({ members }: { members: MemberRow[] }) {
   const router = useRouter()
@@ -80,6 +80,10 @@ function AddMemberForm({ onAdded }: { onAdded: () => void }) {
 function MemberRowCard({ member, onChanged }: { member: MemberRow; onChanged: () => void }) {
   const [showPassword, setShowPassword] = useState(false)
   const [newPassword, setNewPassword] = useState('')
+  const [showEmail, setShowEmail] = useState(false)
+  const [newEmail, setNewEmail] = useState(member.email)
+  const [savingEmail, setSavingEmail] = useState(false)
+  const [savedEmail, setSavedEmail] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [saved, setSaved] = useState(false)
@@ -99,6 +103,19 @@ function MemberRowCard({ member, onChanged }: { member: MemberRow; onChanged: ()
     setTimeout(() => setSaved(false), 2000)
   }
 
+  async function handleEmailSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setSavingEmail(true)
+    setError('')
+    const { error } = await changeMemberEmail(member.id, newEmail)
+    setSavingEmail(false)
+    if (error) { setError(error); return }
+    setShowEmail(false)
+    setSavedEmail(true)
+    onChanged()
+    setTimeout(() => setSavedEmail(false), 2000)
+  }
+
   async function handleDelete() {
     setDeleting(true)
     setError('')
@@ -116,6 +133,9 @@ function MemberRowCard({ member, onChanged }: { member: MemberRow; onChanged: ()
           <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{member.email}</p>
         </div>
         <div className="flex gap-2 shrink-0">
+          <button onClick={() => setShowEmail(v => !v)} className="text-xs font-bold px-2.5 py-1.5 rounded-lg" style={{ background: 'var(--tint)', color: 'var(--text-muted2)' }}>
+            Email
+          </button>
           <button onClick={() => setShowPassword(v => !v)} className="text-xs font-bold px-2.5 py-1.5 rounded-lg" style={{ background: 'var(--tint)', color: 'var(--text-muted2)' }}>
             Contraseña
           </button>
@@ -126,6 +146,22 @@ function MemberRowCard({ member, onChanged }: { member: MemberRow; onChanged: ()
           )}
         </div>
       </div>
+
+      {showEmail && (
+        <form onSubmit={handleEmailSubmit} className="flex gap-2 mt-3">
+          <input
+            value={newEmail}
+            onChange={e => setNewEmail(e.target.value)}
+            type="email"
+            placeholder="Email real del jugador"
+            required
+            style={{ ...inputStyle, flex: 1 }}
+          />
+          <button type="submit" disabled={savingEmail} className="text-xs font-bold px-3 rounded-xl disabled:opacity-50" style={{ background: savedEmail ? 'var(--green)' : 'var(--accent)', color: '#fff' }}>
+            {savingEmail ? '...' : savedEmail ? '✓' : 'Guardar'}
+          </button>
+        </form>
+      )}
 
       {showPassword && (
         <form onSubmit={handlePasswordSubmit} className="flex gap-2 mt-3">

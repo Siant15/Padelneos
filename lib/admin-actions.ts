@@ -79,6 +79,22 @@ export async function changeMemberPassword(playerId: string, newPassword: string
   return { error: null }
 }
 
+export async function changeMemberEmail(playerId: string, newEmail: string): Promise<{ error: string | null }> {
+  await assertIsAdmin()
+  const email = newEmail.trim()
+  if (!email || !email.includes('@')) return { error: 'Introduce un email válido.' }
+
+  const admin = adminClient()
+  const { error } = await admin.auth.admin.updateUserById(playerId, { email, email_confirm: true })
+  if (error) {
+    const message = error.message.toLowerCase().includes('already been registered')
+      ? 'Ese email ya está registrado por otro miembro.'
+      : error.message
+    return { error: message }
+  }
+  return { error: null }
+}
+
 export async function removeMember(playerId: string): Promise<{ error: string | null }> {
   await assertIsAdmin()
   const user = await getCachedUser()
