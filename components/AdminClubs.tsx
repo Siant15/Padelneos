@@ -73,12 +73,12 @@ export default function AdminClubs({ clubs }: { clubs: ClubRow[] }) {
 
       <div className="flex flex-col gap-2">
         {clubs.map(c => (
-          <div key={c.id} className="rounded-xl px-3 py-2 flex items-center justify-between gap-2" style={{ background: 'var(--surface)', boxShadow: '0 3px 10px rgba(0,0,0,0.04)' }}>
+          <div key={c.id} className="rounded-xl px-3 py-2 min-w-0" style={{ background: 'var(--surface)', boxShadow: '0 3px 10px rgba(0,0,0,0.04)' }}>
             <div className="min-w-0">
               <p className="text-sm font-bold truncate">{c.name}</p>
               {c.address && <p className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>{c.address}</p>}
             </div>
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex flex-wrap items-center gap-2 mt-1.5">
               {c.mapsUrl && (
                 <a href={c.mapsUrl} target="_blank" rel="noopener noreferrer" className="text-xs font-bold px-2 py-1 rounded-lg" style={{ background: 'var(--tint)', color: 'var(--text-muted2)' }}>
                   Maps

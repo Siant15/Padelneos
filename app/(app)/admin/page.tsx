@@ -13,7 +13,7 @@ export default async function AdminPage() {
   const [members, seasons, clubs] = await Promise.all([listMembers(), listSeasons(), listClubs()])
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 overflow-x-hidden">
       <div>
         <h1 className="font-heading text-[22px] font-extrabold mb-1">Administración</h1>
         <p className="text-sm" style={{ color: 'var(--text-muted)' }}>

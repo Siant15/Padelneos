@@ -54,15 +54,15 @@ function SeasonCard({ season }: { season: SeasonRow }) {
   }
 
   return (
-    <div className="rounded-2xl p-4" style={{ background: 'var(--surface)', boxShadow: '0 3px 10px rgba(0,0,0,0.04)' }}>
-      <div className="flex items-center justify-between">
-        <button onClick={toggle} className="text-left flex-1">
-          <p className="font-bold text-sm">{season.name}</p>
-          <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-            {season.status === 'active' ? 'Activa' : 'Finalizada'} · {season.roundCount}/{season.minMatches} jornadas
-          </p>
-        </button>
-        <button onClick={() => setConfirming(true)} className="text-xs font-bold px-2.5 py-1.5 rounded-lg shrink-0" style={{ background: 'oklch(0.95 0.04 30)', color: 'var(--red)' }}>
+    <div className="rounded-2xl p-4 min-w-0" style={{ background: 'var(--surface)', boxShadow: '0 3px 10px rgba(0,0,0,0.04)' }}>
+      <button onClick={toggle} className="text-left block w-full min-w-0">
+        <p className="font-bold text-sm truncate">{season.name}</p>
+        <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--text-muted)' }}>
+          {season.status === 'active' ? 'Activa' : 'Finalizada'} · {season.roundCount}/{season.minMatches} jornadas
+        </p>
+      </button>
+      <div className="flex flex-wrap gap-2 mt-2.5">
+        <button onClick={() => setConfirming(true)} className="text-xs font-bold px-2.5 py-1.5 rounded-lg" style={{ background: 'oklch(0.95 0.04 30)', color: 'var(--red)' }}>
           Eliminar
         </button>
       </div>
@@ -124,21 +124,19 @@ function RoundRowItem({ round, onDeleted }: { round: RoundRow; onDeleted: () => 
   }
 
   return (
-    <div className="rounded-xl px-3 py-2" style={{ background: 'var(--surface2)' }}>
-      <div className="flex items-center justify-between gap-2">
-        <div className="text-xs">
-          <span className="font-bold">J{round.roundNumber}</span> · {STATUS_LABEL[round.status] ?? round.status}
-          {round.scheduledDate && <> · {round.scheduledDate}{round.scheduledTime ? ` ${formatTime(round.scheduledTime)}` : ''}</>}
-          {round.club && <> · {round.club}</>}
-        </div>
-        <div className="flex gap-1.5 shrink-0">
-          <Link href={`/admin/jornadas/${round.id}/editar`} className="text-[11px] font-bold px-2 py-1 rounded-lg" style={{ background: 'var(--tint)', color: 'var(--text-muted2)' }}>
-            Editar
-          </Link>
-          <button onClick={() => setConfirming(true)} className="text-[11px] font-bold px-2 py-1 rounded-lg" style={{ background: 'oklch(0.95 0.04 30)', color: 'var(--red)' }}>
-            Eliminar
-          </button>
-        </div>
+    <div className="rounded-xl px-3 py-2 min-w-0" style={{ background: 'var(--surface2)' }}>
+      <div className="text-xs break-words">
+        <span className="font-bold">J{round.roundNumber}</span> · {STATUS_LABEL[round.status] ?? round.status}
+        {round.scheduledDate && <> · {round.scheduledDate}{round.scheduledTime ? ` ${formatTime(round.scheduledTime)}` : ''}</>}
+        {round.club && <> · {round.club}</>}
+      </div>
+      <div className="flex flex-wrap gap-1.5 mt-1.5">
+        <Link href={`/admin/jornadas/${round.id}/editar`} className="text-[11px] font-bold px-2 py-1 rounded-lg" style={{ background: 'var(--tint)', color: 'var(--text-muted2)' }}>
+          Editar
+        </Link>
+        <button onClick={() => setConfirming(true)} className="text-[11px] font-bold px-2 py-1 rounded-lg" style={{ background: 'oklch(0.95 0.04 30)', color: 'var(--red)' }}>
+          Eliminar
+        </button>
       </div>
       {confirming && (
         <div className="mt-2 flex items-center gap-2">

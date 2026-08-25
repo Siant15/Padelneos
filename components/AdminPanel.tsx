@@ -126,25 +126,23 @@ function MemberRowCard({ member, onChanged }: { member: MemberRow; onChanged: ()
   }
 
   return (
-    <div className="rounded-2xl p-4" style={{ background: 'var(--surface)', boxShadow: '0 3px 10px rgba(0,0,0,0.04)' }}>
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="font-bold text-sm">{member.name} {member.isAdmin && <span className="text-xs font-bold" style={{ color: 'var(--accent)' }}>(admin)</span>}</p>
-          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{member.email}</p>
-        </div>
-        <div className="flex gap-2 shrink-0">
-          <button onClick={() => setShowEmail(v => !v)} className="text-xs font-bold px-2.5 py-1.5 rounded-lg" style={{ background: 'var(--tint)', color: 'var(--text-muted2)' }}>
-            Email
+    <div className="rounded-2xl p-4 min-w-0" style={{ background: 'var(--surface)', boxShadow: '0 3px 10px rgba(0,0,0,0.04)' }}>
+      <div className="min-w-0">
+        <p className="font-bold text-sm truncate">{member.name} {member.isAdmin && <span className="text-xs font-bold" style={{ color: 'var(--accent)' }}>(admin)</span>}</p>
+        <p className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>{member.email}</p>
+      </div>
+      <div className="flex flex-wrap gap-2 mt-2.5">
+        <button onClick={() => setShowEmail(v => !v)} className="text-xs font-bold px-2.5 py-1.5 rounded-lg" style={{ background: 'var(--tint)', color: 'var(--text-muted2)' }}>
+          Email
+        </button>
+        <button onClick={() => setShowPassword(v => !v)} className="text-xs font-bold px-2.5 py-1.5 rounded-lg" style={{ background: 'var(--tint)', color: 'var(--text-muted2)' }}>
+          Contraseña
+        </button>
+        {!member.isAdmin && (
+          <button onClick={() => setConfirmingDelete(true)} className="text-xs font-bold px-2.5 py-1.5 rounded-lg" style={{ background: 'oklch(0.95 0.04 30)', color: 'var(--red)' }}>
+            Eliminar
           </button>
-          <button onClick={() => setShowPassword(v => !v)} className="text-xs font-bold px-2.5 py-1.5 rounded-lg" style={{ background: 'var(--tint)', color: 'var(--text-muted2)' }}>
-            Contraseña
-          </button>
-          {!member.isAdmin && (
-            <button onClick={() => setConfirmingDelete(true)} className="text-xs font-bold px-2.5 py-1.5 rounded-lg" style={{ background: 'oklch(0.95 0.04 30)', color: 'var(--red)' }}>
-              Eliminar
-            </button>
-          )}
-        </div>
+        )}
       </div>
 
       {showEmail && (
