@@ -400,32 +400,35 @@ export default function ResultadoPage() {
           <div className="rounded-xl p-4" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
             <p className="text-sm font-semibold mb-4">Marcador</p>
 
-            {/* Header equipos */}
-            <div className="grid grid-cols-[1fr_2.5rem_0.5rem_2.5rem] gap-2 mb-3 text-xs" style={{ color: 'var(--text-muted)' }}>
-              <span>Equipo</span>
-              <span className="text-center" style={{ color: 'var(--accent)' }}>
-                {team1Players.map(p => p.name).join(' & ')}
-              </span>
+            {/* Cada pareja es una fila, cada set una columna */}
+            <div className="grid gap-2 mb-2" style={{ gridTemplateColumns: `1fr repeat(${sets.length}, 3rem)` }}>
               <span />
-              <span className="text-center" style={{ color: 'var(--orange)' }}>
-                {team2Players.map(p => p.name).join(' & ')}
-              </span>
+              {sets.map((_, i) => (
+                <span key={i} className="text-center text-xs" style={{ color: 'var(--text-muted)' }}>Set {i + 1}</span>
+              ))}
             </div>
 
-            <div className="space-y-2">
+            <div className="grid gap-2 items-center mb-2" style={{ gridTemplateColumns: `1fr repeat(${sets.length}, 3rem)` }}>
+              <span className="text-sm font-semibold truncate" style={{ color: 'var(--accent)' }}>
+                {team1Players.map(p => p.name).join(' & ')}
+              </span>
               {sets.map((s, i) => (
-                <div key={i} className="grid grid-cols-[1fr_2.5rem_0.5rem_2.5rem] gap-2 items-center">
-                  <span className="text-sm" style={{ color: 'var(--text-muted)' }}>Set {i + 1}</span>
-                  <input type="number" min={0} max={7} value={s.t1}
-                    onChange={e => setScore(i, 't1', e.target.value)}
-                    className="text-center rounded-lg py-2 text-sm font-bold outline-none"
-                    style={{ background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)' }} />
-                  <span className="text-center text-xs" style={{ color: 'var(--text-muted)' }}>-</span>
-                  <input type="number" min={0} max={7} value={s.t2}
-                    onChange={e => setScore(i, 't2', e.target.value)}
-                    className="text-center rounded-lg py-2 text-sm font-bold outline-none"
-                    style={{ background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)' }} />
-                </div>
+                <input key={i} type="number" min={0} max={7} value={s.t1}
+                  onChange={e => setScore(i, 't1', e.target.value)}
+                  className="text-center rounded-lg py-2 text-sm font-bold outline-none"
+                  style={{ background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)' }} />
+              ))}
+            </div>
+
+            <div className="grid gap-2 items-center" style={{ gridTemplateColumns: `1fr repeat(${sets.length}, 3rem)` }}>
+              <span className="text-sm font-semibold truncate" style={{ color: 'var(--orange)' }}>
+                {team2Players.map(p => p.name).join(' & ')}
+              </span>
+              {sets.map((s, i) => (
+                <input key={i} type="number" min={0} max={7} value={s.t2}
+                  onChange={e => setScore(i, 't2', e.target.value)}
+                  className="text-center rounded-lg py-2 text-sm font-bold outline-none"
+                  style={{ background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)' }} />
               ))}
             </div>
 

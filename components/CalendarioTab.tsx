@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import JornadasAccordion, { type JornadaViewModel } from '@/components/JornadasAccordion'
 import MiniCalendar from '@/components/MiniCalendar'
 
@@ -84,6 +85,10 @@ export default function CalendarioTab({
       {action === 'new' && (
         <SeasonForm mode="new" players={players} onCancel={() => setAction(null)} />
       )}
+
+      <Link href="/liga/historico" className="text-xs font-bold text-center" style={{ color: 'var(--text-muted)' }}>
+        📜 Ver ligas finalizadas →
+      </Link>
     </div>
   )
 }
