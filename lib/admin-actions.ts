@@ -144,3 +144,35 @@ export async function deleteSeason(seasonId: string): Promise<{ error: string | 
   updateTag('liga-data')
   return { error: null }
 }
+
+// ─── Clubs (alta manual, para los que no aparecen en OpenStreetMap) ──
+export type ClubRow = { id: string; name: string; address: string | null; mapsUrl: string | null }
+
+export async function listClubs(): Promise<ClubRow[]> {
+  await assertIsAdmin()
+  const admin = adminClient()
+  const { data } = await admin.from('clubs').select('id, name, address, maps_url').order('name')
+  return (data ?? []).map(c => ({ id: c.id, name: c.name, address: c.address, mapsUrl: c.maps_url }))
+}
+
+export async function addManualClub(name: string, address: string, mapsUrl: string): Promise<{ error: string | null }> {
+  await assertIsAdmin()
+  if (!name.trim()) return { error: 'El nombre del club es obligatorio.' }
+
+  const finalMapsUrl = mapsUrl.trim() || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([name, address].filter(Boolean).join(', '))}`
+
+  const admin = adminClient()
+  const { error } = await admin
+    .from('clubs')
+    .upsert({ name: name.trim(), address: address.trim() || null, maps_url: finalMapsUrl }, { onConflict: 'name' })
+  if (error) return { error: error.message }
+  return { error: null }
+}
+
+export async function deleteClub(clubId: string): Promise<{ error: string | null }> {
+  await assertIsAdmin()
+  const admin = adminClient()
+  const { error } = await admin.from('clubs').delete().eq('id', clubId)
+  if (error) return { error: error.message }
+  return { error: null }
+}
