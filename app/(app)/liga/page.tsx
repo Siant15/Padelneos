@@ -176,14 +176,13 @@ export default async function LigaPage() {
   )
 
   const playerList = (players as { id: string; name: string }[] | null) ?? []
-  const settledActas = settledRoundRefs.length ? await getCachedSettledActas(settledRoundRefs.map(r => r.id), playerList) : []
+  const [settledActas, openBetting] = await Promise.all([
+    settledRoundRefs.length ? getCachedSettledActas(settledRoundRefs.map(r => r.id), playerList) : Promise.resolve([]),
+    userId && openRoundRefs.length ? getCachedOpenRoundsBetting(seasonId ?? '', openRoundRefs.map(r => r.id), userId) : Promise.resolve(null),
+  ])
   const settledEntries: ApuestasRoundEntry[] = settledRoundRefs.map((r, i) => ({
     kind: 'settled' as const, roundId: r.id, roundNumber: r.round_number, acta: settledActas[i],
   }))
-
-  const openBetting = userId && openRoundRefs.length
-    ? await getCachedOpenRoundsBetting(seasonId ?? '', openRoundRefs.map(r => r.id), userId)
-    : null
 
   const openEntries: ApuestasRoundEntry[] = openBetting ? openRoundRefs.map((r, i) => {
     const ctx = openBetting.contexts[i]

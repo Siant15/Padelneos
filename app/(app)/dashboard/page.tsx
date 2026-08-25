@@ -34,13 +34,21 @@ export default async function DashboardPage() {
   const seasonId = activeSeasonRow?.id
   const rounds = seasonId ? await getCachedSeasonRounds(seasonId) : []
 
-  const { rows, piques } = seasonId ? await getInicioData(supabase, seasonId) : { rows: [], piques: [] }
-
   const nextRound = (rounds.find(r => r.status === 'scheduled') as Round | undefined) ?? null
   const round = nextRound
   const match = round?.match as { team1_p1?: { name: string }; team1_p2?: { name: string }; team2_p1?: { name: string }; team2_p2?: { name: string } } | undefined
   const effectiveTime = round?.scheduled_time?.slice(0, 5)
   const effectiveClub = round?.club
+
+  // Ninguna de estas tres depende del resultado de las otras dos —
+  // se lanzan a la vez en vez de una detrás de otra para no sumar
+  // sus latencias de red.
+  const [{ rows, piques }, bettingContext, clubMapsRow] = await Promise.all([
+    seasonId ? getInicioData(supabase, seasonId) : Promise.resolve({ rows: [], piques: [] }),
+    round && user ? getRoundBettingContext(supabase, round.id, user.id) : Promise.resolve(null),
+    effectiveClub ? supabase.from('clubs').select('maps_url').eq('name', effectiveClub).maybeSingle() : Promise.resolve({ data: null }),
+  ])
+  const clubMapsUrl = clubMapsRow?.data?.maps_url ?? null
 
   const seasonRoundDates = rounds.filter(r => r.status !== 'played').map(r => r.scheduled_date)
   const today = new Date().toISOString().slice(0, 10)
@@ -63,12 +71,6 @@ export default async function DashboardPage() {
     })
     .filter((x): x is { pair1: [string, string]; pair2: [string, string] } => !!x)
   const risk = estimateDinnerRisk(rows.map(r => ({ id: r.id, sportPoints: r.points, bettingBonus: 0 })), remainingPairings)
-
-  const bettingContext = round && user ? await getRoundBettingContext(supabase, round.id, user.id) : null
-
-  const clubMapsUrl = effectiveClub
-    ? (await supabase.from('clubs').select('maps_url').eq('name', effectiveClub).maybeSingle()).data?.maps_url ?? null
-    : null
 
   return (
     <div className="flex flex-col px-5 pt-4 pb-6 gap-4">
