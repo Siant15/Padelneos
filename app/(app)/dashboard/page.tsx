@@ -92,19 +92,20 @@ export default async function DashboardPage() {
             <p className="text-[11px] font-extrabold uppercase tracking-wide opacity-90">Próximo partido</p>
 
             <div className="flex items-center gap-3 text-xs font-bold opacity-95">
-              <span className="flex items-center gap-1"><Calendar size={13} /> Jornada {round.round_number}</span>
-              {effectiveTime && <span className="flex items-center gap-1"><Clock size={13} /> {round.scheduled_date ? formatDate(round.scheduled_date).split(',')[0] : ''} · {effectiveTime}</span>}
+              <span className="flex items-center gap-1"><Calendar size={13} /> J{round.round_number}</span>
+              <span className="flex items-center gap-1"><Clock size={13} /> {round.scheduled_date ? formatDate(round.scheduled_date).split(',')[0] : '-'} · {effectiveTime || '-'}</span>
             </div>
-            {effectiveClub && (
-              <p className="text-xs flex items-center gap-1 -mt-1.5 opacity-90">
-                <MapPin size={13} /> {effectiveClub}
-                {clubMapsUrl && (
-                  <a href={clubMapsUrl} target="_blank" rel="noopener noreferrer" className="underline font-bold">
-                    Ver en Maps
-                  </a>
-                )}
-              </p>
-            )}
+            <p className="text-xs flex items-center gap-1 -mt-1.5 opacity-90">
+              <MapPin size={13} /> {effectiveClub || '-'}
+              {clubMapsUrl && (
+                <a href={clubMapsUrl} target="_blank" rel="noopener noreferrer" className="underline font-bold">
+                  Ver en Maps
+                </a>
+              )}
+            </p>
+            <p className="text-xs -mt-1.5 opacity-90">
+              Responsable (reserva y pelotas): {round.court_booker?.name ?? '-'}
+            </p>
 
             {match && (
               <div className="flex items-center justify-center gap-3 py-1">
