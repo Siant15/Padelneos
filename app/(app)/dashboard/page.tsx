@@ -4,6 +4,8 @@ import { formatDate } from '@/lib/types'
 import Link from 'next/link'
 import { Calendar, Clock, MapPin, ArrowUp, ArrowDown, Minus, Flame, Snowflake, Flag, Pencil } from 'lucide-react'
 import ConfirmCourtButton from '@/components/ConfirmCourtButton'
+import ClickableCard from '@/components/ClickableCard'
+import StopPropagation from '@/components/StopPropagation'
 import DinnerRiskInfo from '@/components/DinnerRiskInfo'
 import PiquesCarousel from '@/components/PiquesCarousel'
 import { getRoundBettingContext } from '@/lib/betting-queries'
@@ -86,14 +88,11 @@ export default async function DashboardPage() {
 
       {/* Próximo partido */}
       {round ? (
-        <div
+        <ClickableCard
+          href={`/admin/jornadas/${round.id}/editar`}
           className="relative overflow-hidden rounded-[22px] p-4 text-white"
           style={{ background: 'oklch(0.4 0.09 155)' }}
         >
-          {/* Toda la tarjeta abre "Editar jornada" salvo los controles
-              explícitos (Resultado, Apostar, Ver en Maps, confirmar
-              reserva), que van por encima con z-index más alto. */}
-          <Link href={`/admin/jornadas/${round.id}/editar`} aria-label="Editar jornada" className="absolute inset-0 z-10 rounded-[22px]" />
           <div className="relative flex flex-col gap-3">
             <p className="text-[11px] font-extrabold uppercase tracking-wide opacity-90">Próximo partido</p>
 
@@ -104,9 +103,11 @@ export default async function DashboardPage() {
             <p className="text-xs flex items-center gap-1 -mt-1.5 opacity-90">
               <MapPin size={13} /> {effectiveClub || '-'}
               {clubMapsUrl && (
-                <a href={clubMapsUrl} target="_blank" rel="noopener noreferrer" className="relative z-20 underline font-bold">
-                  Ver en Maps
-                </a>
+                <StopPropagation>
+                  <a href={clubMapsUrl} target="_blank" rel="noopener noreferrer" className="underline font-bold">
+                    Ver en Maps
+                  </a>
+                </StopPropagation>
               )}
             </p>
             <p className="text-xs -mt-1.5 opacity-90">
@@ -145,14 +146,15 @@ export default async function DashboardPage() {
             </div>
 
             {!round.court_confirmed && round.court_booker_id === user?.id && (
-              <div className="relative z-20">
+              <StopPropagation>
                 <ConfirmCourtButton roundId={round.id} />
-              </div>
+              </StopPropagation>
             )}
 
-            <div className="relative z-20 flex gap-2 mt-1">
+            <div className="flex gap-2 mt-1">
               <Link
                 href={`/admin/jornadas/${round.id}/resultado`}
+                onClick={e => e.stopPropagation()}
                 className="flex-1 text-center text-sm font-bold py-2.5 rounded-xl transition hover:opacity-90"
                 style={{ background: '#fff', color: 'oklch(0.4 0.09 155)' }}
               >
@@ -160,6 +162,7 @@ export default async function DashboardPage() {
               </Link>
               <Link
                 href={`/liga?tab=apuestas&round=${round.id}`}
+                onClick={e => e.stopPropagation()}
                 className="flex-1 text-center text-sm font-bold py-2.5 rounded-xl transition hover:opacity-90 flex items-center justify-center gap-1.5"
                 style={{ background: 'rgba(255,255,255,0.16)', color: '#fff' }}
               >
@@ -167,7 +170,7 @@ export default async function DashboardPage() {
               </Link>
             </div>
           </div>
-        </div>
+        </ClickableCard>
       ) : !seasonId ? (
         <Link
           href="/liga"
