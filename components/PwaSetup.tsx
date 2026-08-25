@@ -106,7 +106,12 @@ export default function PwaSetup() {
       if (error) throw error
       setPushOk(true)
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err)
+      // Los errores de Supabase (PostgrestError) son objetos planos con
+      // `.message`, no instancias de Error — String(err) sobre ellos da
+      // "[object Object]" en vez del texto real.
+      const message = err instanceof Error
+        ? err.message
+        : (err && typeof err === 'object' && 'message' in err) ? String((err as { message: unknown }).message) : String(err)
       setPushOk(false)
       setPushError(`No se pudo activar: ${message}`)
     } finally {
