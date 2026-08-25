@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import type { BettingQuestionTemplate } from '@/lib/types'
+import { revalidateLigaData } from '@/lib/actions'
 
 type CustomAnswerType = 'yes_no' | 'player' | 'custom_options'
 
@@ -49,6 +50,7 @@ export default function AddQuestionPicker({ roundId, templates }: { roundId: str
       setError('No se pudo añadir la pregunta: ' + rpcError.message)
       return
     }
+    await revalidateLigaData()
     router.refresh()
   }
 
@@ -96,6 +98,7 @@ export default function AddQuestionPicker({ roundId, templates }: { roundId: str
     }
 
     setText(''); setOptions(['', '']); setAllowNone(false); setAnswerType('yes_no'); setCreating(false)
+    await revalidateLigaData()
     router.refresh()
   }
 

@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import type { BettingMarket } from '@/lib/types'
 import { isValidSetScore } from '@/lib/types'
 import { marketCloseTime, canonicalExactScore, ANSWER_TYPE_ICON, QUICK_BET_AMOUNT } from '@/lib/betting'
+import { revalidateLigaData } from '@/lib/actions'
 
 interface Props {
   markets: BettingMarket[]
@@ -84,6 +85,7 @@ export default function BettingMarketsBoard({ markets, userId, chipsLeft, roundS
       setChips(c => ({ ...c, [optionId]: original }))
       return
     }
+    await revalidateLigaData()
     router.refresh()
   }
 
@@ -110,6 +112,7 @@ export default function BettingMarketsBoard({ markets, userId, chipsLeft, roundS
       return
     }
     setChips(c => ({ ...c, [optionId]: newValue }))
+    await revalidateLigaData()
     router.refresh()
   }
 
@@ -161,6 +164,7 @@ export default function BettingMarketsBoard({ markets, userId, chipsLeft, roundS
       setError(describeBetError(betError.message))
       return
     }
+    await revalidateLigaData()
     router.refresh()
   }
 

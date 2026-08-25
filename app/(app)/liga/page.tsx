@@ -1,11 +1,10 @@
 import { Suspense } from 'react'
-import { createClient, getCachedUser } from '@/lib/supabase/server'
+import { getCachedUser } from '@/lib/supabase/server'
 import type { IndividualStanding, PairStanding } from '@/lib/types'
 import { formatDate, getJornadaReservaStatus } from '@/lib/types'
 import LigaTabs from '@/components/LigaTabs'
 import type { JornadaViewModel } from '@/components/JornadasAccordion'
-import { getRoundActa, getRoundBettingContext } from '@/lib/betting-queries'
-import { getCachedActiveSeason, getCachedPlayers, getCachedSeasonRounds, getCachedSeasonAggregates } from '@/lib/supabase/cached'
+import { getCachedActiveSeason, getCachedPlayers, getCachedSeasonRounds, getCachedSeasonAggregates, getCachedSettledActas, getCachedOpenRoundsBetting } from '@/lib/supabase/cached'
 import type { ApuestasRoundEntry } from '@/components/ApuestasTab'
 
 const MEDALS = ['🥇', '🥈', '🥉', '4º']
@@ -18,7 +17,6 @@ function playerName(player: BetRow['player']): string | undefined {
 }
 
 export default async function LigaPage() {
-  const supabase = await createClient()
   const user = await getCachedUser()
   const userId = user?.id ?? ''
 
@@ -178,38 +176,33 @@ export default async function LigaPage() {
   )
 
   const playerList = (players as { id: string; name: string }[] | null) ?? []
-  const settledEntries: ApuestasRoundEntry[] = await Promise.all(
-    settledRoundRefs.map(async r => ({ kind: 'settled' as const, roundId: r.id, roundNumber: r.round_number, acta: await getRoundActa(supabase, r.id, playerList) }))
-  )
+  const settledActas = settledRoundRefs.length ? await getCachedSettledActas(settledRoundRefs.map(r => r.id), playerList) : []
+  const settledEntries: ApuestasRoundEntry[] = settledRoundRefs.map((r, i) => ({
+    kind: 'settled' as const, roundId: r.id, roundNumber: r.round_number, acta: settledActas[i],
+  }))
 
-  const { data: catalogTemplates } = await supabase.from('betting_question_templates').select('*').eq('active', true).order('text')
+  const openBetting = userId && openRoundRefs.length
+    ? await getCachedOpenRoundsBetting(seasonId ?? '', openRoundRefs.map(r => r.id), userId)
+    : null
 
-  const openEntries: ApuestasRoundEntry[] = userId ? await Promise.all(
-    openRoundRefs.map(async r => {
-      const ctx = await getRoundBettingContext(supabase, r.id, userId)
-      const templateIds = [...new Set(ctx.markets.map(m => m.template_id).filter((id): id is string => !!id))]
-      const { data: jackpots } = templateIds.length
-        ? await supabase.from('jackpots').select('template_id, chips').eq('season_id', seasonId ?? '').in('template_id', templateIds)
-        : { data: [] as { template_id: string; chips: number }[] }
-      const jackpotByTemplate: Record<string, number> = {}
-      for (const j of jackpots ?? []) jackpotByTemplate[j.template_id] = j.chips
-      const usedTemplateIds = new Set(templateIds)
-      const availableTemplates = (catalogTemplates ?? []).filter(t => !usedTemplateIds.has(t.id))
-      return {
-        kind: 'open' as const,
-        roundId: r.id,
-        roundNumber: r.round_number,
-        ...matchLabels(r),
-        scheduledDate: r.scheduled_date,
-        scheduledTime: r.scheduled_time,
-        club: r.club,
-        markets: ctx.markets,
-        chipsLeft: ctx.chipsLeft,
-        jackpotByTemplate,
-        availableTemplates,
-      }
-    })
-  ) : []
+  const openEntries: ApuestasRoundEntry[] = openBetting ? openRoundRefs.map((r, i) => {
+    const ctx = openBetting.contexts[i]
+    const templateIds = new Set(ctx.markets.map(m => m.template_id).filter((id): id is string => !!id))
+    const availableTemplates = openBetting.catalogTemplates.filter(t => !templateIds.has(t.id))
+    return {
+      kind: 'open' as const,
+      roundId: r.id,
+      roundNumber: r.round_number,
+      ...matchLabels(r),
+      scheduledDate: r.scheduled_date,
+      scheduledTime: r.scheduled_time,
+      club: r.club,
+      markets: ctx.markets,
+      chipsLeft: ctx.chipsLeft,
+      jackpotByTemplate: openBetting.jackpotByTemplate,
+      availableTemplates,
+    }
+  }) : []
 
   const pendingEntries: ApuestasRoundEntry[] = pendingRoundRefs.map(r => ({
     kind: 'pending' as const,

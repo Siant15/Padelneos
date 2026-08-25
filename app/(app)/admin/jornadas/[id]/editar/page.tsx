@@ -119,7 +119,12 @@ export default function EditarJornadaPage() {
     // jornada) se quedarían con las parejas antiguas si no se
     // refrescan aquí. La resolución en sí no depende de esto — ya se
     // decide en vivo por el partido real — solo el texto mostrado.
-    await supabase.rpc('refresh_round_option_labels', { p_round_id: roundId })
+    const { error: refreshError } = await supabase.rpc('refresh_round_option_labels', { p_round_id: roundId })
+    if (refreshError) {
+      setSaveError('Jornada guardada, pero los textos de las apuestas no se pudieron actualizar: ' + refreshError.message)
+      setLoading(false)
+      return
+    }
 
     await revalidateLigaData()
     setSaved(true)

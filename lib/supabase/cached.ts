@@ -1,5 +1,6 @@
 import { createClient as createRawClient } from '@supabase/supabase-js'
 import { unstable_cache } from 'next/cache'
+import { getRoundActa, getRoundBettingContext } from '@/lib/betting-queries'
 
 // Consultas de liga que son iguales para los 4 jugadores (temporada
 // activa, calendario, clasificaciones, estado de las apuestas por
@@ -88,5 +89,42 @@ export const getCachedSeasonAggregates = unstable_cache(
     }
   },
   ['season-aggregates'],
+  { revalidate: REVALIDATE_SECONDS, tags: ['liga-data'] }
+)
+
+// El acta de una jornada liquidada es igual para los 4 jugadores y ya
+// no cambia (salvo que se deshaga la liquidación), así que se cachea
+// igual que el resto de datos de liga — evita repetir ~6 consultas por
+// jornada liquidada en cada visita a Liga → Apuestas.
+export const getCachedSettledActas = unstable_cache(
+  async (roundIds: string[], players: { id: string; name: string }[]) => {
+    const client = serviceClient()
+    return Promise.all(roundIds.map(id => getRoundActa(client, id, players)))
+  },
+  ['settled-actas'],
+  { revalidate: REVALIDATE_SECONDS, tags: ['liga-data'] }
+)
+
+// El contexto de apuestas de las jornadas abiertas sí depende del
+// jugador (fichas restantes, apuestas propias), así que el userId es
+// parte de la clave de caché — cada jugador cachea su propia vista.
+export const getCachedOpenRoundsBetting = unstable_cache(
+  async (seasonId: string, roundIds: string[], userId: string) => {
+    const client = serviceClient()
+    const [contexts, { data: catalogTemplates }] = await Promise.all([
+      Promise.all(roundIds.map(id => getRoundBettingContext(client, id, userId))),
+      client.from('betting_question_templates').select('*').eq('active', true).order('text'),
+    ])
+
+    const allTemplateIds = [...new Set(contexts.flatMap(ctx => ctx.markets.map(m => m.template_id).filter((id): id is string => !!id)))]
+    const { data: jackpots } = allTemplateIds.length
+      ? await client.from('jackpots').select('template_id, chips').eq('season_id', seasonId).in('template_id', allTemplateIds)
+      : { data: [] as { template_id: string; chips: number }[] }
+    const jackpotByTemplate: Record<string, number> = {}
+    for (const j of jackpots ?? []) jackpotByTemplate[j.template_id] = j.chips
+
+    return { contexts, catalogTemplates: catalogTemplates ?? [], jackpotByTemplate }
+  },
+  ['open-rounds-betting'],
   { revalidate: REVALIDATE_SECONDS, tags: ['liga-data'] }
 )
