@@ -151,7 +151,7 @@ export default async function DashboardPage() {
                 Resultado
               </Link>
               <Link
-                href={`/apuestas/${round.id}`}
+                href={`/liga?tab=apuestas&round=${round.id}`}
                 className="flex-1 text-center text-sm font-bold py-2.5 rounded-xl transition hover:opacity-90 flex items-center justify-center gap-1.5"
                 style={{ background: 'rgba(255,255,255,0.16)', color: '#fff' }}
               >

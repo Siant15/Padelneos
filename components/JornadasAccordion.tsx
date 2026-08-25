@@ -98,7 +98,7 @@ export default function JornadasAccordion({ items }: { items: JornadaViewModel[]
                     {j.isNext && (
                       <div>
                         💰 Mercado de apuestas abierto —{' '}
-                        <Link href={`/apuestas/${j.id}`} className="font-bold" style={{ color: 'var(--accent)' }}>apostar en esta jornada</Link>.
+                        <Link href={`/liga?tab=apuestas&round=${j.id}`} className="font-bold" style={{ color: 'var(--accent)' }}>apostar en esta jornada</Link>.
                       </div>
                     )}
                     <div className="flex gap-2 mt-1">
@@ -117,7 +117,7 @@ export default function JornadasAccordion({ items }: { items: JornadaViewModel[]
                         📝 Resultado
                       </Link>
                       <Link
-                        href={`/apuestas/${j.id}`}
+                        href={`/liga?tab=apuestas&round=${j.id}`}
                         className="flex-1 text-center text-xs font-bold py-2 rounded-xl"
                         style={{ background: 'var(--surface2)', color: 'var(--accent)' }}
                       >

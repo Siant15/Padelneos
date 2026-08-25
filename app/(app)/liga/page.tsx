@@ -182,6 +182,8 @@ export default async function LigaPage() {
     settledRoundRefs.map(async r => ({ kind: 'settled' as const, roundId: r.id, roundNumber: r.round_number, acta: await getRoundActa(supabase, r.id, playerList) }))
   )
 
+  const { data: catalogTemplates } = await supabase.from('betting_question_templates').select('*').eq('active', true).order('text')
+
   const openEntries: ApuestasRoundEntry[] = userId ? await Promise.all(
     openRoundRefs.map(async r => {
       const ctx = await getRoundBettingContext(supabase, r.id, userId)
@@ -191,6 +193,8 @@ export default async function LigaPage() {
         : { data: [] as { template_id: string; chips: number }[] }
       const jackpotByTemplate: Record<string, number> = {}
       for (const j of jackpots ?? []) jackpotByTemplate[j.template_id] = j.chips
+      const usedTemplateIds = new Set(templateIds)
+      const availableTemplates = (catalogTemplates ?? []).filter(t => !usedTemplateIds.has(t.id))
       return {
         kind: 'open' as const,
         roundId: r.id,
@@ -202,6 +206,7 @@ export default async function LigaPage() {
         markets: ctx.markets,
         chipsLeft: ctx.chipsLeft,
         jackpotByTemplate,
+        availableTemplates,
       }
     })
   ) : []

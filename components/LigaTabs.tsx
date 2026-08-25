@@ -48,6 +48,7 @@ export default function LigaTabs({
 }) {
   const searchParams = useSearchParams()
   const initial = searchParams.get('tab') as Section | null
+  const initialRoundId = searchParams.get('round') ?? undefined
   const [section, setSection] = useState<Section>(initial && SECTIONS.some(s => s.key === initial) ? initial : 'calendario')
 
   return (
@@ -107,7 +108,7 @@ export default function LigaTabs({
             Ve a la pestaña <Link href="/liga?tab=calendario" className="font-bold" style={{ color: 'var(--accent)' }}>Calendario</Link> para crear la liga.
           </div>
         ) : (
-          <ApuestasTab userId={userId} rounds={apuestasRounds} />
+          <ApuestasTab userId={userId} rounds={apuestasRounds} initialRoundId={initialRoundId} />
         )
       )}
     </div>

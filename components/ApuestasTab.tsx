@@ -2,16 +2,17 @@
 
 import { useState } from 'react'
 import type { RoundActa } from '@/lib/betting-queries'
-import type { BettingMarket } from '@/lib/types'
+import type { BettingMarket, BettingQuestionTemplate } from '@/lib/types'
 import { DAYS_ES, formatTime } from '@/lib/types'
 import ApuestasActa from '@/components/ApuestasActa'
 import BettingMarketsBoard from '@/components/BettingMarketsBoard'
 import ApuestasInfo from '@/components/ApuestasInfo'
+import AddQuestionPicker from '@/components/AddQuestionPicker'
 
 type BaseRound = { roundId: string; roundNumber: number; pair1Label: string | null; pair2Label: string | null; scheduledDate: string | null; scheduledTime: string | null; club: string | null }
 
 export type SettledRoundEntry = { kind: 'settled'; roundId: string; roundNumber: number; acta: RoundActa }
-export type OpenRoundEntry = BaseRound & { kind: 'open'; markets: BettingMarket[]; chipsLeft: number; jackpotByTemplate: Record<string, number> }
+export type OpenRoundEntry = BaseRound & { kind: 'open'; markets: BettingMarket[]; chipsLeft: number; jackpotByTemplate: Record<string, number>; availableTemplates: BettingQuestionTemplate[] }
 export type PendingRoundEntry = BaseRound & { kind: 'pending'; reason: 'awaiting_settlement' | 'no_questions' }
 export type ApuestasRoundEntry = SettledRoundEntry | OpenRoundEntry | PendingRoundEntry
 
@@ -30,14 +31,15 @@ const STATUS_COLOR: Record<ApuestasRoundEntry['kind'], string> = {
 // página al cambiar de jornada — todo viene precalculado desde el
 // servidor (para TODAS las jornadas de la temporada, liquidadas,
 // abiertas o pendientes) y se conmuta con estado local.
-export default function ApuestasTab({ userId, rounds }: { userId: string; rounds: ApuestasRoundEntry[] }) {
+export default function ApuestasTab({ userId, rounds, initialRoundId }: { userId: string; rounds: ApuestasRoundEntry[]; initialRoundId?: string }) {
   const sorted = [...rounds].sort((a, b) => a.roundNumber - b.roundNumber)
   const settled = sorted.filter((r): r is SettledRoundEntry => r.kind === 'settled')
   const open = sorted.filter((r): r is OpenRoundEntry => r.kind === 'open')
   const lastSettled = settled[settled.length - 1] ?? null
   const firstOpen = open[0] ?? null
 
-  const defaultId = lastSettled?.roundId ?? firstOpen?.roundId ?? sorted[0]?.roundId ?? ''
+  const requestedExists = initialRoundId && sorted.some(r => r.roundId === initialRoundId)
+  const defaultId = (requestedExists ? initialRoundId : null) ?? lastSettled?.roundId ?? firstOpen?.roundId ?? sorted[0]?.roundId ?? ''
   const [selectedId, setSelectedId] = useState(defaultId)
   const [historyOpen, setHistoryOpen] = useState(false)
 
@@ -147,6 +149,9 @@ export default function ApuestasTab({ userId, rounds }: { userId: string; rounds
               jackpotByTemplate={current.jackpotByTemplate}
             />
           </div>
+          {current.availableTemplates.length > 0 && (
+            <AddQuestionPicker roundId={current.roundId} templates={current.availableTemplates} />
+          )}
         </>
       )}
 
