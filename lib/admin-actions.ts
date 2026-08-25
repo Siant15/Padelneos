@@ -96,3 +96,51 @@ export async function removeMember(playerId: string): Promise<{ error: string | 
   updateTag('liga-data')
   return { error: null }
 }
+
+// ─── Temporadas y jornadas ──────────────────────────────────────────
+export type SeasonRow = { id: string; name: string; status: string; minMatches: number; roundCount: number }
+export type RoundRow = { id: string; roundNumber: number; scheduledDate: string | null; scheduledTime: string | null; club: string | null; status: string }
+
+export async function listSeasons(): Promise<SeasonRow[]> {
+  await assertIsAdmin()
+  const admin = adminClient()
+  const [{ data: seasons }, { data: rounds }] = await Promise.all([
+    admin.from('seasons').select('id, name, status, min_matches').order('created_at', { ascending: false }),
+    admin.from('rounds').select('season_id'),
+  ])
+  const countBySeason = new Map<string, number>()
+  for (const r of rounds ?? []) countBySeason.set(r.season_id, (countBySeason.get(r.season_id) ?? 0) + 1)
+  return (seasons ?? []).map(s => ({ id: s.id, name: s.name, status: s.status, minMatches: s.min_matches, roundCount: countBySeason.get(s.id) ?? 0 }))
+}
+
+export async function listRounds(seasonId: string): Promise<RoundRow[]> {
+  await assertIsAdmin()
+  const admin = adminClient()
+  const { data } = await admin
+    .from('rounds')
+    .select('id, round_number, scheduled_date, scheduled_time, club, status')
+    .eq('season_id', seasonId)
+    .order('round_number', { ascending: true })
+  return (data ?? []).map(r => ({
+    id: r.id, roundNumber: r.round_number, scheduledDate: r.scheduled_date,
+    scheduledTime: r.scheduled_time, club: r.club, status: r.status,
+  }))
+}
+
+export async function deleteRound(roundId: string): Promise<{ error: string | null }> {
+  await assertIsAdmin()
+  const admin = adminClient()
+  const { error } = await admin.from('rounds').delete().eq('id', roundId)
+  if (error) return { error: error.message }
+  updateTag('liga-data')
+  return { error: null }
+}
+
+export async function deleteSeason(seasonId: string): Promise<{ error: string | null }> {
+  await assertIsAdmin()
+  const admin = adminClient()
+  const { error } = await admin.from('seasons').delete().eq('id', seasonId)
+  if (error) return { error: error.message }
+  updateTag('liga-data')
+  return { error: null }
+}
