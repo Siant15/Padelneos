@@ -88,19 +88,21 @@ export default async function DashboardPage() {
           className="relative overflow-hidden rounded-[22px] p-4 text-white"
           style={{ background: 'oklch(0.4 0.09 155)' }}
         >
+          {/* Toda la tarjeta abre "Editar jornada" salvo los controles
+              explícitos (Resultado, Apostar, Ver en Maps, confirmar
+              reserva), que van por encima con z-index más alto. */}
+          <Link href={`/admin/jornadas/${round.id}/editar`} aria-label="Editar jornada" className="absolute inset-0 z-10 rounded-[22px]" />
           <div className="relative flex flex-col gap-3">
             <p className="text-[11px] font-extrabold uppercase tracking-wide opacity-90">Próximo partido</p>
 
             <div className="flex items-center gap-3 text-xs font-bold opacity-95">
-              <Link href={`/admin/jornadas/${round.id}/editar`} className="flex items-center gap-1 underline-offset-2 hover:underline">
-                <Calendar size={13} /> J{round.round_number} <Pencil size={11} className="opacity-80" />
-              </Link>
+              <span className="flex items-center gap-1"><Calendar size={13} /> J{round.round_number} <Pencil size={11} className="opacity-80" /></span>
               <span className="flex items-center gap-1"><Clock size={13} /> {round.scheduled_date ? formatDate(round.scheduled_date).split(',')[0] : '-'} · {effectiveTime || '-'}</span>
             </div>
             <p className="text-xs flex items-center gap-1 -mt-1.5 opacity-90">
               <MapPin size={13} /> {effectiveClub || '-'}
               {clubMapsUrl && (
-                <a href={clubMapsUrl} target="_blank" rel="noopener noreferrer" className="underline font-bold">
+                <a href={clubMapsUrl} target="_blank" rel="noopener noreferrer" className="relative z-20 underline font-bold">
                   Ver en Maps
                 </a>
               )}
@@ -141,10 +143,12 @@ export default async function DashboardPage() {
             </div>
 
             {!round.court_confirmed && round.court_booker_id === user?.id && (
-              <ConfirmCourtButton roundId={round.id} />
+              <div className="relative z-20">
+                <ConfirmCourtButton roundId={round.id} />
+              </div>
             )}
 
-            <div className="flex gap-2 mt-1">
+            <div className="relative z-20 flex gap-2 mt-1">
               <Link
                 href={`/admin/jornadas/${round.id}/resultado`}
                 className="flex-1 text-center text-sm font-bold py-2.5 rounded-xl transition hover:opacity-90"
