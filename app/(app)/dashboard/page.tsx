@@ -66,6 +66,10 @@ export default async function DashboardPage() {
 
   const bettingContext = round && user ? await getRoundBettingContext(supabase, round.id, user.id) : null
 
+  const clubMapsUrl = effectiveClub
+    ? (await supabase.from('clubs').select('maps_url').eq('name', effectiveClub).maybeSingle()).data?.maps_url ?? null
+    : null
+
   return (
     <div className="flex flex-col px-5 pt-4 pb-6 gap-4">
       {/* Saludo + duración de temporada */}
@@ -92,7 +96,14 @@ export default async function DashboardPage() {
               {effectiveTime && <span className="flex items-center gap-1"><Clock size={13} /> {round.scheduled_date ? formatDate(round.scheduled_date).split(',')[0] : ''} · {effectiveTime}</span>}
             </div>
             {effectiveClub && (
-              <p className="text-xs flex items-center gap-1 -mt-1.5 opacity-90"><MapPin size={13} /> {effectiveClub}</p>
+              <p className="text-xs flex items-center gap-1 -mt-1.5 opacity-90">
+                <MapPin size={13} /> {effectiveClub}
+                {clubMapsUrl && (
+                  <a href={clubMapsUrl} target="_blank" rel="noopener noreferrer" className="underline font-bold">
+                    Ver en Maps
+                  </a>
+                )}
+              </p>
             )}
 
             {match && (

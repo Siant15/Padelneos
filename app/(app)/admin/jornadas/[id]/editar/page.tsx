@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter, useParams } from 'next/navigation'
 import type { Profile } from '@/lib/types'
 import { revalidateLigaData } from '@/lib/actions'
+import ClubPicker from '@/components/ClubPicker'
 
 export default function EditarJornadaPage() {
   const supabase = createClient()
@@ -144,10 +145,7 @@ export default function EditarJornadaPage() {
         </Field>
 
         <Field label="Club">
-          <input type="text" value={form.club}
-            onChange={e => setForm(f => ({ ...f, club: e.target.value }))}
-            placeholder="Ej: Club Padel Indoor"
-            style={inputStyle} />
+          <ClubPicker value={form.club} onChange={v => setForm(f => ({ ...f, club: v }))} />
         </Field>
 
         <Field label="Estado">
