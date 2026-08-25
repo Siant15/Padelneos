@@ -2,7 +2,7 @@ import { createClient, getCachedUser } from '@/lib/supabase/server'
 import type { Round } from '@/lib/types'
 import { formatDate } from '@/lib/types'
 import Link from 'next/link'
-import { Calendar, Clock, MapPin, ArrowUp, ArrowDown, Minus, Flame, Snowflake, Flag } from 'lucide-react'
+import { Calendar, Clock, MapPin, ArrowUp, ArrowDown, Minus, Flame, Snowflake, Flag, Pencil } from 'lucide-react'
 import ConfirmCourtButton from '@/components/ConfirmCourtButton'
 import DinnerRiskInfo from '@/components/DinnerRiskInfo'
 import PiquesCarousel from '@/components/PiquesCarousel'
@@ -92,7 +92,9 @@ export default async function DashboardPage() {
             <p className="text-[11px] font-extrabold uppercase tracking-wide opacity-90">Próximo partido</p>
 
             <div className="flex items-center gap-3 text-xs font-bold opacity-95">
-              <span className="flex items-center gap-1"><Calendar size={13} /> J{round.round_number}</span>
+              <Link href={`/admin/jornadas/${round.id}/editar`} className="flex items-center gap-1 underline-offset-2 hover:underline">
+                <Calendar size={13} /> J{round.round_number} <Pencil size={11} className="opacity-80" />
+              </Link>
               <span className="flex items-center gap-1"><Clock size={13} /> {round.scheduled_date ? formatDate(round.scheduled_date).split(',')[0] : '-'} · {effectiveTime || '-'}</span>
             </div>
             <p className="text-xs flex items-center gap-1 -mt-1.5 opacity-90">
