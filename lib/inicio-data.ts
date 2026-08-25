@@ -18,16 +18,10 @@ export async function getInicioData(supabase: SupabaseClient, seasonId: string):
   const rows = computeStandingsRows(players, roundsForPiques, allBetResults)
   const headToHead = computeHeadToHead(roundsForPiques)
 
-  const nextRound = rounds.find(r => r.status === 'scheduled')
-  const nextMatch = nextRound?.match as { team1_p1?: { id: string }; team1_p2?: { id: string }; team2_p1?: { id: string }; team2_p2?: { id: string } } | null
-  const nextPairing = nextMatch?.team1_p1?.id && nextMatch.team1_p2?.id && nextMatch.team2_p1?.id && nextMatch.team2_p2?.id
-    ? { team1: [nextMatch.team1_p1.id, nextMatch.team1_p2.id], team2: [nextMatch.team2_p1.id, nextMatch.team2_p2.id] }
-    : null
-
   const bettingTop = bettingRanking[0]
-    ? { name: bettingRanking[0].name, correctPicks: bettingRanking[0].correct_picks, points: bettingRanking[0].points }
+    ? { name: bettingRanking[0].name, correctPicks: bettingRanking[0].correct_picks }
     : null
 
-  const piques = computePiques(rows, headToHead, nextPairing, bettingTop)
+  const piques = computePiques(rows, headToHead, bettingTop)
   return { rows, piques }
 }

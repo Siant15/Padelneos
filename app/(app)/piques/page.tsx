@@ -1,19 +1,17 @@
 import Link from 'next/link'
-import { Swords, Target, Flame, Snowflake, TrendingUp, Repeat, Dices } from 'lucide-react'
+import { Flame, TrendingUp, Repeat, Dices, Trophy, AlertTriangle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { getCachedActiveSeason } from '@/lib/supabase/cached'
 import { getInicioData } from '@/lib/inicio-data'
 import type { Pique } from '@/lib/piques'
 
-const ICON_BY_TYPE: Record<Pique['type'], typeof Swords> = {
-  liderato: Swords,
-  podio: Target,
+const ICON_BY_TYPE: Record<Pique['type'], typeof Flame> = {
   en_llamas: Flame,
-  bajo_presion: Snowflake,
   remontada: TrendingUp,
   cuentas_pendientes: Repeat,
   tapado: Dices,
-  rey_pronosticos: Dices,
+  rey_pronosticos: Trophy,
+  bajo_presion: AlertTriangle,
 }
 
 export default async function PiquesPage() {

@@ -132,11 +132,11 @@ export default async function DashboardPage() {
 
             <div className="flex gap-2 mt-1">
               <Link
-                href="/liga?tab=calendario"
+                href={`/admin/jornadas/${round.id}/resultado`}
                 className="flex-1 text-center text-sm font-bold py-2.5 rounded-xl transition hover:opacity-90"
                 style={{ background: '#fff', color: 'oklch(0.4 0.09 155)' }}
               >
-                Ver jornada
+                Resultado
               </Link>
               <Link
                 href={`/apuestas/${round.id}`}

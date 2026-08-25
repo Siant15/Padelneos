@@ -3,8 +3,7 @@
 // recalculan cada vez que se pide la página (que a su vez está detrás
 // de la caché de 15s de lib/supabase/cached.ts + updateTag en
 // lib/actions.ts), así que se quedan fijas hasta que se registre un
-// nuevo resultado o se liquide una jornada — igual que pide el spec
-// ("no deben cambiar mientras el usuario está mirando la pantalla").
+// nuevo resultado o se liquide una jornada.
 
 export type RoundWithMatch = {
   id: string
@@ -134,141 +133,117 @@ export function computeHeadToHead(rounds: RoundWithMatch[]): Record<string, Reco
 }
 
 export type Pique = {
-  type: 'liderato' | 'podio' | 'en_llamas' | 'bajo_presion' | 'remontada' | 'cuentas_pendientes' | 'tapado' | 'rey_pronosticos'
+  type: 'en_llamas' | 'remontada' | 'cuentas_pendientes' | 'tapado' | 'rey_pronosticos' | 'bajo_presion'
   category: string
   title: string
   text: string
-  priority: number // 1 = más prioritario
-  score: number // desempate dentro de la misma prioridad
+  score: number // 0-1, para elegir las 2 más relevantes de las 6
 }
 
 export function computePiques(
   rows: PlayerRow[],
   headToHead: Record<string, Record<string, number>>,
-  nextPairing: { team1: string[]; team2: string[] } | null,
-  bettingTop: { name: string; correctPicks: number; points: number } | null
+  bettingTop: { name: string; correctPicks: number } | null
 ): Pique[] {
   const candidates: Pique[] = []
   const byRank = [...rows].sort((a, b) => a.rank - b.rank)
-  const [r1, r2, r3, r4] = byRank
 
-  // 1) Rivalidades con poca diferencia de puntos.
-  if (r1 && r2) {
-    const gap = r1.points - r2.points
-    if (gap <= 2) {
-      candidates.push({
-        type: 'liderato', category: 'Liderato',
-        title: `${r1.name} vs ${r2.name}`,
-        text: gap === 0 ? 'Empatados en la cima' : `Solo ${gap} punto${gap === 1 ? '' : 's'} los separa`,
-        priority: 1, score: 10 - gap,
-      })
-    }
-  }
-  if (r3 && r4) {
-    const gap = r3.points - r4.points
-    if (gap <= 2) {
-      candidates.push({
-        type: 'podio', category: 'Podio',
-        title: `${r3.name} vs ${r4.name}`,
-        text: gap === 0 ? 'Empatados por el último cajón' : 'Una victoria cambia el orden',
-        priority: 1, score: 9 - gap,
-      })
-    }
-  }
-
-  // 2) Posibilidad de adelantar en la próxima jornada: si el próximo
-  // partido enfrenta directamente a dos rivales ya detectados arriba,
-  // sube su prioridad (empatan con el resto pero con más score).
-  if (nextPairing) {
-    const pairs = [nextPairing.team1, nextPairing.team2]
-    for (const c of candidates) {
-      const names = c.title.split(' vs ')
-      const involved = byRank.filter(r => names.includes(r.name)).map(r => r.id)
-      const facingEachOther = involved.length === 2 && pairs.some(team => involved.every(id => !team.includes(id)))
-      if (facingEachOther) c.score += 5
-    }
-  }
-
-  // 3) Rachas.
-  const onFire = byRank.filter(r => r.activeStreak?.type === 'V' && r.activeStreak.length >= 3)
+  // En llamas: jugador con mejor racha (de victorias) activa.
+  const onFire = byRank
+    .filter(r => r.activeStreak?.type === 'V')
     .sort((a, b) => (b.activeStreak?.length ?? 0) - (a.activeStreak?.length ?? 0))[0]
   if (onFire) {
+    const length = onFire.activeStreak!.length
     candidates.push({
       type: 'en_llamas', category: 'En llamas',
       title: `${onFire.name} está en racha`,
-      text: `${onFire.activeStreak!.length} victorias seguidas`,
-      priority: 3, score: onFire.activeStreak!.length,
-    })
-  }
-  const underFire = byRank.filter(r => r.activeStreak?.type === 'D' && r.activeStreak.length >= 3)
-    .sort((a, b) => (b.activeStreak?.length ?? 0) - (a.activeStreak?.length ?? 0))[0]
-  if (underFire) {
-    candidates.push({
-      type: 'bajo_presion', category: 'Bajo presión',
-      title: `${underFire.name} bajo presión`,
-      text: `${underFire.activeStreak!.length} derrotas seguidas`,
-      priority: 3, score: underFire.activeStreak!.length,
+      text: `${length} victoria${length === 1 ? '' : 's'} seguida${length === 1 ? '' : 's'}`,
+      score: Math.min(1, length / 4),
     })
   }
 
-  // 4) Cambios importantes de posición.
-  const climber = byRank.filter(r => r.rankDelta >= 2).sort((a, b) => b.rankDelta - a.rankDelta)[0]
-  if (climber) {
+  // La remontada: quien más puestos ha subido respecto a la jornada anterior.
+  const climber = [...byRank].sort((a, b) => b.rankDelta - a.rankDelta)[0]
+  if (climber && climber.rankDelta > 0) {
     candidates.push({
       type: 'remontada', category: 'La remontada',
       title: `La remontada de ${climber.name}`,
       text: `Sube ${climber.rankDelta} puesto${climber.rankDelta === 1 ? '' : 's'} esta jornada`,
-      priority: 4, score: climber.rankDelta,
+      score: Math.min(1, climber.rankDelta / 3),
     })
   }
 
-  // 5) Historiales de enfrentamientos igualados o pendientes de revancha,
-  // solo si además se van a enfrentar en la próxima jornada.
-  if (nextPairing) {
-    for (const team of [nextPairing.team1, nextPairing.team2]) {
-      const rival = team[0] && nextPairing.team1.includes(team[0]) ? nextPairing.team2 : nextPairing.team1
-      for (const a of team) {
-        for (const b of rival) {
-          const aWins = headToHead[a]?.[b] ?? 0
-          const bWins = headToHead[b]?.[a] ?? 0
-          if (aWins + bWins === 0) continue
-          if (bWins > aWins) {
-            const nameA = byRank.find(r => r.id === a)?.name
-            const nameB = byRank.find(r => r.id === b)?.name
-            if (nameA && nameB) {
-              candidates.push({
-                type: 'cuentas_pendientes', category: 'Cuentas pendientes',
-                title: `${nameA} busca revancha`,
-                text: `${bWins}-${aWins} en enfrentamientos directos ante ${nameB}`,
-                priority: 5, score: bWins - aWins,
-              })
-            }
-          }
-        }
+  // Partido con cuentas pendientes: la pareja de rivales con el
+  // enfrentamiento directo más igualado (más partidos jugados entre
+  // ellos y la diferencia de victorias más pequeña posible).
+  let bestPair: { a: PlayerRow; b: PlayerRow; aWins: number; bWins: number } | null = null
+  for (let i = 0; i < byRank.length; i++) {
+    for (let j = i + 1; j < byRank.length; j++) {
+      const a = byRank[i], b = byRank[j]
+      const aWins = headToHead[a.id]?.[b.id] ?? 0
+      const bWins = headToHead[b.id]?.[a.id] ?? 0
+      const total = aWins + bWins
+      if (total === 0) continue
+      const diff = Math.abs(aWins - bWins)
+      if (!bestPair || total - diff > (bestPair.aWins + bestPair.bWins) - Math.abs(bestPair.aWins - bestPair.bWins)) {
+        bestPair = { a, b, aWins, bWins }
       }
     }
   }
-
-  // 6) El tapado: menos puntos de los cuatro, pero con impulso reciente.
-  const lowestPoints = [...byRank].sort((a, b) => a.points - b.points)[0]
-  if (lowestPoints && lowestPoints.rank === byRank.length && (lowestPoints.rankDelta > 0 || lowestPoints.activeStreak?.type === 'V')) {
+  if (bestPair) {
+    const total = bestPair.aWins + bestPair.bWins
+    const diff = Math.abs(bestPair.aWins - bestPair.bWins)
     candidates.push({
-      type: 'tapado', category: 'El tapado',
-      title: `${lowestPoints.name}, el tapado`,
-      text: 'El último de la tabla que nadie se quiere encontrar',
-      priority: 6, score: 1,
+      type: 'cuentas_pendientes', category: 'Cuentas pendientes',
+      title: `${bestPair.a.name} vs ${bestPair.b.name}`,
+      text: `${bestPair.aWins}-${bestPair.bWins} en sus enfrentamientos directos`,
+      score: Math.min(1, (total - diff) / 4),
     })
   }
 
-  // 6) Rendimiento en apuestas.
+  // El tapado: el peor clasificado con más probabilidad de sorprender
+  // (mejor racha reciente entre los que están más abajo en la tabla).
+  const lastTwo = byRank.slice(-2)
+  const tapado = [...lastTwo].sort((a, b) => {
+    const scoreOf = (r: PlayerRow) => r.results.filter(x => x === 'V').length - r.results.filter(x => x === 'D').length
+    return scoreOf(b) - scoreOf(a)
+  })[0]
+  if (tapado) {
+    const wins = tapado.results.filter(x => x === 'V').length
+    const hasMomentum = wins > 0
+    candidates.push({
+      type: 'tapado', category: 'El tapado',
+      title: `${tapado.name}, el tapado`,
+      text: hasMomentum ? 'Va de menos a más y puede dar la sorpresa' : 'El que nadie quiere encontrarse en el cuadro',
+      score: hasMomentum ? Math.min(1, 0.4 + wins * 0.2) : 0.2,
+    })
+  }
+
+  // Rey de los pronósticos: quien más apuestas ha acertado.
   if (bettingTop && bettingTop.correctPicks > 0) {
     candidates.push({
       type: 'rey_pronosticos', category: 'Rey de los pronósticos',
       title: `${bettingTop.name}, rey de los pronósticos`,
       text: `${bettingTop.correctPicks} apuesta${bettingTop.correctPicks === 1 ? '' : 's'} acertada${bettingTop.correctPicks === 1 ? '' : 's'} esta temporada`,
-      priority: 6, score: bettingTop.correctPicks,
+      score: Math.min(1, bettingTop.correctPicks / 6),
     })
   }
 
-  return candidates.sort((a, b) => a.priority - b.priority || b.score - a.score)
+  // Bajo presión: quien necesita ganar para no perder posición (menor
+  // diferencia de puntos con quien tiene justo debajo en la tabla).
+  let underPressure: { row: PlayerRow; gap: number } | null = null
+  for (let i = 0; i < byRank.length - 1; i++) {
+    const gap = byRank[i].points - byRank[i + 1].points
+    if (!underPressure || gap < underPressure.gap) underPressure = { row: byRank[i], gap }
+  }
+  if (underPressure) {
+    candidates.push({
+      type: 'bajo_presion', category: 'Bajo presión',
+      title: `${underPressure.row.name} bajo presión`,
+      text: underPressure.gap === 0 ? 'Empatado con quien le pisa los talones' : `Solo ${underPressure.gap} punto${underPressure.gap === 1 ? '' : 's'} de ventaja sobre el siguiente`,
+      score: Math.min(1, 1 - underPressure.gap / 4),
+    })
+  }
+
+  return candidates.sort((a, b) => b.score - a.score)
 }

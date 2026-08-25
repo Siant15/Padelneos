@@ -1,30 +1,26 @@
 import Link from 'next/link'
-import { Swords, Target, Flame, Snowflake, TrendingUp, Repeat, Dices } from 'lucide-react'
+import { Flame, TrendingUp, Repeat, Dices, Trophy, AlertTriangle } from 'lucide-react'
 import type { Pique } from '@/lib/piques'
 
-const ICON_BY_TYPE: Record<Pique['type'], typeof Swords> = {
-  liderato: Swords,
-  podio: Target,
+const ICON_BY_TYPE: Record<Pique['type'], typeof Flame> = {
   en_llamas: Flame,
-  bajo_presion: Snowflake,
   remontada: TrendingUp,
   cuentas_pendientes: Repeat,
   tapado: Dices,
-  rey_pronosticos: Dices,
+  rey_pronosticos: Trophy,
+  bajo_presion: AlertTriangle,
 }
 
-// Fondo suave + acento por historia: verde menta para las de arriba de
-// tabla, melocotón para las de abajo/rachas negativas — coherente con
-// el resto de la identidad visual (sin degradados ni fotografías).
+// Fondo suave + acento por historia: verde menta para las positivas,
+// melocotón para las de presión/riesgo — coherente con el resto de la
+// identidad visual (sin degradados ni fotografías).
 const STYLE_BY_TYPE: Record<Pique['type'], { bg: string; accent: string }> = {
-  liderato: { bg: 'oklch(0.94 0.03 155)', accent: 'var(--green)' },
-  podio: { bg: 'oklch(0.95 0.04 55)', accent: 'var(--orange)' },
   en_llamas: { bg: 'oklch(0.94 0.03 155)', accent: 'var(--green)' },
-  bajo_presion: { bg: 'oklch(0.95 0.04 55)', accent: 'var(--orange)' },
   remontada: { bg: 'oklch(0.94 0.03 155)', accent: 'var(--green)' },
+  rey_pronosticos: { bg: 'oklch(0.94 0.03 155)', accent: 'var(--green)' },
   cuentas_pendientes: { bg: 'oklch(0.95 0.04 55)', accent: 'var(--orange)' },
   tapado: { bg: 'oklch(0.95 0.04 55)', accent: 'var(--orange)' },
-  rey_pronosticos: { bg: 'oklch(0.94 0.03 155)', accent: 'var(--green)' },
+  bajo_presion: { bg: 'oklch(0.95 0.04 55)', accent: 'var(--orange)' },
 }
 
 // Las dos historias más relevantes, siempre las dos visibles a la vez,
@@ -56,16 +52,7 @@ export default function PiquesCarousel({ piques }: { piques: Pique[] }) {
           )
         })}
       </div>
-      <div className="flex items-center justify-center gap-1.5 mt-2.5">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <span
-            key={i}
-            className="rounded-full"
-            style={{ width: 6, height: 6, background: i === 0 ? 'var(--accent)' : 'var(--tint)' }}
-          />
-        ))}
-      </div>
-      <p className="text-[11px] text-center mt-1.5" style={{ color: 'var(--text-muted2)' }}>
+      <p className="text-[11px] text-center mt-2.5" style={{ color: 'var(--text-muted2)' }}>
         Se actualiza al cerrar cada jornada
       </p>
     </div>
