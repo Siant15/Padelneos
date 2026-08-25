@@ -151,24 +151,24 @@ export default async function DashboardPage() {
               </StopPropagation>
             )}
 
-            <div className="flex gap-2 mt-1">
-              <Link
-                href={`/admin/jornadas/${round.id}/resultado`}
-                onClick={e => e.stopPropagation()}
-                className="flex-1 text-center text-sm font-bold py-2.5 rounded-xl transition hover:opacity-90"
-                style={{ background: '#fff', color: 'oklch(0.4 0.09 155)' }}
-              >
-                Resultado
-              </Link>
-              <Link
-                href={`/liga?tab=apuestas&round=${round.id}`}
-                onClick={e => e.stopPropagation()}
-                className="flex-1 text-center text-sm font-bold py-2.5 rounded-xl transition hover:opacity-90 flex items-center justify-center gap-1.5"
-                style={{ background: 'rgba(255,255,255,0.16)', color: '#fff' }}
-              >
-                Apostar · {bettingContext?.chipsLeft ?? 100} fichas
-              </Link>
-            </div>
+            <StopPropagation>
+              <div className="flex gap-2 mt-1">
+                <Link
+                  href={`/admin/jornadas/${round.id}/resultado`}
+                  className="flex-1 text-center text-sm font-bold py-2.5 rounded-xl transition hover:opacity-90"
+                  style={{ background: '#fff', color: 'oklch(0.4 0.09 155)' }}
+                >
+                  Resultado
+                </Link>
+                <Link
+                  href={`/liga?tab=apuestas&round=${round.id}`}
+                  className="flex-1 text-center text-sm font-bold py-2.5 rounded-xl transition hover:opacity-90 flex items-center justify-center gap-1.5"
+                  style={{ background: 'rgba(255,255,255,0.16)', color: '#fff' }}
+                >
+                  Apostar · {bettingContext?.chipsLeft ?? 100} fichas
+                </Link>
+              </div>
+            </StopPropagation>
           </div>
         </ClickableCard>
       ) : !seasonId ? (
