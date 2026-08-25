@@ -114,6 +114,13 @@ export default function EditarJornadaPage() {
       if (newMatch) setForm(f => ({ ...f, matchId: newMatch.id }))
     }
 
+    // El emparejamiento pudo cambiar: los textos de "Ganador del
+    // partido"/"Resultado por sets" (creados una vez al generar la
+    // jornada) se quedarían con las parejas antiguas si no se
+    // refrescan aquí. La resolución en sí no depende de esto — ya se
+    // decide en vivo por el partido real — solo el texto mostrado.
+    await supabase.rpc('refresh_round_option_labels', { p_round_id: roundId })
+
     await revalidateLigaData()
     setSaved(true)
     setLoading(false)
