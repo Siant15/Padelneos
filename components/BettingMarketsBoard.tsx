@@ -34,7 +34,7 @@ export default function BettingMarketsBoard({ markets, userId, chipsLeft, roundS
   }
 
   const [chips, setChips] = useState<Record<string, number>>(originalChips)
-  const [saving, setSaving] = useState(false)
+  const [savingOption, setSavingOption] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [quickBetting, setQuickBetting] = useState<string | null>(null)
   const [exactScoreDrafts, setExactScoreDrafts] = useState<Record<string, [string, string][]>>({})
@@ -44,50 +44,46 @@ export default function BettingMarketsBoard({ markets, userId, chipsLeft, roundS
   const originalTotal = Object.values(originalChips).reduce((s, v) => s + v, 0)
   const chipsAvailable = chipsLeft + originalTotal
   const totalChips = Object.values(chips).reduce((s, v) => s + v, 0)
-  const isOverBudget = totalChips > chipsAvailable
+  const chipsRemaining = chipsAvailable - totalChips
 
   const editableMarkets = markets.filter(m => {
     const closeTime = marketCloseTime(m, round)
     const isClosedByTime = closeTime !== null && new Date(closeTime) <= new Date()
     return roundStatus === 'scheduled' && !m.resolved && !isClosedByTime
   })
-  const editableOptionIds = new Set(editableMarkets.flatMap(m => (m.options ?? []).map(o => o.id)))
-  const hasChanges = [...editableOptionIds].some(id => (chips[id] ?? 0) !== (originalChips[id] ?? 0))
 
   function getTotalChipsOnOption(market: BettingMarket, optionId: string) {
     return market.bets?.filter(b => b.option_id === optionId).reduce((s, b) => s + b.chips, 0) ?? 0
   }
 
-  async function saveAll() {
-    if (isOverBudget || !hasChanges) return
-    setSaving(true)
+  // Autoguardado: cada cambio en una casilla de fichas se guarda solo
+  // (al perder el foco), sin botón de "Guardar apuestas" aparte —
+  // mismo criterio que la apuesta rápida (quickBet).
+  async function commitChip(marketId: string, optionId: string) {
+    const value = chips[optionId] ?? 0
+    const original = originalChips[optionId] ?? 0
+    if (value === original) return
+
+    const projectedTotal = totalChips - original + value
+    if (projectedTotal > chipsAvailable) {
+      setError(`No te quedan fichas suficientes (disponibles: ${chipsAvailable - (totalChips - value)}).`)
+      setChips(c => ({ ...c, [optionId]: original }))
+      return
+    }
+
+    setSavingOption(optionId)
     setError('')
 
-    const toUpsert = Object.entries(chips)
-      .filter(([optionId, value]) => value > 0 && editableOptionIds.has(optionId))
-      .map(([optionId, value]) => ({ market_id: optionMarketId[optionId], option_id: optionId, player_id: userId, chips: value }))
-    const toDelete = Object.keys(originalChips)
-      .filter(optionId => editableOptionIds.has(optionId) && !(chips[optionId] > 0))
+    const { error: saveError } = value > 0
+      ? await supabase.from('bets').upsert({ market_id: marketId, option_id: optionId, player_id: userId, chips: value }, { onConflict: 'market_id,option_id,player_id' })
+      : await supabase.from('bets').delete().eq('player_id', userId).eq('option_id', optionId)
 
-    if (toUpsert.length) {
-      const { error: upsertError } = await supabase.from('bets').upsert(toUpsert, { onConflict: 'market_id,option_id,player_id' })
-      if (upsertError) {
-        setError(describeBetError(upsertError.message))
-        setSaving(false)
-        return
-      }
+    setSavingOption(null)
+    if (saveError) {
+      setError(describeBetError(saveError.message))
+      setChips(c => ({ ...c, [optionId]: original }))
+      return
     }
-
-    if (toDelete.length) {
-      const { error: deleteError } = await supabase.from('bets').delete().eq('player_id', userId).in('option_id', toDelete)
-      if (deleteError) {
-        setError('No se pudieron actualizar todas las apuestas: ' + deleteError.message)
-        setSaving(false)
-        return
-      }
-    }
-
-    setSaving(false)
     router.refresh()
   }
 
@@ -172,8 +168,8 @@ export default function BettingMarketsBoard({ markets, userId, chipsLeft, roundS
     <div className="flex flex-col gap-3.5">
       {error && <p className="text-xs" style={{ color: 'var(--red)' }}>⚠ {error}</p>}
       {editableMarkets.length > 0 && (
-        <p className="text-xs" style={{ color: isOverBudget ? 'var(--red)' : 'var(--text-muted2)' }}>
-          {isOverBudget ? `⚠ Te pasas por ${totalChips - chipsAvailable} fichas` : `${totalChips}/${chipsAvailable} fichas usadas en esta jornada`}
+        <p className="text-xs" style={{ color: 'var(--text-muted2)' }}>
+          Te quedan <strong>{chipsRemaining}</strong> de {chipsAvailable} fichas por apostar en esta jornada
         </p>
       )}
 
@@ -275,7 +271,9 @@ export default function BettingMarketsBoard({ markets, userId, chipsLeft, roundS
                               value={myChips}
                               onChange={e => setChips(c => ({ ...c, [option.id]: Math.max(0, parseInt(e.target.value) || 0) }))}
                               onFocus={e => e.target.select()}
-                              className="w-[52px] text-center text-xs rounded-lg py-1 outline-none"
+                              onBlur={() => commitChip(market.id, option.id)}
+                              disabled={savingOption === option.id}
+                              className="w-[52px] text-center text-xs rounded-lg py-1 outline-none disabled:opacity-50"
                               style={{ border: '1px solid var(--hairline)', color: 'var(--text)' }}
                             />
                           </>
@@ -298,16 +296,6 @@ export default function BettingMarketsBoard({ markets, userId, chipsLeft, roundS
         )
       })}
 
-      {editableMarkets.length > 0 && (
-        <button
-          onClick={saveAll}
-          disabled={saving || !hasChanges || isOverBudget}
-          className="font-heading text-sm py-3 rounded-2xl font-bold transition hover:opacity-90 disabled:opacity-40"
-          style={{ background: 'var(--accent)', color: '#fff' }}
-        >
-          {saving ? 'Guardando...' : hasChanges ? '✓ Guardar apuestas' : 'Sin cambios que guardar'}
-        </button>
-      )}
     </div>
   )
 }

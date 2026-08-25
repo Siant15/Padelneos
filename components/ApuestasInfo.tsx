@@ -13,17 +13,17 @@ export default function ApuestasInfo() {
       <button
         type="button"
         onClick={() => setOpen(v => !v)}
-        aria-label="Cómo funcionan las apuestas"
         aria-expanded={open}
-        className="flex items-center justify-center shrink-0"
-        style={{ color: 'var(--text-muted2)' }}
+        className="flex items-center gap-1 shrink-0 text-[11px] font-bold rounded-full px-2 py-1"
+        style={{ color: 'var(--accent)', background: 'var(--tint)' }}
       >
-        <Info size={15} strokeWidth={2.2} />
+        <Info size={13} strokeWidth={2.4} />
+        ¿Cómo funcionan?
       </button>
       {open && (
         <div
           role="tooltip"
-          className="absolute left-0 top-6 z-10 w-72 rounded-xl p-3 text-left"
+          className="absolute left-0 top-8 z-10 w-72 rounded-xl p-3 text-left"
           style={{ background: 'var(--surface)', boxShadow: '0 6px 20px rgba(0,0,0,0.14)', border: '1px solid var(--border)' }}
         >
           <p className="text-[11px] font-bold mb-2" style={{ color: 'var(--text-muted2)' }}>
