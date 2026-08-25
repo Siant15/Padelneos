@@ -239,8 +239,12 @@ export default function BettingMarketsBoard({ markets, userId, chipsLeft, roundS
                   const myChips = chips[option.id] ?? 0
                   const pct = totalMarketChips ? Math.round((totalOnOption / totalMarketChips) * 100) : 0
                   const cuota = totalOnOption ? (potWithJackpot / totalOnOption).toFixed(1) : '—'
-                  const color = OPTION_COLORS[idx % OPTION_COLORS.length]
                   const isSelfNegativeBet = option.player_id === userId && option.is_self_negative
+                  // Las opciones bloqueadas para ti (no puedes apostar contra
+                  // ti mismo) muestran la barra en gris neutro en vez del
+                  // color de la paleta — ese color sugiere "puedes actuar
+                  // aquí" y aquí no puedes, aunque otros sí hayan apostado.
+                  const color = isSelfNegativeBet ? 'var(--text-muted2)' : OPTION_COLORS[idx % OPTION_COLORS.length]
                   const estimatedPrize = myChips > 0 && totalOnOption > 0 ? Math.round((myChips / totalOnOption) * potWithJackpot * 100) / 100 : 0
 
                   return (
@@ -254,7 +258,7 @@ export default function BettingMarketsBoard({ markets, userId, chipsLeft, roundS
                       </div>
                       <div className="flex items-center gap-2">
                         <div className="flex-1 h-2.5 rounded-full overflow-hidden" style={{ background: 'var(--tint)' }}>
-                          <div className="h-full rounded-full" style={{ width: `${pct}%`, background: color }} />
+                          <div className="h-full rounded-full" style={{ width: `${pct}%`, background: color, opacity: isSelfNegativeBet ? 0.5 : 1 }} />
                         </div>
                         {canBet && !isSelfNegativeBet ? (
                           <>
@@ -285,8 +289,11 @@ export default function BettingMarketsBoard({ markets, userId, chipsLeft, roundS
                           <span className="text-[11px] w-[38px] text-right" style={{ color: 'var(--text-muted2)' }}>{myChips}f</span>
                         )}
                       </div>
+                      <p className="text-[11px] mt-1" style={{ color: 'var(--text-muted2)' }}>
+                        {totalOnOption > 0 ? `${totalOnOption} fichas apostadas en total` : 'Nadie ha apostado aquí todavía'}
+                      </p>
                       {isSelfNegativeBet && (
-                        <p className="text-[11px] mt-1" style={{ color: 'var(--red)' }}>No puedes apostar contra ti mismo</p>
+                        <p className="text-[11px] mt-0.5" style={{ color: 'var(--red)' }}>No puedes apostar contra ti mismo</p>
                       )}
                       {canBet && estimatedPrize > 0 && (
                         <p className="text-[11px] mt-0.5" style={{ color: 'var(--green)' }}>Si acierta: ≈{estimatedPrize.toFixed(2)} fichas</p>
