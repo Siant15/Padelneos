@@ -25,6 +25,8 @@ function isStandalone(): boolean {
   return window.matchMedia('(display-mode: standalone)').matches || (window.navigator as { standalone?: boolean }).standalone === true
 }
 
+const VAPID_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+
 export default function PwaSetup() {
   const supabase = createClient()
   const [installEvent, setInstallEvent] = useState<BeforeInstallPromptEvent | null>(null)
@@ -75,17 +77,10 @@ export default function PwaSetup() {
         return
       }
 
-      const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
-      if (!vapidKey) {
-        setPushError('Las notificaciones no están configuradas todavía en el servidor.')
-        setSubscribing(false)
-        return
-      }
-
       const registration = await navigator.serviceWorker.ready
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(vapidKey),
+        applicationServerKey: urlBase64ToUint8Array(VAPID_KEY!),
       })
 
       const { data: { user } } = await supabase.auth.getUser()
@@ -140,7 +135,11 @@ export default function PwaSetup() {
         </div>
       )}
 
-      {permission === 'unsupported' ? (
+      {!VAPID_KEY ? (
+        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+          🔔 Las notificaciones todavía no están configuradas en el servidor. En cuanto lo estén, este botón se activará solo.
+        </p>
+      ) : permission === 'unsupported' ? (
         <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
           {ios && !standalone
             ? '🔔 Las notificaciones en iPhone solo funcionan una vez instalada la app (botón de arriba). Después, ábrela desde el icono y vuelve aquí para activarlas.'
