@@ -44,7 +44,16 @@ export default function PwaSetup() {
     setPermission(typeof Notification !== 'undefined' ? Notification.permission : 'unsupported')
 
     if ('serviceWorker' in navigator) {
+      // "Permiso concedido" no significa "ya suscrito": si un intento
+      // anterior falló después de pedir el permiso (p.ej. el guardado en
+      // la base de datos), el navegador seguiría diciendo 'granted' sin
+      // que exista una suscripción real. Se comprueba de verdad contra
+      // el propio pushManager en vez de asumirlo por el permiso.
       navigator.serviceWorker.register('/sw.js').catch(() => {})
+      navigator.serviceWorker.ready
+        .then(registration => registration.pushManager.getSubscription())
+        .then(sub => setPushOk(!!sub))
+        .catch(() => {})
     }
 
     function onBeforeInstall(e: Event) {
@@ -96,8 +105,10 @@ export default function PwaSetup() {
 
       if (error) throw error
       setPushOk(true)
-    } catch {
-      setPushError('No se pudo activar. Vuelve a intentarlo en unos segundos.')
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      setPushOk(false)
+      setPushError(`No se pudo activar: ${message}`)
     } finally {
       setSubscribing(false)
     }
@@ -145,8 +156,6 @@ export default function PwaSetup() {
             ? '🔔 Las notificaciones en iPhone solo funcionan una vez instalada la app (botón de arriba). Después, ábrela desde el icono y vuelve aquí para activarlas.'
             : '🔔 Este navegador no admite notificaciones.'}
         </p>
-      ) : permission === 'granted' && !pushOk ? (
-        <p className="text-xs" style={{ color: 'var(--green)' }}>✓ Notificaciones activadas en este dispositivo</p>
       ) : (
         <button
           onClick={handleEnableNotifications}
