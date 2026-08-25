@@ -50,6 +50,7 @@ export default function NavBar({ isAdmin }: { isAdmin: boolean }) {
               <Link
                 key={href}
                 href={href}
+                prefetch
                 aria-current={active ? 'page' : undefined}
                 className="flex flex-col items-center justify-center gap-1 flex-1 py-3"
                 style={{ color: active ? 'var(--accent)' : 'var(--text-muted2)' }}

@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getCachedUser } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import BettingMarketsBoard from '@/components/BettingMarketsBoard'
@@ -11,7 +11,7 @@ import { CHIPS_PER_ROUND } from '@/lib/betting'
 export default async function ApuestasPage({ params }: { params: Promise<{ roundId: string }> }) {
   const { roundId } = await params
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getCachedUser()
 
   const ctx = await getRoundBettingContext(supabase, roundId, user?.id ?? '')
   if (!ctx.round) notFound()

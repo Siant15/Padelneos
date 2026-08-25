@@ -1,5 +1,5 @@
 import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import { cache } from 'react'
 
 // Memoizado por request (React cache()): el layout y la página que
@@ -29,11 +29,18 @@ export const createClient = cache(async () => {
   )
 })
 
-// Un único punto de validación de la sesión por request — se cachea con
-// createClient(), así que layout.tsx, la página y cualquier query
-// posterior que llame a esta función reutilizan la misma comprobación.
-export const getCachedUser = cache(async () => {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  return user
+// proxy.ts ya valida la sesión contra Supabase Auth en cada navegación
+// (es lo único que puede bloquear el acceso antes de renderizar nada) y
+// deja el resultado en cabeceras (x-user-id/x-user-email). Antes,
+// layout.tsx y cada página volvían a llamar a supabase.auth.getUser()
+// por su cuenta, repitiendo esa misma validación de red una segunda vez
+// en cada cambio de pestaña — de ahí la lentitud al navegar. Leer la
+// cabecera es gratis: nada que el cliente mande puede falsificarla,
+// porque el proxy siempre la sobrescribe con su propio resultado
+// (Headers.set reemplaza cualquier valor previo del mismo nombre).
+export const getCachedUser = cache(async (): Promise<{ id: string; email: string | null } | null> => {
+  const h = await headers()
+  const id = h.get('x-user-id')
+  if (!id) return null
+  return { id, email: h.get('x-user-email') || null }
 })
