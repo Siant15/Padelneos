@@ -6,6 +6,7 @@ import type { BettingMarket } from '@/lib/types'
 import { DAYS_ES, formatTime } from '@/lib/types'
 import ApuestasActa from '@/components/ApuestasActa'
 import BettingMarketsBoard from '@/components/BettingMarketsBoard'
+import ApuestasInfo from '@/components/ApuestasInfo'
 
 type BaseRound = { roundId: string; roundNumber: number; pair1Label: string | null; pair2Label: string | null; scheduledDate: string | null; scheduledTime: string | null; club: string | null }
 
@@ -53,6 +54,10 @@ export default function ApuestasTab({ userId, rounds }: { userId: string; rounds
 
   return (
     <div className="flex flex-col gap-3">
+      <div className="flex items-center gap-1.5">
+        <span className="font-heading text-sm font-bold">Apuestas de la liga</span>
+        <ApuestasInfo />
+      </div>
       <div className="flex items-center gap-2 flex-wrap">
         <div className="flex rounded-xl p-1 gap-1" style={{ background: 'var(--tint)' }}>
           <button
