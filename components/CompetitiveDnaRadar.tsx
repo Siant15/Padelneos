@@ -117,18 +117,24 @@ export default function CompetitiveDnaRadar({ players, viewerId, seasonLabel }: 
       </p>
 
       {others.length > 0 && (
-        <label className="flex items-center gap-2 mb-3 text-[11px] font-bold" style={{ color: 'var(--text-muted2)' }}>
-          COMPARAR CON
-          <select
-            value={compareId}
-            onChange={e => setCompareId(e.target.value)}
-            className="flex-1 rounded-lg px-2 py-1.5 text-xs font-bold outline-none"
-            style={{ background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)' }}
-          >
-            <option value="none">Nadie</option>
-            {others.map(p => <option key={p.playerId} value={p.playerId}>{p.playerName}</option>)}
-          </select>
-        </label>
+        <div className="flex items-center gap-1.5 mb-3 overflow-x-auto">
+          <span className="text-[11px] font-bold shrink-0" style={{ color: 'var(--text-muted2)' }}>COMPARAR CON</span>
+          {[{ playerId: 'none', playerName: 'Nadie' }, ...others].map(p => (
+            <button
+              key={p.playerId}
+              type="button"
+              onClick={() => setCompareId(p.playerId)}
+              aria-pressed={compareId === p.playerId}
+              className="shrink-0 text-[11px] font-bold px-2 py-1 rounded-full transition"
+              style={{
+                background: compareId === p.playerId ? 'var(--orange)' : 'var(--surface2)',
+                color: compareId === p.playerId ? '#fff' : 'var(--text-muted)',
+              }}
+            >
+              {p.playerName}
+            </button>
+          ))}
+        </div>
       )}
 
       <div className="relative mx-auto" style={{ width: '100%', maxWidth: 280, aspectRatio: '1 / 1' }}>
