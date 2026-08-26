@@ -6,13 +6,11 @@ import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import type { Profile } from '@/lib/types'
 import { isValidSetScore } from '@/lib/types'
-import MetricsInfoButton from '@/components/MetricsInfoButton'
 import { revalidateLigaData } from '@/lib/actions'
 
 type PairForm = { team1_p1_id: string; team1_p2_id: string; team2_p1_id: string; team2_p2_id: string }
 
 type SetScore = { t1: string; t2: string }
-type StatEntry = { aces: number; double_faults: number; bolas_por_3: number; smash_al_cristal: number }
 
 type MatchStatus = {
   winner: 'team1' | 'team2' | null
@@ -64,7 +62,6 @@ export default function ResultadoPage() {
   const [roundNumber, setRoundNumber] = useState(0)
   const [players, setPlayers] = useState<{ id: string; name: string; team: 1 | 2 }[]>([])
   const [sets, setSets] = useState<SetScore[]>([{ t1: '', t2: '' }, { t1: '', t2: '' }])
-  const [stats, setStats] = useState<Record<string, StatEntry>>({})
   const [loading, setLoading] = useState(false)
   const [saved, setSaved] = useState(false)
   const [saveError, setSaveError] = useState('')
@@ -117,22 +114,6 @@ export default function ResultadoPage() {
         existingSets.push({ t1: m.set3_t1.toString(), t2: m.set3_t2?.toString() ?? '' })
       }
       setSets(existingSets)
-
-      // Precargar stats
-      supabase.from('match_stats').select('*').eq('match_id', m.id).then(({ data: s }) => {
-        if (s) {
-          const statsMap: Record<string, StatEntry> = {}
-          for (const st of s) {
-            statsMap[st.player_id] = {
-              aces: st.aces,
-              double_faults: st.double_faults,
-              bolas_por_3: st.bolas_por_3,
-              smash_al_cristal: st.smash_al_cristal,
-            }
-          }
-          setStats(statsMap)
-        }
-      })
     })
   }, [roundId])
 
@@ -149,24 +130,6 @@ export default function ResultadoPage() {
     } else {
       setSets([...sets, { t1: '', t2: '' }])
     }
-  }
-
-  function adjustStat(playerId: string, field: keyof StatEntry, delta: number) {
-    setStats(prev => {
-      const current = prev[playerId] ?? { aces: 0, double_faults: 0, bolas_por_3: 0, smash_al_cristal: 0 }
-      return {
-        ...prev,
-        [playerId]: { ...current, [field]: Math.max(0, current[field] + delta) },
-      }
-    })
-  }
-
-  function setStat(playerId: string, field: keyof StatEntry, value: string) {
-    const n = Math.max(0, parseInt(value, 10) || 0)
-    setStats(prev => {
-      const current = prev[playerId] ?? { aces: 0, double_faults: 0, bolas_por_3: 0, smash_al_cristal: 0 }
-      return { ...prev, [playerId]: { ...current, [field]: n } }
-    })
   }
 
   const pairIds = [pairForm.team1_p1_id, pairForm.team1_p2_id, pairForm.team2_p1_id, pairForm.team2_p2_id].filter(Boolean)
@@ -234,24 +197,6 @@ export default function ResultadoPage() {
       return
     }
 
-    const statsRows = players.map(player => {
-      const st = stats[player.id] ?? { aces: 0, double_faults: 0, bolas_por_3: 0, smash_al_cristal: 0 }
-      return {
-        match_id: matchId,
-        player_id: player.id,
-        aces: st.aces,
-        double_faults: st.double_faults,
-        bolas_por_3: st.bolas_por_3,
-        smash_al_cristal: st.smash_al_cristal,
-      }
-    })
-    const { error: statsError } = await supabase.from('match_stats').upsert(statsRows, { onConflict: 'match_id,player_id' })
-    if (statsError) {
-      setSaveError('Resultado guardado, pero fallaron las estadísticas: ' + statsError.message)
-      setLoading(false)
-      return
-    }
-
     // Con el resultado ya guardado, las preguntas de apuestas automáticas
     // (ganador, resultado por sets, marcador exacto, tie-break...) se
     // resuelven solas; las anecdóticas se siguen resolviendo a mano
@@ -284,24 +229,6 @@ export default function ResultadoPage() {
       `Resultado: ${scoreParts.join(', ')} → ganan ${winnerNames} 🏆`,
     ]
 
-    const highlights: string[] = []
-    let topAces = { name: '', value: 0 }
-    let topDf = { name: '', value: 0 }
-    let topSmash = { name: '', value: 0 }
-    for (const p of players) {
-      const st = stats[p.id]
-      if (!st) continue
-      if (st.aces > topAces.value) topAces = { name: p.name, value: st.aces }
-      if (st.double_faults > topDf.value) topDf = { name: p.name, value: st.double_faults }
-      if (st.smash_al_cristal > topSmash.value) topSmash = { name: p.name, value: st.smash_al_cristal }
-    }
-    if (topAces.value > 0) highlights.push(`🎯 Más aces: ${topAces.name} (${topAces.value})`)
-    if (topDf.value > 0) highlights.push(`🧈 Más dobles faltas: ${topDf.name} (${topDf.value})`)
-    if (topSmash.value > 0) highlights.push(`💥 Smash al cristal: ${topSmash.name} (${topSmash.value})`)
-
-    if (highlights.length) {
-      lines.push('', '📊 Destacados:', ...highlights)
-    }
     lines.push('', '¡A por la próxima! 💪')
     return lines.join('\n')
   }
@@ -468,58 +395,6 @@ export default function ResultadoPage() {
             )}
           </div>
 
-          {/* Stats individuales */}
-          <div className="rounded-xl p-4" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
-            <div className="flex items-center gap-2 mb-4">
-              <p className="text-sm font-semibold">Estadísticas individuales</p>
-              <MetricsInfoButton />
-            </div>
-            <div className="space-y-5">
-              {players.map(player => {
-                const st = stats[player.id] ?? { aces: 0, double_faults: 0, bolas_por_3: 0, smash_al_cristal: 0 }
-                return (
-                  <div key={player.id}>
-                    <p className="text-sm font-medium mb-2" style={{ color: player.team === 1 ? 'var(--accent)' : 'var(--orange)' }}>
-                      {player.name}
-                    </p>
-                    <div className="grid grid-cols-2 gap-2">
-                      {([
-                        { key: 'aces', label: '🎯 Aces' },
-                        { key: 'double_faults', label: '❌ DF' },
-                        { key: 'bolas_por_3', label: '🎱 B×3' },
-                        { key: 'smash_al_cristal', label: '💥 SC' },
-                      ] as const).map(({ key, label }) => (
-                        <div key={key} className="flex items-center justify-between gap-1 rounded-lg px-1.5 py-1" style={{ background: 'var(--surface2)' }}>
-                          <label className="text-xs" style={{ color: 'var(--text-muted)' }}>{label}</label>
-                          <div className="flex items-center gap-1">
-                            <button type="button"
-                              onClick={() => adjustStat(player.id, key, -1)}
-                              className="w-9 h-9 rounded-lg text-sm font-bold flex items-center justify-center shrink-0"
-                              style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>−</button>
-                            <input
-                              type="number"
-                              min={0}
-                              inputMode="numeric"
-                              value={st[key] ?? 0}
-                              onChange={e => setStat(player.id, key, e.target.value)}
-                              onFocus={e => e.target.select()}
-                              className="w-9 text-center text-sm font-bold rounded-lg py-1.5 outline-none"
-                              style={{ background: 'var(--surface2)', border: 'none', color: 'var(--text)' }}
-                            />
-                            <button type="button"
-                              onClick={() => adjustStat(player.id, key, 1)}
-                              className="w-9 h-9 rounded-lg text-sm font-bold flex items-center justify-center shrink-0"
-                              style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>+</button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-
           {saveError && (
             <p className="text-sm font-semibold text-center" style={{ color: 'var(--red)' }}>⚠ {saveError}</p>
           )}
@@ -555,7 +430,7 @@ export default function ResultadoPage() {
               className="w-full py-3 rounded-xl font-semibold transition hover:opacity-90 disabled:opacity-40"
               style={{ background: 'var(--accent)', color: '#fff' }}>
               {!winner ? 'Completa el marcador primero' :
-                loading ? 'Guardando...' : 'Guardar resultado + stats'}
+                loading ? 'Guardando...' : 'Guardar resultado'}
             </button>
           )}
         </form>
