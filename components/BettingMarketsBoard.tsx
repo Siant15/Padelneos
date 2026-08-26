@@ -89,11 +89,12 @@ export default function BettingMarketsBoard({ markets, userId, chipsLeft, roundS
     router.refresh()
   }
 
-  // Apuesta rápida: añade QUICK_BET_AMOUNT fichas a esta opción y guarda
-  // al momento, sin pasar por el botón general de "Guardar apuestas".
-  async function quickBet(marketId: string, optionId: string) {
+  // Apuesta rápida: suma o resta QUICK_BET_AMOUNT fichas a esta opción y
+  // guarda al momento, sin pasar por el botón general de "Guardar apuestas".
+  async function quickBet(marketId: string, optionId: string, delta: number) {
     const current = chips[optionId] ?? 0
-    const newValue = current + QUICK_BET_AMOUNT
+    const newValue = Math.max(0, current + delta)
+    if (newValue === current) return
     if (totalChips - current + newValue > chipsAvailable) {
       setError(`No te quedan fichas suficientes para apostar ${QUICK_BET_AMOUNT} más.`)
       return
@@ -101,14 +102,13 @@ export default function BettingMarketsBoard({ markets, userId, chipsLeft, roundS
     setQuickBetting(optionId)
     setError('')
 
-    const { error: upsertError } = await supabase.from('bets').upsert(
-      { market_id: marketId, option_id: optionId, player_id: userId, chips: newValue },
-      { onConflict: 'market_id,option_id,player_id' }
-    )
+    const { error: saveError } = newValue > 0
+      ? await supabase.from('bets').upsert({ market_id: marketId, option_id: optionId, player_id: userId, chips: newValue }, { onConflict: 'market_id,option_id,player_id' })
+      : await supabase.from('bets').delete().eq('player_id', userId).eq('option_id', optionId)
 
     setQuickBetting(null)
-    if (upsertError) {
-      setError(describeBetError(upsertError.message))
+    if (saveError) {
+      setError(describeBetError(saveError.message))
       return
     }
     setChips(c => ({ ...c, [optionId]: newValue }))
@@ -260,7 +260,17 @@ export default function BettingMarketsBoard({ markets, userId, chipsLeft, roundS
                           <>
                             <button
                               type="button"
-                              onClick={() => quickBet(market.id, option.id)}
+                              onClick={() => quickBet(market.id, option.id, -QUICK_BET_AMOUNT)}
+                              disabled={quickBetting === option.id || myChips <= 0}
+                              title={`Quitar ${QUICK_BET_AMOUNT} fichas de aquí`}
+                              className="text-[11px] font-bold px-2 py-1 rounded-lg shrink-0 transition hover:opacity-90 disabled:opacity-40"
+                              style={{ background: 'var(--surface2)', color: 'var(--accent)' }}
+                            >
+                              {quickBetting === option.id ? '...' : `−${QUICK_BET_AMOUNT}`}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => quickBet(market.id, option.id, QUICK_BET_AMOUNT)}
                               disabled={quickBetting === option.id}
                               title={`Apostar ${QUICK_BET_AMOUNT} fichas más aquí`}
                               className="text-[11px] font-bold px-2 py-1 rounded-lg shrink-0 transition hover:opacity-90 disabled:opacity-40"

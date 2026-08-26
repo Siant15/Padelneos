@@ -191,7 +191,7 @@ export default async function EstadisticasPage() {
                   <span className="text-xs" style={{ color: 'var(--text-muted2)' }}>{r.matches} partidos</span>
                 </div>
                 {!!nicknames[r.id]?.length && (
-                  <div className="flex flex-wrap gap-1 mb-2">
+                  <div className="flex flex-wrap gap-1">
                     {nicknames[r.id].map(n => (
                       <span key={n} className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'var(--surface2)', color: 'var(--accent)' }}>
                         {n}
@@ -199,12 +199,6 @@ export default async function EstadisticasPage() {
                     ))}
                   </div>
                 )}
-                <div className="grid grid-cols-4 gap-2">
-                  <StatBox emoji="🎯" label="Aces" value={r.aces} perMatch={r.matches ? +(r.aces / r.matches).toFixed(1) : 0} />
-                  <StatBox emoji="❌" label="DF" value={r.double_faults} perMatch={r.matches ? +(r.double_faults / r.matches).toFixed(1) : 0} />
-                  <StatBox emoji="🎱" label="B×3" value={r.bolas_por_3} perMatch={r.matches ? +(r.bolas_por_3 / r.matches).toFixed(1) : 0} />
-                  <StatBox emoji="💥" label="SC" value={r.smash_al_cristal} perMatch={r.matches ? +(r.smash_al_cristal / r.matches).toFixed(1) : 0} />
-                </div>
               </div>
             ))}
           </div>
@@ -245,17 +239,6 @@ export default async function EstadisticasPage() {
       <div className="text-xs" style={{ color: 'var(--text-muted2)' }}>
         DF = Dobles faltas · B×3 = Bolas por 3 · SC = Smash al cristal
       </div>
-    </div>
-  )
-}
-
-function StatBox({ emoji, label, value, perMatch }: { emoji: string; label: string; value: number; perMatch: number }) {
-  return (
-    <div className="rounded-xl p-2 text-center" style={{ background: 'var(--surface2)' }}>
-      <div className="text-base">{emoji}</div>
-      <div className="font-extrabold text-base">{value}</div>
-      <div className="text-[10px]" style={{ color: 'var(--text-muted2)' }}>{label}</div>
-      <div className="text-[10px]" style={{ color: 'var(--text-muted2)' }}>{perMatch}/p</div>
     </div>
   )
 }
