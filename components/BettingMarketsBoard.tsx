@@ -260,23 +260,13 @@ export default function BettingMarketsBoard({ markets, userId, chipsLeft, roundS
                           <>
                             <button
                               type="button"
-                              onClick={() => quickBet(market.id, option.id, -QUICK_BET_AMOUNT)}
-                              disabled={quickBetting === option.id || myChips <= 0}
-                              title={`Quitar ${QUICK_BET_AMOUNT} fichas de aquí`}
-                              className="text-[11px] font-bold px-2 py-1 rounded-lg shrink-0 transition hover:opacity-90 disabled:opacity-40"
-                              style={{ background: 'var(--surface2)', color: 'var(--accent)' }}
-                            >
-                              {quickBetting === option.id ? '...' : `−${QUICK_BET_AMOUNT}`}
-                            </button>
-                            <button
-                              type="button"
                               onClick={() => quickBet(market.id, option.id, QUICK_BET_AMOUNT)}
                               disabled={quickBetting === option.id}
                               title={`Apostar ${QUICK_BET_AMOUNT} fichas más aquí`}
-                              className="text-[11px] font-bold px-2 py-1 rounded-lg shrink-0 transition hover:opacity-90 disabled:opacity-40"
-                              style={{ background: 'var(--accent)', color: '#fff' }}
+                              className="w-8 h-8 rounded-lg text-sm font-bold shrink-0 flex items-center justify-center transition hover:opacity-90 disabled:opacity-40"
+                              style={{ background: 'var(--green)', color: '#fff' }}
                             >
-                              {quickBetting === option.id ? '...' : `⚡+${QUICK_BET_AMOUNT}`}
+                              {quickBetting === option.id ? '···' : '+'}
                             </button>
                             <input
                               type="number"
@@ -290,6 +280,16 @@ export default function BettingMarketsBoard({ markets, userId, chipsLeft, roundS
                               className="w-[52px] text-center text-xs rounded-lg py-1 outline-none disabled:opacity-50"
                               style={{ border: '1px solid var(--hairline)', color: 'var(--text)' }}
                             />
+                            <button
+                              type="button"
+                              onClick={() => quickBet(market.id, option.id, -QUICK_BET_AMOUNT)}
+                              disabled={quickBetting === option.id || myChips <= 0}
+                              title={`Quitar ${QUICK_BET_AMOUNT} fichas de aquí`}
+                              className="w-8 h-8 rounded-lg text-sm font-bold shrink-0 flex items-center justify-center transition hover:opacity-90 disabled:opacity-40"
+                              style={{ background: 'var(--red)', color: '#fff' }}
+                            >
+                              {quickBetting === option.id ? '···' : '−'}
+                            </button>
                           </>
                         ) : (
                           <span className="text-[11px] w-[38px] text-right" style={{ color: 'var(--text-muted2)' }}>{myChips}f</span>

@@ -103,6 +103,7 @@ function SeasonForm({ mode, players, onCancel }: {
   const router = useRouter()
   const [name, setName] = useState(`Liga Pádel ${new Date().getFullYear()}`)
   const [minMatches, setMinMatches] = useState(9)
+  const [firstMatchDate, setFirstMatchDate] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -117,6 +118,7 @@ function SeasonForm({ mode, players, onCancel }: {
     const { error: rpcError } = await supabase.rpc('start_new_season', {
       p_name: name.trim(),
       p_min_matches: minMatches,
+      p_first_match_date: firstMatchDate || null,
     })
 
     setLoading(false)
@@ -150,6 +152,15 @@ function SeasonForm({ mode, players, onCancel }: {
         <input type="number" min={1} max={30} required value={minMatches}
           onChange={e => setMinMatches(+e.target.value)}
           style={inputStyle} />
+      </Field>
+
+      <Field label="Fecha del primer partido (opcional)">
+        <input type="date" value={firstMatchDate}
+          onChange={e => setFirstMatchDate(e.target.value)}
+          style={inputStyle} />
+        <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
+          Si la pones, el resto de jornadas se rellenan solas cada 7 días (J2, J3...). Se puede ajustar cualquiera después desde Editar jornada.
+        </p>
       </Field>
 
       <div>
