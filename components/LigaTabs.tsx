@@ -79,25 +79,12 @@ export default function LigaTabs({
       )}
 
       {section === 'clasificacion' && (
-        <>
-          <ClasificacionTabs
-            individual={clasificacionIndividual}
-            parejas={clasificacionParejas}
-            apuestasMatrix={clasificacionApuestasMatrix}
-            apuestasRoundLabels={clasificacionApuestasRoundLabels}
-          />
-          <Link
-            href="/estadisticas"
-            className="flex items-center justify-between rounded-2xl px-4 py-3.5 transition hover:opacity-90"
-            style={{ background: 'var(--surface)', boxShadow: '0 3px 10px rgba(0,0,0,0.04)' }}
-          >
-            <div>
-              <p className="font-heading font-bold text-sm">📊 Estadísticas de juego</p>
-              <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Aces, dobles faltas, bolas por 3 y récords</p>
-            </div>
-            <span style={{ color: 'var(--text-muted2)' }}>→</span>
-          </Link>
-        </>
+        <ClasificacionTabs
+          individual={clasificacionIndividual}
+          parejas={clasificacionParejas}
+          apuestasMatrix={clasificacionApuestasMatrix}
+          apuestasRoundLabels={clasificacionApuestasRoundLabels}
+        />
       )}
 
       {section === 'apuestas' && (
