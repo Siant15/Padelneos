@@ -4,6 +4,8 @@ import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import PwaSetup from '@/components/PwaSetup'
+import CompetitiveDnaRadar from '@/components/CompetitiveDnaRadar'
+import type { PlayerDna } from '@/lib/dna-data'
 
 type Stats = { matches_played: number; wins: number; total_points: number }
 
@@ -15,6 +17,8 @@ export default function PerfilForm({
   initialPreferredSide,
   initialAvatarUrl,
   initialStats,
+  dnaPlayers,
+  seasonLabel,
 }: {
   userId: string
   initialName: string
@@ -23,6 +27,8 @@ export default function PerfilForm({
   initialPreferredSide: string
   initialAvatarUrl: string | null
   initialStats: Stats
+  dnaPlayers: PlayerDna[]
+  seasonLabel: string
 }) {
   const supabase = createClient()
   const router = useRouter()
@@ -153,6 +159,10 @@ export default function PerfilForm({
         <StatCard value={stats.wins} label="Victorias" />
         <StatCard value={stats.total_points} label="Puntos" accent />
       </div>
+
+      {dnaPlayers.length > 0 && (
+        <CompetitiveDnaRadar players={dnaPlayers} viewerId={userId} seasonLabel={seasonLabel} />
+      )}
 
       <form
         onSubmit={handleSubmit}
