@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter, useParams } from 'next/navigation'
+import Link from 'next/link'
 import type { Profile } from '@/lib/types'
 import { isValidSetScore } from '@/lib/types'
 import MetricsInfoButton from '@/components/MetricsInfoButton'
@@ -528,6 +529,16 @@ export default function ResultadoPage() {
               <div className="w-full py-3 rounded-xl font-semibold text-center" style={{ background: 'var(--green)', color: '#fff' }}>
                 ✓ Guardado
               </div>
+              {/* El resultado ya resuelve solo "Ganador"/"Resultado por
+                  sets"/etc, pero las preguntas anecdóticas (doble falta,
+                  smash al cristal...) no se pueden deducir del marcador —
+                  hay que resolverlas a mano, o la jornada se queda sin
+                  poder liquidarse nunca. */}
+              <Link href={`/admin/jornadas/${roundId}/mercados`}
+                className="block w-full py-3 rounded-xl font-semibold text-center transition hover:opacity-90"
+                style={{ background: 'var(--orange-bg)', color: 'var(--orange)' }}>
+                ⚠️ Resolver las preguntas de apuestas pendientes →
+              </Link>
               <button type="button" onClick={handleShare}
                 className="w-full py-3 rounded-xl font-semibold transition hover:opacity-90"
                 style={{ background: '#25D366', color: '#fff' }}>
