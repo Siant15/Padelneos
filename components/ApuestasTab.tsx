@@ -123,7 +123,14 @@ export default function ApuestasTab({ userId, rounds, initialRoundId }: { userId
             scheduledTime={current.acta.round?.scheduledTime ?? null}
             club={current.acta.round?.club ?? null}
           />
-          <ApuestasActa markets={current.acta.markets} standings={current.acta.standings} />
+          <ApuestasActa
+            markets={current.acta.markets}
+            closure={current.acta.closure}
+            pair1Label={current.acta.pair1Label}
+            pair2Label={current.acta.pair2Label}
+            scoreLabel={current.acta.scoreLabel}
+            userId={userId}
+          />
         </>
       )}
 

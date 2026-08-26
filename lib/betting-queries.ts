@@ -136,7 +136,18 @@ export type ActaMarket = {
   rows: ActaBetRow[]
 }
 
-export type ActaStandingsLine = { rank: number; name: string; pointBonus: number }[]
+// Cierre de la jornada: una fila por jugador con lo apostado/recibido y
+// los puntos de la jornada — viene tal cual de betting_round_results
+// (escrita por settle_round), sin volver a calcular el ranking aquí.
+export type ActaClosureRow = {
+  playerId: string
+  playerName: string
+  rank: number
+  chipsBet: number
+  chipsReceived: number
+  points: number
+  correctCount: number
+}
 
 export type RoundActa = {
   round: { id: string; roundNumber: number; status: string; scheduledDate: string | null; scheduledTime: string | null; club: string | null } | null
@@ -145,7 +156,7 @@ export type RoundActa = {
   scoreLabel: string | null
   isSettled: boolean
   markets: ActaMarket[]
-  standings: ActaStandingsLine
+  closure: ActaClosureRow[]
 }
 
 // `preloadedPlayers` evita repetir la consulta a `profiles` (siempre la
@@ -173,7 +184,7 @@ export async function getRoundActa(supabase: SupabaseClient, roundId: string, pr
   const players = playersResult.data
 
   if (!round) {
-    return { round: null, pair1Label: null, pair2Label: null, scoreLabel: null, isSettled: false, markets: [], standings: [] }
+    return { round: null, pair1Label: null, pair2Label: null, scoreLabel: null, isSettled: false, markets: [], closure: [] }
   }
 
   const match = round.match as unknown as (Match & { team1_p1: { name: string }; team1_p2: { name: string }; team2_p1: { name: string }; team2_p2: { name: string } }) | null
@@ -214,9 +225,17 @@ export async function getRoundActa(supabase: SupabaseClient, roundId: string, pr
     }
   })
 
-  const standings: ActaStandingsLine = (results ?? [])
-    .filter(r => r.point_bonus > 0)
-    .map(r => ({ rank: r.rank, name: (r.player as { name: string } | null)?.name ?? '?', pointBonus: r.point_bonus }))
+  const closure: ActaClosureRow[] = (results ?? [])
+    .map(r => ({
+      playerId: r.player_id,
+      playerName: (r.player as { name: string } | null)?.name ?? '?',
+      rank: r.rank,
+      chipsBet: r.chips_bet,
+      chipsReceived: r.chips_won,
+      points: r.point_bonus,
+      correctCount: r.correct_count,
+    }))
+    .sort((a, b) => a.rank - b.rank)
 
   return {
     round: {
@@ -232,6 +251,6 @@ export async function getRoundActa(supabase: SupabaseClient, roundId: string, pr
     scoreLabel: match ? setsWonLabel(match as Match) : null,
     isSettled,
     markets: actaMarkets,
-    standings,
+    closure,
   }
 }
