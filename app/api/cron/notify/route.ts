@@ -27,8 +27,8 @@ export async function GET(request: Request) {
   }
 
   const type = new URL(request.url).searchParams.get('type')
-  if (type !== 'dayBefore' && type !== 'reminder') {
-    return NextResponse.json({ error: 'type debe ser dayBefore o reminder' }, { status: 400 })
+  if (type !== 'dayBefore' && type !== 'reminder90') {
+    return NextResponse.json({ error: 'type debe ser dayBefore o reminder90' }, { status: 400 })
   }
 
   const admin = createPushAdminClient()
@@ -73,7 +73,7 @@ export async function GET(request: Request) {
 
   const { data: round } = await admin
     .from('rounds')
-    .select('id, round_number, scheduled_time, club, court_booker:profiles!court_booker_id(name), match:matches(team1_p1:profiles!team1_p1_id(name), team1_p2:profiles!team1_p2_id(name), team2_p1:profiles!team2_p1_id(name), team2_p2:profiles!team2_p2_id(name))')
+    .select('id, round_number, scheduled_date, scheduled_time, club, reminder_90_sent_at, court_booker:profiles!court_booker_id(name), match:matches(team1_p1:profiles!team1_p1_id(name), team1_p2:profiles!team1_p2_id(name), team2_p1:profiles!team2_p1_id(name), team2_p2:profiles!team2_p2_id(name))')
     .eq('season_id', season.id)
     .eq('scheduled_date', targetDate)
     .maybeSingle()
@@ -94,9 +94,26 @@ export async function GET(request: Request) {
     return NextResponse.json(result)
   }
 
-  // "reminder": mensaje personalizado según la clasificación de cada
-  // jugador, así que no puede ir por sendPushToAll (payload único para
-  // todos) — se manda uno a uno igual que antes.
+  // "reminder90": se llama cada ~15 min (GitHub Actions, no cron de
+  // Vercel — el plan Hobby no permite crons más frecuentes que 1/día).
+  // Solo manda el aviso si el partido empieza dentro de los próximos
+  // 75-105 min (ventana centrada en 90 y con margen para el propio
+  // intervalo de 15 min entre comprobaciones) y todavía no se avisó.
+  if (!round.scheduled_time) return NextResponse.json({ sent: 0, reason: 'la jornada de hoy no tiene hora confirmada' })
+  if (round.reminder_90_sent_at) return NextResponse.json({ sent: 0, reason: 'ya se avisó para esta jornada' })
+
+  // +02:00 asume horario de verano (CEST) como el resto de este cron
+  // (tampoco calculaba DST antes) — en horario de invierno (CET,
+  // UTC+1) esto adelanta el aviso una hora real.
+  const matchDateTime = new Date(`${round.scheduled_date}T${round.scheduled_time}+02:00`)
+  const minutesUntil = (matchDateTime.getTime() - now.getTime()) / 60000
+  if (minutesUntil < 75 || minutesUntil > 105) {
+    return NextResponse.json({ sent: 0, reason: `fuera de ventana (quedan ${Math.round(minutesUntil)} min)` })
+  }
+
+  // Mensaje personalizado según la clasificación de cada jugador, así
+  // que no puede ir por sendPushToAll (payload único para todos) — se
+  // manda uno a uno.
   webpush.setVapidDetails(process.env.VAPID_SUBJECT, process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY, process.env.VAPID_PRIVATE_KEY)
 
   const { data: subs } = await admin.from('push_subscriptions').select('*')
@@ -115,7 +132,7 @@ export async function GET(request: Request) {
   for (const sub of subs) {
     const rank = ranked.findIndex(r => r.player_id === sub.player_id)
     const line = rank === -1 ? 'Esta noche, a por todas 🎾' : pickLine(rank, ranked.length)
-    const payload = { title: '🤫 Esta noche toca partido', body: line, url: '/dashboard' }
+    const payload = { title: '⏰ El partido empieza en 90 min', body: line, url: '/dashboard' }
     try {
       await webpush.sendNotification(
         { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
@@ -128,6 +145,7 @@ export async function GET(request: Request) {
     }
   }
   if (toDelete.length) await admin.from('push_subscriptions').delete().in('id', toDelete)
+  await admin.from('rounds').update({ reminder_90_sent_at: now.toISOString() }).eq('id', round.id)
 
   return NextResponse.json({ sent, removed: toDelete.length })
 }

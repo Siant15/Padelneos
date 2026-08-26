@@ -1,0 +1,21 @@
+name: Recordatorio 90 min antes del partido
+
+# El plan Hobby de Vercel solo permite crons de una vez al día, y este
+# aviso necesita comprobarse cada pocos minutos porque la hora del
+# partido cambia de una jornada a otra (no hay una hora fija de sobra
+# para un cron diario). GitHub Actions sí permite esta frecuencia
+# gratis, así que el endpoint decide por sí mismo si toca avisar o no
+# — este workflow solo lo llama cada 15 minutos.
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch: {}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Comprobar y enviar recordatorio si toca
+        run: |
+          curl -sf -X GET "https://padelneos-beta.vercel.app/api/cron/notify?type=reminder90" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
