@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server'
-import { createClient as createAdminClient } from '@supabase/supabase-js'
+import { createPushAdminClient, sendPushToAll } from '@/lib/push'
 import webpush from 'web-push'
 
 // Mensajes "picantes" según la posición en la clasificación, para el
-// aviso de las 18:00. Nunca los mismos dos veces seguidas sería ideal,
-// pero con 4 jugadores y un cron diario no merece la pena la complejidad.
+// recordatorio de última hora. Nunca los mismos dos veces seguidas sería
+// ideal, pero con 4 jugadores y un cron diario no merece la pena la
+// complejidad.
 const TOP_LINES = ['Vas primero. No la líes esta noche 😏', 'Líder de la liga. A mantenerlo 🏆']
 const MID_LINES = ['Terreno de nadie. Esta noche decide 🎾', 'Ni arriba ni abajo... todavía']
 const BOTTOM_LINES = ['Si no aprietas, pagas la cena 🍽️', 'Que la presión no te pueda esta noche', 'El último puesto invita, no tú']
@@ -24,24 +25,19 @@ export async function GET(request: Request) {
   if (!process.env.VAPID_SUBJECT || !process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) {
     return NextResponse.json({ error: 'Faltan variables VAPID en el entorno' }, { status: 500 })
   }
-  webpush.setVapidDetails(
-    process.env.VAPID_SUBJECT,
-    process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
-    process.env.VAPID_PRIVATE_KEY
-  )
 
   const type = new URL(request.url).searchParams.get('type')
-  if (type !== 'morning' && type !== 'evening') {
-    return NextResponse.json({ error: 'type debe ser morning o evening' }, { status: 400 })
+  if (type !== 'dayBefore' && type !== 'reminder') {
+    return NextResponse.json({ error: 'type debe ser dayBefore o reminder' }, { status: 400 })
   }
 
-  const admin = createAdminClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
+  const admin = createPushAdminClient()
 
-  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Madrid' }) // YYYY-MM-DD
+  // "Hoy" y "mañana" en huso de Madrid, no en UTC del servidor.
+  const now = new Date()
+  const today = now.toLocaleDateString('en-CA', { timeZone: 'Europe/Madrid' })
+  const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000).toLocaleDateString('en-CA', { timeZone: 'Europe/Madrid' })
+  const targetDate = type === 'dayBefore' ? tomorrow : today
 
   const { data: season } = await admin
     .from('seasons')
@@ -79,51 +75,51 @@ export async function GET(request: Request) {
     .from('rounds')
     .select('id, round_number, scheduled_time, club, court_booker:profiles!court_booker_id(name), match:matches(team1_p1:profiles!team1_p1_id(name), team1_p2:profiles!team1_p2_id(name), team2_p1:profiles!team2_p1_id(name), team2_p2:profiles!team2_p2_id(name))')
     .eq('season_id', season.id)
-    .eq('scheduled_date', today)
+    .eq('scheduled_date', targetDate)
     .maybeSingle()
 
-  if (!round) return NextResponse.json({ sent: 0, reason: 'no hay jornada hoy' })
-
-  const { data: subs } = await admin.from('push_subscriptions').select('*')
-  if (!subs?.length) return NextResponse.json({ sent: 0, reason: 'nadie suscrito' })
+  if (!round) return NextResponse.json({ sent: 0, reason: type === 'dayBefore' ? 'no hay jornada mañana' : 'no hay jornada hoy' })
 
   const time = (round.scheduled_time ?? season.match_time)?.slice(0, 5) ?? ''
   const club = round.club ?? season.default_club ?? ''
   const match = round.match as unknown as { team1_p1?: { name: string }; team1_p2?: { name: string }; team2_p1?: { name: string }; team2_p2?: { name: string } } | null
   const booker = (Array.isArray(round.court_booker) ? round.court_booker[0] : round.court_booker) as { name: string } | null
 
-  let payloadFor: (playerId: string) => { title: string; body: string }
-
-  if (type === 'morning') {
+  if (type === 'dayBefore') {
     const pairing = match
       ? `${match.team1_p1?.name} & ${match.team1_p2?.name} vs ${match.team2_p1?.name} & ${match.team2_p2?.name}`
       : `Emparejamiento por confirmar (reserva: ${booker?.name ?? 'sin asignar'})`
     const body = [pairing, [time && `⏰ ${time}`, club && `📍 ${club}`].filter(Boolean).join(' · ')].filter(Boolean).join('\n')
-    payloadFor = () => ({ title: `🎾 Partido hoy · Jornada ${round.round_number}`, body })
-  } else {
-    const { data: standings } = await admin
-      .from('individual_standings')
-      .select('player_id')
-      .eq('season_id', season.id)
-      .order('total_points', { ascending: false })
-      .order('sport_points', { ascending: false })
-    const ranked = standings ?? []
-    payloadFor = (playerId: string) => {
-      const rank = ranked.findIndex(r => r.player_id === playerId)
-      const line = rank === -1 ? 'Esta noche, a por todas 🎾' : pickLine(rank, ranked.length)
-      return { title: '🤫 Esta noche toca partido', body: line }
-    }
+    const result = await sendPushToAll(admin, { title: `🎾 Mañana toca partido · Jornada ${round.round_number}`, body, url: '/dashboard' })
+    return NextResponse.json(result)
   }
+
+  // "reminder": mensaje personalizado según la clasificación de cada
+  // jugador, así que no puede ir por sendPushToAll (payload único para
+  // todos) — se manda uno a uno igual que antes.
+  webpush.setVapidDetails(process.env.VAPID_SUBJECT, process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY, process.env.VAPID_PRIVATE_KEY)
+
+  const { data: subs } = await admin.from('push_subscriptions').select('*')
+  if (!subs?.length) return NextResponse.json({ sent: 0, reason: 'nadie suscrito' })
+
+  const { data: standings } = await admin
+    .from('individual_standings')
+    .select('player_id')
+    .eq('season_id', season.id)
+    .order('total_points', { ascending: false })
+    .order('sport_points', { ascending: false })
+  const ranked = standings ?? []
 
   let sent = 0
   const toDelete: string[] = []
-
   for (const sub of subs) {
-    const payload = payloadFor(sub.player_id)
+    const rank = ranked.findIndex(r => r.player_id === sub.player_id)
+    const line = rank === -1 ? 'Esta noche, a por todas 🎾' : pickLine(rank, ranked.length)
+    const payload = { title: '🤫 Esta noche toca partido', body: line, url: '/dashboard' }
     try {
       await webpush.sendNotification(
         { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
-        JSON.stringify({ ...payload, url: '/dashboard' })
+        JSON.stringify(payload)
       )
       sent++
     } catch (err) {
@@ -131,10 +127,7 @@ export async function GET(request: Request) {
       if (statusCode === 404 || statusCode === 410) toDelete.push(sub.id)
     }
   }
-
-  if (toDelete.length) {
-    await admin.from('push_subscriptions').delete().in('id', toDelete)
-  }
+  if (toDelete.length) await admin.from('push_subscriptions').delete().in('id', toDelete)
 
   return NextResponse.json({ sent, removed: toDelete.length })
 }

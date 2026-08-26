@@ -111,10 +111,20 @@ export const getCachedSettledActas = unstable_cache(
 export const getCachedOpenRoundsBetting = unstable_cache(
   async (seasonId: string, roundIds: string[], userId: string) => {
     const client = serviceClient()
-    const [contexts, { data: catalogTemplates }] = await Promise.all([
+    const [contexts, { data: catalogTemplates }, { data: usageRows }] = await Promise.all([
       Promise.all(roundIds.map(id => getRoundBettingContext(client, id, userId))),
       client.from('betting_question_templates').select('*').eq('active', true).order('text'),
+      client.from('betting_markets').select('template_id').not('template_id', 'is', null),
     ])
+
+    // "+ Añadir más preguntas" ordenada de más a menos usada, en vez de
+    // alfabética — así las preguntas que de verdad se juegan quedan
+    // arriba y no hay que buscar entre las que nadie elige.
+    const usageCount: Record<string, number> = {}
+    for (const row of usageRows ?? []) {
+      if (row.template_id) usageCount[row.template_id] = (usageCount[row.template_id] ?? 0) + 1
+    }
+    const sortedCatalog = [...(catalogTemplates ?? [])].sort((a, b) => (usageCount[b.id] ?? 0) - (usageCount[a.id] ?? 0))
 
     const allTemplateIds = [...new Set(contexts.flatMap(ctx => ctx.markets.map(m => m.template_id).filter((id): id is string => !!id)))]
     const { data: jackpots } = allTemplateIds.length
@@ -123,7 +133,7 @@ export const getCachedOpenRoundsBetting = unstable_cache(
     const jackpotByTemplate: Record<string, number> = {}
     for (const j of jackpots ?? []) jackpotByTemplate[j.template_id] = j.chips
 
-    return { contexts, catalogTemplates: catalogTemplates ?? [], jackpotByTemplate }
+    return { contexts, catalogTemplates: sortedCatalog, jackpotByTemplate }
   },
   ['open-rounds-betting'],
   { revalidate: REVALIDATE_SECONDS, tags: ['liga-data'] }

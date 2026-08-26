@@ -1,29 +1,23 @@
 'use client'
 
 import { useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
-import { revalidateLigaData } from '@/lib/actions'
+import { confirmCourtReservation } from '@/lib/court-actions'
 
 export default function ConfirmCourtButton({ roundId }: { roundId: string }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const router = useRouter()
-  const supabase = createClient()
 
   async function confirm() {
     setLoading(true)
     setError('')
-    const { error } = await supabase
-      .from('rounds')
-      .update({ court_confirmed: true })
-      .eq('id', roundId)
+    const { error } = await confirmCourtReservation(roundId)
     setLoading(false)
     if (error) {
-      setError('No se pudo confirmar: ' + error.message)
+      setError('No se pudo confirmar: ' + error)
       return
     }
-    await revalidateLigaData()
     router.refresh()
   }
 

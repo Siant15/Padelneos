@@ -36,7 +36,7 @@ export default function MercadosPage() {
   const [isSettled, setIsSettled] = useState(false)
 
   const loadData = useCallback(async () => {
-    const [{ data: m, error: marketsError }, { data: p }, { data: r }, { data: settlement }, { data: allTemplates }] = await Promise.all([
+    const [{ data: m, error: marketsError }, { data: p }, { data: r }, { data: settlement }, { data: allTemplates }, { data: usageRows }] = await Promise.all([
       supabase.from('betting_markets')
         .select('*, options:betting_options!market_id(*, player:profiles(id, name)), bets(*), template:betting_question_templates(*)')
         .eq('round_id', roundId)
@@ -45,6 +45,7 @@ export default function MercadosPage() {
       supabase.from('rounds').select('status, round_number, season_id').eq('id', roundId).single(),
       supabase.from('round_settlements').select('id').eq('round_id', roundId).is('voided_at', null).maybeSingle(),
       supabase.from('betting_question_templates').select('*').eq('active', true).order('text'),
+      supabase.from('betting_markets').select('template_id').not('template_id', 'is', null),
     ])
     setLoadError(marketsError ? 'No se pudieron cargar las apuestas: ' + marketsError.message : '')
     const marketRows = (m as MarketWithAll[]) ?? []
@@ -53,8 +54,17 @@ export default function MercadosPage() {
     setRoundStatus(r?.status ?? '')
     setIsSettled(!!settlement)
 
+    // Catálogo ordenado de más a menos usada, igual que en Liga → Apuestas.
+    const usageCount: Record<string, number> = {}
+    for (const row of usageRows ?? []) {
+      if (row.template_id) usageCount[row.template_id] = (usageCount[row.template_id] ?? 0) + 1
+    }
     const usedTemplateIds = new Set(marketRows.map(mr => mr.template_id).filter(Boolean))
-    setCatalog(((allTemplates as BettingQuestionTemplate[]) ?? []).filter(t => !usedTemplateIds.has(t.id)))
+    setCatalog(
+      ((allTemplates as BettingQuestionTemplate[]) ?? [])
+        .filter(t => !usedTemplateIds.has(t.id))
+        .sort((a, b) => (usageCount[b.id] ?? 0) - (usageCount[a.id] ?? 0))
+    )
   }, [roundId])
 
   useEffect(() => { loadData() }, [loadData])
@@ -119,6 +129,9 @@ export default function MercadosPage() {
       setPayoutError('No se pudo liquidar la jornada: ' + error.message)
       return
     }
+    // Limpieza del catálogo (best-effort: si falla no bloquea la
+    // liquidación, que es lo que de verdad importa aquí).
+    await supabase.rpc('prune_stale_question_templates')
     await revalidateLigaData()
     setPayoutsCalculated(true)
     setIsSettled(true)
