@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import JornadasAccordion, { type JornadaViewModel } from '@/components/JornadasAccordion'
 import MiniCalendar from '@/components/MiniCalendar'
+import { revalidateLigaData } from '@/lib/actions'
 
 type PlayerLite = { id: string; name: string }
 
@@ -126,6 +127,7 @@ function SeasonForm({ mode, players, onCancel }: {
       setError('No se pudo crear la liga: ' + rpcError.message)
       return
     }
+    await revalidateLigaData()
     router.refresh()
   }
 
@@ -219,6 +221,7 @@ function ExtendForm({ currentMin, onCancel }: { currentMin: number; onCancel: ()
       setError('No se pudo ampliar el calendario: ' + rpcError.message)
       return
     }
+    await revalidateLigaData()
     onCancel()
     router.refresh()
   }
