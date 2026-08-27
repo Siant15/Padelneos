@@ -78,6 +78,7 @@ export default function MercadosPage() {
       setLoadError('No se pudo borrar la pregunta: ' + error.message)
       return
     }
+    await revalidateLigaData()
     await loadData()
   }
 
@@ -90,6 +91,7 @@ export default function MercadosPage() {
       winning_option_id: winningOptionId,
     }).eq('id', market.id)
     if (error) setResolveError('No se pudo resolver la pregunta: ' + error.message)
+    else await revalidateLigaData()
     await loadData()
     setResolving(null)
   }
@@ -104,6 +106,7 @@ export default function MercadosPage() {
       winning_option_id: null,
     }).eq('id', market.id)
     if (error) setResolveError('No se pudo anular la pregunta: ' + error.message)
+    else await revalidateLigaData()
     await loadData()
     setVoiding(null)
   }
@@ -114,6 +117,7 @@ export default function MercadosPage() {
     const { error } = await supabase.rpc('auto_resolve_round_markets', { p_round_id: roundId })
     setAutoResolving(false)
     if (error) setResolveError('No se pudieron resolver las preguntas automáticas: ' + error.message)
+    else await revalidateLigaData()
     await loadData()
   }
 

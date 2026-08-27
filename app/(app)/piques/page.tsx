@@ -1,6 +1,5 @@
 import Link from 'next/link'
 import { Flame, TrendingUp, Repeat, Dices, Trophy, AlertTriangle } from 'lucide-react'
-import { createClient } from '@/lib/supabase/server'
 import { getCachedActiveSeason } from '@/lib/supabase/cached'
 import { getInicioData } from '@/lib/inicio-data'
 import type { Pique } from '@/lib/piques'
@@ -15,10 +14,9 @@ const ICON_BY_TYPE: Record<Pique['type'], typeof Flame> = {
 }
 
 export default async function PiquesPage() {
-  const supabase = await createClient()
   const season = await getCachedActiveSeason()
 
-  const { piques } = season ? await getInicioData(supabase, season.id) : { piques: [] as Pique[] }
+  const { piques } = season ? await getInicioData(season.id) : { piques: [] as Pique[] }
 
   return (
     <div className="px-5 pt-5 pb-6">

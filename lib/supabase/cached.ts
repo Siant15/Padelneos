@@ -1,6 +1,6 @@
 import { createClient as createRawClient } from '@supabase/supabase-js'
 import { unstable_cache } from 'next/cache'
-import { getRoundActa, getRoundBettingContext } from '@/lib/betting-queries'
+import { getRoundActa, getRoundBettingContext, getSeasonBettingRanking } from '@/lib/betting-queries'
 
 // Consultas de liga que son iguales para los 4 jugadores (temporada
 // activa, calendario, clasificaciones, estado de las apuestas por
@@ -136,5 +136,15 @@ export const getCachedOpenRoundsBetting = unstable_cache(
     return { contexts, catalogTemplates: sortedCatalog, jackpotByTemplate }
   },
   ['open-rounds-betting'],
+  { revalidate: REVALIDATE_SECONDS, tags: ['liga-data'] }
+)
+
+// El ranking de apuestas de la temporada (vista betting_leaderboard)
+// es igual para los 4 jugadores, pero se quedó fuera de la caché — se
+// pedía sin pasar por unstable_cache en cada visita a Inicio/Piques,
+// a diferencia del resto de datos que usa getInicioData.
+export const getCachedSeasonBettingRanking = unstable_cache(
+  async (seasonId: string) => getSeasonBettingRanking(serviceClient(), seasonId),
+  ['season-betting-ranking'],
   { revalidate: REVALIDATE_SECONDS, tags: ['liga-data'] }
 )

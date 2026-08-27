@@ -59,6 +59,7 @@ export default function ClubPicker({ value, onChange }: { value: string; onChang
       <div className="flex gap-2">
         <input
           type="text"
+          aria-label="Buscar club de pádel"
           value={query}
           onChange={e => { setQuery(e.target.value); onChange(e.target.value) }}
           placeholder="Ej: Vall Parc"
@@ -68,6 +69,7 @@ export default function ClubPicker({ value, onChange }: { value: string; onChang
           type="button"
           onClick={handleSearch}
           disabled={searching || query.trim().length < 3}
+          aria-label="Buscar club"
           className="px-3 rounded-xl text-sm font-bold disabled:opacity-40"
           style={{ background: 'var(--accent)', color: '#fff' }}
         >

@@ -7,16 +7,20 @@ export default async function PerfilPage() {
   const user = await getCachedUser()
   if (!user) return null
 
-  const [{ data: profile }, { data: activeSeason }] = await Promise.all([
+  // La consulta de "temporada más reciente de cualquier estado" se
+  // lanza siempre en paralelo con las otras dos (aunque se descarte si
+  // hay temporada activa) en vez de esperar a saberlo primero — cuesta
+  // una consulta de más en el caso común, pero evita un round-trip
+  // extra en serie cuando no hay temporada activa.
+  const [{ data: profile }, { data: activeSeason }, { data: mostRecentSeason }] = await Promise.all([
     supabase.from('profiles').select('*').eq('id', user.id).maybeSingle(),
     supabase.from('seasons').select('id, name').eq('status', 'active').order('created_at', { ascending: false }).limit(1).maybeSingle(),
+    supabase.from('seasons').select('id, name').order('created_at', { ascending: false }).limit(1).maybeSingle(),
   ])
 
   // Si no hay temporada activa, se usa la más reciente de cualquier
   // estado (determinista: siempre la misma hasta que se cree otra).
-  const { data: season } = activeSeason
-    ? { data: activeSeason }
-    : await supabase.from('seasons').select('id, name').order('created_at', { ascending: false }).limit(1).maybeSingle()
+  const season = activeSeason ?? mostRecentSeason
 
   const [{ data: standing }, dnaPlayers] = await Promise.all([
     season

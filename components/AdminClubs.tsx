@@ -56,9 +56,9 @@ export default function AdminClubs({ clubs }: { clubs: ClubRow[] }) {
         </button>
       ) : (
         <form onSubmit={handleSubmit} className="rounded-2xl p-4 flex flex-col gap-3" style={{ background: 'var(--surface)', boxShadow: '0 3px 10px rgba(0,0,0,0.04)' }}>
-          <input value={name} onChange={e => setName(e.target.value)} placeholder="Nombre del club" required style={inputStyle} />
-          <input value={address} onChange={e => setAddress(e.target.value)} placeholder="Dirección (opcional)" style={inputStyle} />
-          <input value={mapsUrl} onChange={e => setMapsUrl(e.target.value)} placeholder="Enlace de Google Maps (opcional, se genera solo si lo dejas vacío)" style={inputStyle} />
+          <input aria-label="Nombre del club" value={name} onChange={e => setName(e.target.value)} placeholder="Nombre del club" required style={inputStyle} />
+          <input aria-label="Dirección" value={address} onChange={e => setAddress(e.target.value)} placeholder="Dirección (opcional)" style={inputStyle} />
+          <input aria-label="Enlace de Google Maps" value={mapsUrl} onChange={e => setMapsUrl(e.target.value)} placeholder="Enlace de Google Maps (opcional, se genera solo si lo dejas vacío)" style={inputStyle} />
           {error && <p className="text-xs" style={{ color: 'var(--red)' }}>⚠ {error}</p>}
           <div className="flex gap-2">
             <button type="button" onClick={() => setOpen(false)} className="flex-1 py-2 rounded-xl text-sm font-bold" style={{ background: 'var(--tint)', color: '#555' }}>

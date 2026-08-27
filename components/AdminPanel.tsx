@@ -61,9 +61,9 @@ function AddMemberForm({ onAdded }: { onAdded: () => void }) {
       style={{ background: 'var(--surface)', boxShadow: '0 3px 10px rgba(0,0,0,0.04)' }}
     >
       <p className="text-sm font-bold">Nuevo miembro</p>
-      <input value={name} onChange={e => setName(e.target.value)} placeholder="Nombre" required style={inputStyle} />
-      <input value={email} onChange={e => setEmail(e.target.value)} placeholder="Email" type="email" required style={inputStyle} />
-      <input value={password} onChange={e => setPassword(e.target.value)} placeholder="Contraseña (mínimo 8 caracteres)" type="password" minLength={8} required style={inputStyle} />
+      <input aria-label="Nombre" value={name} onChange={e => setName(e.target.value)} placeholder="Nombre" required style={inputStyle} />
+      <input aria-label="Email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Email" type="email" required style={inputStyle} />
+      <input aria-label="Contraseña" value={password} onChange={e => setPassword(e.target.value)} placeholder="Contraseña (mínimo 8 caracteres)" type="password" minLength={8} required style={inputStyle} />
       {error && <p className="text-xs" style={{ color: 'var(--red)' }}>⚠ {error}</p>}
       <div className="flex gap-2">
         <button type="button" onClick={() => setOpen(false)} className="flex-1 py-2 rounded-xl text-sm font-bold" style={{ background: 'var(--tint)', color: '#555' }}>

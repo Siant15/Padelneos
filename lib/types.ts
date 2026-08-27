@@ -271,16 +271,6 @@ export function isValidSetScore(a: number, b: number): boolean {
   return false
 }
 
-export function getMatchScore(match: Match): string {
-  if (!match.set1_t1 && match.set1_t1 !== 0) return '-'
-  const sets = [
-    `${match.set1_t1}-${match.set1_t2}`,
-    `${match.set2_t1}-${match.set2_t2}`,
-  ]
-  if (match.set3_t1 !== null) sets.push(`${match.set3_t1}-${match.set3_t2}`)
-  return sets.join(' / ')
-}
-
 export function getPairName(match: Match, team: 'team1' | 'team2'): string {
   if (team === 'team1') {
     return `${match.team1_p1?.name ?? '?'} & ${match.team1_p2?.name ?? '?'}`

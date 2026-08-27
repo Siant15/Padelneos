@@ -46,7 +46,7 @@ export default async function DashboardPage() {
   // se lanzan a la vez en vez de una detrás de otra para no sumar
   // sus latencias de red.
   const [{ rows, piques }, bettingContext, clubMapsRow] = await Promise.all([
-    seasonId ? getInicioData(supabase, seasonId) : Promise.resolve({ rows: [], piques: [] }),
+    seasonId ? getInicioData(seasonId) : Promise.resolve({ rows: [], piques: [] }),
     round && user ? getRoundBettingContext(supabase, round.id, user.id) : Promise.resolve(null),
     effectiveClub ? supabase.from('clubs').select('maps_url').eq('name', effectiveClub).maybeSingle() : Promise.resolve({ data: null }),
   ])

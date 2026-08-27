@@ -90,26 +90,6 @@ export async function getSeasonBettingRanking(supabase: SupabaseClient, seasonId
   return (data ?? []) as SeasonBettingRankingRow[]
 }
 
-// Fichas restantes de un jugador en la jornada activa más próxima de
-// la temporada (para la zona de saldo de Inicio). Devuelve null si no
-// hay jornada con apuestas abiertas.
-export async function getActiveRoundChipsLeft(supabase: SupabaseClient, seasonId: string, userId: string): Promise<{ roundId: string; roundNumber: number; chipsLeft: number; openMarketsCount: number } | null> {
-  const { data: rounds } = await supabase
-    .from('rounds')
-    .select('id, round_number, scheduled_date, scheduled_time, status')
-    .eq('season_id', seasonId)
-    .eq('status', 'scheduled')
-    .order('round_number', { ascending: true })
-
-  for (const round of rounds ?? []) {
-    const ctx = await getRoundBettingContext(supabase, round.id, userId)
-    if (ctx.openMarketsCount > 0) {
-      return { roundId: round.id, roundNumber: round.round_number, chipsLeft: ctx.chipsLeft, openMarketsCount: ctx.openMarketsCount }
-    }
-  }
-  return null
-}
-
 // ─── "Acta" de una jornada liquidada ────────────────────────────────
 // Vista de solo lectura para Liga → Apuestas: quién apostó qué, quién
 // acertó y cuánto ganó, pregunta por pregunta. Los importes de premio
