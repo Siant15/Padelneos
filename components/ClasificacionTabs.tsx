@@ -1,8 +1,9 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 
-type IndividualRow = { medal: string; name: string; pj: number; pg: number; pe: number; pp: number; apuestas: number; total: number }
+type IndividualRow = { medal: string; playerId: string; name: string; pj: number; pg: number; pe: number; pp: number; apuestas: number; total: number }
 type PairRow = { name: string; pj: number; pg: number; pe: number; pp: number; pts: number }
 type ApuestasMatrixRow = { name: string; cells: (number | null)[]; total: number }
 
@@ -54,7 +55,7 @@ export default function ClasificacionTabs({ individual, parejas, apuestasMatrix,
               className="grid text-xs items-center py-2.5"
               style={{ gridTemplateColumns: '1.4fr 0.4fr 0.4fr 0.4fr 0.4fr 0.5fr 0.6fr', borderBottom: i < individual.length - 1 ? '1px solid var(--hairline2)' : undefined }}
             >
-              <span className="font-bold">{row.medal} {row.name}</span>
+              <Link href={`/jugador/${row.playerId}`} className="font-bold truncate" style={{ color: 'var(--text)' }}>{row.medal} {row.name}</Link>
               <span>{row.pj}</span>
               <span>{row.pg}</span>
               <span>{row.pe}</span>

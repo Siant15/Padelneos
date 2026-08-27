@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { addMember, changeMemberPassword, changeMemberEmail, removeMember, type MemberRow } from '@/lib/admin-actions'
 
 export default function AdminPanel({ members }: { members: MemberRow[] }) {
@@ -127,10 +128,22 @@ function MemberRowCard({ member, onChanged }: { member: MemberRow; onChanged: ()
 
   return (
     <div className="rounded-2xl p-4 min-w-0" style={{ background: 'var(--surface)', boxShadow: '0 3px 10px rgba(0,0,0,0.04)' }}>
-      <div className="min-w-0">
-        <p className="font-bold text-sm truncate">{member.name} {member.isAdmin && <span className="text-xs font-bold" style={{ color: 'var(--accent)' }}>(admin)</span>}</p>
-        <p className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>{member.email}</p>
-      </div>
+      <Link href={`/jugador/${member.id}`} className="flex items-center gap-3 min-w-0">
+        {member.avatarUrl ? (
+          <img src={member.avatarUrl} alt="" className="rounded-full object-cover shrink-0" style={{ width: 40, height: 40, border: '1px solid var(--border)' }} />
+        ) : (
+          <div
+            className="flex items-center justify-center rounded-full font-heading font-extrabold text-xs shrink-0"
+            style={{ width: 40, height: 40, background: 'var(--surface2)', color: 'var(--accent)', border: '1px solid var(--border)' }}
+          >
+            {member.name.slice(0, 2).toUpperCase() || '🎾'}
+          </div>
+        )}
+        <div className="min-w-0">
+          <p className="font-bold text-sm truncate">{member.name} {member.isAdmin && <span className="text-xs font-bold" style={{ color: 'var(--accent)' }}>(admin)</span>}</p>
+          <p className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>{member.email}</p>
+        </div>
+      </Link>
       <div className="flex flex-wrap gap-2 mt-2.5">
         <button onClick={() => setShowEmail(v => !v)} className="text-xs font-bold px-2.5 py-1.5 rounded-lg" style={{ background: 'var(--tint)', color: 'var(--text-muted2)' }}>
           Email

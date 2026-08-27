@@ -110,6 +110,7 @@ export default async function LigaPage() {
   // ─── Clasificación ────────────────────────────────────────
   const individualRows = ((individual as IndividualStanding[] | null) ?? []).map((s, i) => ({
     medal: MEDALS[i] ?? `${i + 1}º`,
+    playerId: s.player_id,
     name: s.name,
     pj: s.matches_played,
     pg: s.wins,

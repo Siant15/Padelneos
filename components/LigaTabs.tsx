@@ -11,7 +11,7 @@ import ApuestasTab, { type ApuestasRoundEntry } from '@/components/ApuestasTab'
 type PlayerLite = { id: string; name: string }
 type ActiveSeasonInfo = { id: string; name: string; minMatches: number }
 
-type IndividualRow = { medal: string; name: string; pj: number; pg: number; pe: number; pp: number; apuestas: number; total: number }
+type IndividualRow = { medal: string; playerId: string; name: string; pj: number; pg: number; pe: number; pp: number; apuestas: number; total: number }
 type PairRow = { name: string; pj: number; pg: number; pe: number; pp: number; pts: number }
 type ApuestasMatrixRow = { name: string; cells: (number | null)[]; total: number }
 
