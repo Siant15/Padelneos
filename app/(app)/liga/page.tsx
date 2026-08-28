@@ -89,16 +89,7 @@ export default async function LigaPage() {
       clubLabel: effectiveClub,
       pairALabel: match ? `${match.team1_p1?.name ?? '?'} / ${match.team1_p2?.name ?? '?'}` : 'Por confirmar',
       pairBLabel: match ? `${match.team2_p1?.name ?? '?'} / ${match.team2_p2?.name ?? '?'}` : '',
-      pairAPlayers: match ? [
-        { name: match.team1_p1?.name ?? '?', avatarUrl: match.team1_p1?.avatar_url ?? null },
-        { name: match.team1_p2?.name ?? '?', avatarUrl: match.team1_p2?.avatar_url ?? null },
-      ] : [],
-      pairBPlayers: match ? [
-        { name: match.team2_p1?.name ?? '?', avatarUrl: match.team2_p1?.avatar_url ?? null },
-        { name: match.team2_p2?.name ?? '?', avatarUrl: match.team2_p2?.avatar_url ?? null },
-      ] : [],
       responsableName: round.court_booker?.name ?? 'Sin asignar',
-      responsableAvatarUrl: round.court_booker?.avatar_url ?? null,
       reservaStatus,
       played,
       isNext,

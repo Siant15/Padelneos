@@ -38,7 +38,10 @@ export default async function DashboardPage() {
 
   const nextRound = (rounds.find(r => r.status === 'scheduled') as Round | undefined) ?? null
   const round = nextRound
-  const match = round?.match as { team1_p1?: { name: string }; team1_p2?: { name: string }; team2_p1?: { name: string }; team2_p2?: { name: string } } | undefined
+  const match = round?.match as {
+    team1_p1?: { name: string; avatar_url: string | null }; team1_p2?: { name: string; avatar_url: string | null }
+    team2_p1?: { name: string; avatar_url: string | null }; team2_p2?: { name: string; avatar_url: string | null }
+  } | undefined
   const effectiveTime = round?.scheduled_time?.slice(0, 5)
   const effectiveClub = round?.club
 
@@ -116,7 +119,11 @@ export default async function DashboardPage() {
 
             {match && (
               <div className="flex items-center justify-center gap-3 py-1">
-                <div className="flex-1 text-center">
+                <div className="flex-1 flex flex-col items-center gap-1.5">
+                  <div className="flex -space-x-2">
+                    <MatchAvatar name={match.team1_p1?.name} avatarUrl={match.team1_p1?.avatar_url} />
+                    <MatchAvatar name={match.team1_p2?.name} avatarUrl={match.team1_p2?.avatar_url} />
+                  </div>
                   <p className="font-heading font-bold text-[15px] leading-tight">{match.team1_p1?.name}</p>
                   <p className="font-heading font-bold text-[15px] leading-tight">{match.team1_p2?.name}</p>
                 </div>
@@ -126,7 +133,11 @@ export default async function DashboardPage() {
                 >
                   vs
                 </span>
-                <div className="flex-1 text-center">
+                <div className="flex-1 flex flex-col items-center gap-1.5">
+                  <div className="flex -space-x-2">
+                    <MatchAvatar name={match.team2_p1?.name} avatarUrl={match.team2_p1?.avatar_url} />
+                    <MatchAvatar name={match.team2_p2?.name} avatarUrl={match.team2_p2?.avatar_url} />
+                  </div>
                   <p className="font-heading font-bold text-[15px] leading-tight">{match.team2_p1?.name}</p>
                   <p className="font-heading font-bold text-[15px] leading-tight">{match.team2_p2?.name}</p>
                 </div>
@@ -273,6 +284,25 @@ export default async function DashboardPage() {
       >
         <Flag size={14} className="shrink-0" /> Al terminar la liga, 1º y 2º cenan invitados por 3º y 4º.
       </div>
+    </div>
+  )
+}
+
+// Avatar a juego con la tarjeta verde oscura de "Próximo partido" (el
+// componente Avatar genérico usa colores de superficie clara, aquí
+// hace falta blanco translúcido para que se lea sobre el fondo).
+function MatchAvatar({ name, avatarUrl }: { name?: string; avatarUrl?: string | null }) {
+  if (avatarUrl) {
+    return (
+      <img src={avatarUrl} alt="" className="rounded-full object-cover" style={{ width: 32, height: 32, border: '2px solid rgba(255,255,255,0.4)' }} />
+    )
+  }
+  return (
+    <div
+      className="flex items-center justify-center rounded-full font-heading font-extrabold text-[11px]"
+      style={{ width: 32, height: 32, background: 'rgba(255,255,255,0.16)', border: '2px solid rgba(255,255,255,0.4)' }}
+    >
+      {(name ?? '').slice(0, 2).toUpperCase() || '🎾'}
     </div>
   )
 }

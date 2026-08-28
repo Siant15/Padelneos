@@ -2,9 +2,6 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import Avatar from '@/components/Avatar'
-
-type PlayerAvatar = { name: string; avatarUrl: string | null }
 
 export type JornadaViewModel = {
   id: string
@@ -16,10 +13,7 @@ export type JornadaViewModel = {
   clubLabel: string
   pairALabel: string
   pairBLabel: string
-  pairAPlayers: PlayerAvatar[]
-  pairBPlayers: PlayerAvatar[]
   responsableName: string
-  responsableAvatarUrl: string | null
   reservaStatus: 'pendiente' | 'reservada' | 'finalizada'
   played: boolean
   isNext: boolean
@@ -60,22 +54,8 @@ export default function JornadasAccordion({ items }: { items: JornadaViewModel[]
                 <div className="text-[13px] font-extrabold capitalize">
                   Jornada {j.numLabel} · {j.dateLabel}{j.timeLabel && ` · ${j.timeLabel}`}
                 </div>
-                <div className="flex items-center gap-1.5 mt-1 text-xs" style={{ color: 'var(--text-muted2)' }}>
-                  {j.pairAPlayers.length ? (
-                    <>
-                      <PairAvatars players={j.pairAPlayers} />
-                      <span>{j.pairALabel}</span>
-                      {j.pairBPlayers.length > 0 && (
-                        <>
-                          <span>vs</span>
-                          <PairAvatars players={j.pairBPlayers} />
-                          <span>{j.pairBLabel}</span>
-                        </>
-                      )}
-                    </>
-                  ) : (
-                    <span>{j.pairALabel}</span>
-                  )}
+                <div className="text-xs mt-0.5" style={{ color: 'var(--text-muted2)' }}>
+                  {j.pairALabel}{j.pairBLabel && ` vs ${j.pairBLabel}`}
                 </div>
               </div>
               <span
@@ -91,9 +71,7 @@ export default function JornadasAccordion({ items }: { items: JornadaViewModel[]
                 className="mt-2.5 pt-2.5 text-xs flex flex-col gap-1.5"
                 style={{ borderTop: '1px dashed #EEE', color: '#555' }}
               >
-                <div className="flex items-center gap-1.5">
-                  🏟️ Reserva: <Avatar name={j.responsableName} avatarUrl={j.responsableAvatarUrl} size={18} /> {j.responsableName}
-                </div>
+                <div>🏟️ Reserva: {j.responsableName}</div>
                 {j.clubLabel && (
                   <div>📍 Club: {j.clubLabel}</div>
                 )}
@@ -154,17 +132,5 @@ export default function JornadasAccordion({ items }: { items: JornadaViewModel[]
         )
       })}
     </div>
-  )
-}
-
-function PairAvatars({ players }: { players: PlayerAvatar[] }) {
-  return (
-    <span className="flex -space-x-1.5 shrink-0">
-      {players.map((p, i) => (
-        <span key={i} style={{ zIndex: players.length - i }}>
-          <Avatar name={p.name} avatarUrl={p.avatarUrl} size={18} />
-        </span>
-      ))}
-    </span>
   )
 }
