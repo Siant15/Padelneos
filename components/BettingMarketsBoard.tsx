@@ -41,6 +41,7 @@ export default function BettingMarketsBoard({ markets, userId, chipsLeft, roundS
   const [exactScoreDrafts, setExactScoreDrafts] = useState<Record<string, [string, string][]>>({})
   const [exactScoreChips, setExactScoreChips] = useState<Record<string, number>>({})
   const [exactScoreSaving, setExactScoreSaving] = useState<string | null>(null)
+  const [deletingMarket, setDeletingMarket] = useState<string | null>(null)
 
   const originalTotal = Object.values(originalChips).reduce((s, v) => s + v, 0)
   const chipsAvailable = chipsLeft + originalTotal
@@ -168,6 +169,20 @@ export default function BettingMarketsBoard({ markets, userId, chipsLeft, roundS
     router.refresh()
   }
 
+  async function deleteMarket(marketId: string) {
+    if (!confirm('¿Borrar esta pregunta? Todavía no tiene fichas apostadas.')) return
+    setDeletingMarket(marketId)
+    setError('')
+    const { error: deleteError } = await supabase.from('betting_markets').delete().eq('id', marketId)
+    setDeletingMarket(null)
+    if (deleteError) {
+      setError('No se pudo borrar la pregunta: ' + deleteError.message)
+      return
+    }
+    await revalidateLigaData()
+    router.refresh()
+  }
+
   return (
     <div className="flex flex-col gap-3.5">
       {error && <p className="text-xs" style={{ color: 'var(--red)' }}>⚠ {error}</p>}
@@ -196,6 +211,19 @@ export default function BettingMarketsBoard({ markets, userId, chipsLeft, roundS
               {market.resolved && market.voided && <span className="text-xs font-bold" style={{ color: 'var(--text-muted2)' }}>Anulada</span>}
               {!market.resolved && isClosedByTime && (
                 <span className="text-xs font-bold" style={{ color: 'var(--red)' }}>🔒 Cerrado</span>
+              )}
+              {!market.resolved && totalMarketChips === 0 && (
+                <button
+                  type="button"
+                  onClick={() => deleteMarket(market.id)}
+                  disabled={deletingMarket === market.id}
+                  aria-label="Borrar pregunta"
+                  title="Borrar esta pregunta"
+                  className="text-xs px-1.5 shrink-0 disabled:opacity-40"
+                  style={{ color: 'var(--red)' }}
+                >
+                  {deletingMarket === market.id ? '···' : '🗑️'}
+                </button>
               )}
             </div>
             {!market.resolved && !isClosedByTime && closeTime && (
