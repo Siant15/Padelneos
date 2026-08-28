@@ -12,7 +12,7 @@ const NAV = [
 
 export default function NavBar({ isAdmin }: { isAdmin: boolean }) {
   const pathname = usePathname()
-  const settingsHref = isAdmin ? '/admin' : '/perfil'
+  const settingsHref = isAdmin ? '/admin' : '/ajustes'
 
   return (
     <>

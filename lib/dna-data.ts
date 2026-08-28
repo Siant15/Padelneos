@@ -1,7 +1,12 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { computeCompetitiveDna, type DnaAxes, type PlayerMatchRecord } from '@/lib/dna'
+import { computeCompetitiveDna, computeBestPartner, type DnaAxes, type PlayerMatchRecord } from '@/lib/dna'
 
-export type PlayerDna = { playerId: string; playerName: string; axes: DnaAxes }
+export type PlayerDna = {
+  playerId: string
+  playerName: string
+  axes: DnaAxes
+  bestPartner: { partnerId: string; partnerName: string; winPct: number; matchesTogether: number } | null
+}
 
 type MatchRow = {
   winner: 'team1' | 'team2' | 'draw' | null
@@ -84,17 +89,29 @@ export async function getSeasonCompetitiveDna(supabase: SupabaseClient, seasonId
   }
   const leagueChipsNetTotals = playerIds.map(id => bettingAgg[id].net)
 
-  return playerList.map(p => ({
-    playerId: p.id,
-    playerName: p.name,
-    axes: computeCompetitiveDna({
-      matches: perPlayerMatches[p.id] ?? [],
-      matchesDesc: perPlayerMatches[p.id] ?? [], // las rondas ya vienen ordenadas de más reciente a más antigua
-      possiblePartners: Math.max(0, playerIds.length - 1),
-      correctCount: bettingAgg[p.id]?.correct ?? 0,
-      marketsBet: bettingAgg[p.id]?.bet ?? 0,
-      chipsNet: bettingAgg[p.id]?.net ?? 0,
-      leagueChipsNetTotals,
-    }),
-  }))
+  const nameById = new Map(playerList.map(p => [p.id, p.name]))
+
+  return playerList.map(p => {
+    const matches = perPlayerMatches[p.id] ?? []
+    const bestPartner = computeBestPartner(matches)
+    return {
+      playerId: p.id,
+      playerName: p.name,
+      axes: computeCompetitiveDna({
+        matches,
+        matchesDesc: matches, // las rondas ya vienen ordenadas de más reciente a más antigua
+        possiblePartners: Math.max(0, playerIds.length - 1),
+        correctCount: bettingAgg[p.id]?.correct ?? 0,
+        marketsBet: bettingAgg[p.id]?.bet ?? 0,
+        chipsNet: bettingAgg[p.id]?.net ?? 0,
+        leagueChipsNetTotals,
+      }),
+      bestPartner: bestPartner ? {
+        partnerId: bestPartner.partnerId,
+        partnerName: nameById.get(bestPartner.partnerId) ?? '?',
+        winPct: bestPartner.winPct,
+        matchesTogether: bestPartner.matchesTogether,
+      } : null,
+    }
+  })
 }

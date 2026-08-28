@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
-import PwaSetup from '@/components/PwaSetup'
+import Link from 'next/link'
 import CompetitiveDnaRadar from '@/components/CompetitiveDnaRadar'
 import type { PlayerDna } from '@/lib/dna-data'
 import type { SeasonCourtExpenses } from '@/lib/supabase/cached'
@@ -117,35 +117,6 @@ export default function PerfilForm({
     }
     setAvatarUrl(url)
     router.refresh()
-  }
-
-  const [newPassword, setNewPassword] = useState('')
-  const [showPassword, setShowPassword] = useState(false)
-  const [passwordSaving, setPasswordSaving] = useState(false)
-  const [passwordSaved, setPasswordSaved] = useState(false)
-  const [passwordError, setPasswordError] = useState('')
-
-  async function handleLogout() {
-    await supabase.auth.signOut()
-    router.push('/login')
-    router.refresh()
-  }
-
-  async function handlePasswordSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    setPasswordSaving(true)
-    setPasswordError('')
-
-    const { error: updateError } = await supabase.auth.updateUser({ password: newPassword })
-
-    setPasswordSaving(false)
-    if (updateError) {
-      setPasswordError('No se pudo cambiar la contraseña: ' + updateError.message)
-      return
-    }
-    setNewPassword('')
-    setPasswordSaved(true)
-    setTimeout(() => setPasswordSaved(false), 2000)
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -284,57 +255,9 @@ export default function PerfilForm({
         </button>
       </form>
 
-      <form
-        onSubmit={handlePasswordSubmit}
-        className="rounded-2xl p-4 flex flex-col gap-4 mt-4"
-        style={{ background: 'var(--surface)', boxShadow: '0 3px 10px rgba(0,0,0,0.04)' }}
-      >
-        <h2 className="font-heading text-sm font-bold">🔒 Cambiar contraseña</h2>
-
-        <Field label="Contraseña nueva">
-          <div className="relative">
-            <input
-              type={showPassword ? 'text' : 'password'}
-              required
-              minLength={8}
-              value={newPassword}
-              onChange={e => setNewPassword(e.target.value)}
-              placeholder="Mínimo 8 caracteres"
-              style={{ ...inputStyle, paddingRight: 44 }}
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword(v => !v)}
-              aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-sm"
-              style={{ color: 'var(--text-muted)' }}
-            >
-              {showPassword ? '🙈' : '👁️'}
-            </button>
-          </div>
-        </Field>
-
-        {passwordError && <p className="text-sm text-center" style={{ color: 'var(--red)' }}>⚠ {passwordError}</p>}
-
-        <button
-          type="submit"
-          disabled={passwordSaving || newPassword.length < 8}
-          className="font-heading w-full py-2.5 rounded-[14px] font-bold text-sm transition hover:opacity-90 disabled:opacity-50"
-          style={{ background: passwordSaved ? 'var(--green)' : 'var(--accent)', color: '#fff' }}
-        >
-          {passwordSaving ? 'Guardando...' : passwordSaved ? '✓ Contraseña actualizada' : 'Cambiar contraseña'}
-        </button>
-      </form>
-
-      <PwaSetup />
-
-      <button
-        onClick={handleLogout}
-        className="font-heading w-full py-2.5 rounded-[14px] font-bold text-sm text-center mt-4 transition hover:opacity-90"
-        style={{ background: 'var(--surface)', color: 'var(--red)', boxShadow: '0 3px 10px rgba(0,0,0,0.04)' }}
-      >
-        Salir
-      </button>
+      <Link href="/ajustes" className="block text-center text-sm font-bold mt-4" style={{ color: 'var(--text-muted)' }}>
+        ⚙️ Contraseña, notificaciones y salir →
+      </Link>
     </div>
   )
 }

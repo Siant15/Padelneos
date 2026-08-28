@@ -151,6 +151,35 @@ export function computeCompetitiveDna(input: {
   }
 }
 
+export type BestPartnerResult = { partnerId: string; winPct: number; matchesTogether: number } | null
+
+// Pareja ideal: con qué compañero se gana más, de entre los que ya se
+// han jugado al menos 2 partidos juntos (con 1 solo partido, ganarlo o
+// perderlo decide el 100%/0% — no dice nada fiable todavía). A igual
+// % de victorias, gana quien tenga más partidos jugados juntos (más
+// muestra, dato más fiable).
+const MIN_MATCHES_TOGETHER = 2
+
+export function computeBestPartner(matches: PlayerMatchRecord[]): BestPartnerResult {
+  const byPartner = new Map<string, { wins: number; total: number }>()
+  for (const m of matches) {
+    const cur = byPartner.get(m.partnerId) ?? { wins: 0, total: 0 }
+    cur.total++
+    if (m.won) cur.wins++
+    byPartner.set(m.partnerId, cur)
+  }
+
+  let best: BestPartnerResult = null
+  for (const [partnerId, { wins, total }] of byPartner) {
+    if (total < MIN_MATCHES_TOGETHER) continue
+    const winPct = clampRound((wins / total) * 100)
+    if (!best || winPct > best.winPct || (winPct === best.winPct && total > best.matchesTogether)) {
+      best = { partnerId, winPct, matchesTogether: total }
+    }
+  }
+  return best
+}
+
 export const DNA_AXES = [
   { key: 'vic', label: 'VIC', name: 'Victorias', note: 'Porcentaje de partidos que has ganado.', formula: 'Victorias ÷ partidos jugados.' },
   { key: 'for', label: 'FOR', name: 'Forma', note: 'Tu rendimiento ponderado en los últimos cinco partidos.', formula: 'Resultados ponderados de los últimos cinco partidos.' },

@@ -225,6 +225,22 @@ export default function CompetitiveDnaRadar({ players, viewerId, seasonLabel }: 
         </span>
       </div>
 
+      <div className="mt-3 pt-3" style={{ borderTop: '1px solid var(--hairline)' }}>
+        <p className="text-[11px] font-bold mb-1.5" style={{ color: 'var(--text-muted2)' }}>🤝 Pareja ideal (más % de victorias juntos)</p>
+        <div className="flex flex-col gap-1">
+          {players.map(p => (
+            <p key={p.playerId} className="text-xs">
+              <strong>{p.playerName}</strong>
+              {p.bestPartner ? (
+                <> + <strong>{p.bestPartner.partnerName}</strong> <span style={{ color: 'var(--text-muted)' }}>({p.bestPartner.winPct}% en {p.bestPartner.matchesTogether} partidos)</span></>
+              ) : (
+                <span style={{ color: 'var(--text-muted)' }}> — todavía sin suficientes partidos juntos con nadie</span>
+              )}
+            </p>
+          ))}
+        </div>
+      </div>
+
       <div aria-live="polite">
         {activeAxis && (
           <div

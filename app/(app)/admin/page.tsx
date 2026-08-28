@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { getCachedUser } from '@/lib/supabase/server'
 import { isAdminUser } from '@/lib/admin'
@@ -14,11 +15,16 @@ export default async function AdminPage() {
 
   return (
     <div className="flex flex-col gap-6 overflow-x-hidden">
-      <div>
-        <h1 className="font-heading text-[22px] font-extrabold mb-1">Administración</h1>
-        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-          Miembros, temporadas y jornadas de la liga.
-        </p>
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <h1 className="font-heading text-[22px] font-extrabold mb-1">Administración</h1>
+          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+            Miembros, temporadas y jornadas de la liga.
+          </p>
+        </div>
+        <Link href="/ajustes" className="text-xs font-bold shrink-0 mt-1" style={{ color: 'var(--accent)' }}>
+          ⚙️ Tu cuenta →
+        </Link>
       </div>
 
       <div>
