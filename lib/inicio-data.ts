@@ -3,11 +3,10 @@ import { computeStandingsRows, computeHeadToHead, computePiques, type RoundWithM
 
 export async function getInicioData(seasonId: string): Promise<{ rows: PlayerRow[]; piques: Pique[] }> {
   const [players, rounds] = await Promise.all([getCachedPlayers(), getCachedSeasonRounds(seasonId)])
-  const matchIds = rounds.map(r => (r.match as { id: string } | null)?.id).filter(Boolean) as string[]
   const roundIds = rounds.map(r => r.id)
 
   const [{ allBetResults }, bettingRanking] = await Promise.all([
-    getCachedSeasonAggregates(seasonId, matchIds, roundIds),
+    getCachedSeasonAggregates(seasonId, roundIds),
     getCachedSeasonBettingRanking(seasonId),
   ])
 

@@ -64,12 +64,9 @@ export const getCachedSeasonRounds = unstable_cache(
 )
 
 export const getCachedSeasonAggregates = unstable_cache(
-  async (seasonId: string, matchIds: string[], roundIds: string[]) => {
+  async (seasonId: string, roundIds: string[]) => {
     const client = serviceClient()
-    const [{ data: allStats }, { data: individual }, { data: pairs }, { data: marketsByRound }, { data: settlements }, { data: allBetResults }] = await Promise.all([
-      matchIds.length
-        ? client.from('match_stats').select('*, player:profiles(id, name)').in('match_id', matchIds)
-        : Promise.resolve({ data: [] }),
+    const [{ data: individual }, { data: pairs }, { data: marketsByRound }, { data: settlements }, { data: allBetResults }] = await Promise.all([
       client.from('individual_standings').select('*').eq('season_id', seasonId).order('total_points', { ascending: false }).order('sport_points', { ascending: false }),
       client.from('pair_standings').select('*').eq('season_id', seasonId).order('points', { ascending: false }).order('wins', { ascending: false }),
       roundIds.length
@@ -83,7 +80,6 @@ export const getCachedSeasonAggregates = unstable_cache(
         : Promise.resolve({ data: [] as { round_id: string; player_id: string; rank: number; chips_net: number; point_bonus: number }[] }),
     ])
     return {
-      allStats: allStats ?? [],
       individual: individual ?? [],
       pairs: pairs ?? [],
       marketsByRound: marketsByRound ?? [],

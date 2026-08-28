@@ -31,12 +31,11 @@ export default async function LigaPage() {
   const seasonId = activeSeasonRow?.id
   const rounds = seasonId ? await getCachedSeasonRounds(seasonId) : []
 
-  const matchIds = (rounds ?? []).map(r => (r.match as { id: string } | null)?.id).filter(Boolean) as string[]
   const roundIds = (rounds ?? []).map(r => r.id)
 
-  const { allStats, individual, pairs, marketsByRound, settlements, allBetResults } = seasonId
-    ? await getCachedSeasonAggregates(seasonId, matchIds, roundIds)
-    : { allStats: [], individual: [], pairs: [], marketsByRound: [], settlements: [], allBetResults: [] }
+  const { individual, pairs, marketsByRound, settlements, allBetResults } = seasonId
+    ? await getCachedSeasonAggregates(seasonId, roundIds)
+    : { individual: [], pairs: [], marketsByRound: [], settlements: [], allBetResults: [] }
 
   // ─── Calendario ───────────────────────────────────────────
   const nextRound = (rounds ?? []).find(r => r.status !== 'played')
@@ -48,13 +47,6 @@ export default async function LigaPage() {
       team1_p1?: { name: string; avatar_url: string | null }; team1_p2?: { name: string; avatar_url: string | null }
       team2_p1?: { name: string; avatar_url: string | null }; team2_p2?: { name: string; avatar_url: string | null }
     } | null
-
-    const stats = (allStats ?? [])
-      .filter((s: { match_id: string }) => s.match_id === match?.id)
-      .map((s: { aces: number; double_faults: number; bolas_por_3: number; smash_al_cristal: number; player?: { name: string } }) => ({
-        name: s.player?.name ?? '',
-        line: `${s.aces} aces · ${s.double_faults} df · ${s.bolas_por_3} bolas3 · ${s.smash_al_cristal} cristal`,
-      }))
 
     const betResults = ((allBetResults ?? []) as BetRow[]).filter(b => b.round_id === round.id)
     const betWinner = betResults.find(b => b.rank === 1)
@@ -103,7 +95,6 @@ export default async function LigaPage() {
         : match?.winner === 'team2'
           ? `${match.team2_p1?.name} / ${match.team2_p2?.name}`
           : '',
-      stats,
       betWinner: (betWinner && playerName(betWinner.player)) ?? '',
       betSecond: (betSecond && playerName(betSecond.player)) ?? '',
     }

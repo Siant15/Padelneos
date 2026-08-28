@@ -24,7 +24,6 @@ export type JornadaViewModel = {
   tagColor: string
   scoreLabel: string
   winnerLabel: string
-  stats: { name: string; line: string }[]
   betWinner: string
   betSecond: string
 }
@@ -88,14 +87,6 @@ export default function JornadasAccordion({ items }: { items: JornadaViewModel[]
                 {j.played && (
                   <>
                     <div>🎾 Resultado: <strong>{j.scoreLabel}</strong> ({j.winnerLabel})</div>
-                    <div className="flex flex-col gap-0.5 mt-0.5 rounded-[10px] px-2.5 py-2" style={{ background: '#FAFAF7' }}>
-                      {j.stats.map(s => (
-                        <div key={s.name} className="flex justify-between">
-                          <span>{s.name}</span>
-                          <span style={{ color: 'var(--text-muted2)' }}>{s.line}</span>
-                        </div>
-                      ))}
-                    </div>
                     {j.betWinner && (
                       <div>💰 Mejor apostador: <strong>{j.betWinner}</strong> (+1){j.betSecond && ` · ${j.betSecond} (+0.5)`}</div>
                     )}

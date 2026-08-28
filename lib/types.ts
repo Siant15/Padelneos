@@ -61,18 +61,6 @@ export type Match = {
   team2_p2?: Profile
 }
 
-export type MatchStat = {
-  id: string
-  match_id: string
-  player_id: string
-  aces: number
-  double_faults: number
-  bolas_por_3: number
-  smash_al_cristal: number
-  created_at: string
-  player?: Profile
-}
-
 export type BettingAnswerType = 'pair' | 'player' | 'yes_no' | 'sets_score' | 'exact_score' | 'custom_options'
 export type BettingCategory = 'automatic' | 'anecdotal'
 export type ResolutionKey = 'match_winner' | 'set1_winner' | 'set2_winner' | 'set3_winner' | 'third_set' | 'tiebreak' | 'comeback' | 'sets_score' | 'exact_score'
