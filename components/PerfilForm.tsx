@@ -10,6 +10,33 @@ import type { SeasonCourtExpenses } from '@/lib/supabase/cached'
 
 type Stats = { matches_played: number; wins: number; total_points: number }
 
+// Reduce cualquier foto (aunque venga de un móvil a varios MB y miles
+// de píxeles) a un cuadrado de como mucho `maxSize`px en JPEG — de
+// sobra para un avatar que nunca se ve a más de ~84px, y evita que
+// subir una foto de perfil deje la app lenta para todos.
+function resizeImageToJpeg(file: File, maxSize: number): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    const objectUrl = URL.createObjectURL(file)
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl)
+      const side = Math.min(img.width, img.height)
+      const sx = (img.width - side) / 2
+      const sy = (img.height - side) / 2
+      const size = Math.min(maxSize, side)
+      const canvas = document.createElement('canvas')
+      canvas.width = size
+      canvas.height = size
+      const ctx = canvas.getContext('2d')
+      if (!ctx) { reject(new Error('No se pudo procesar la imagen')); return }
+      ctx.drawImage(img, sx, sy, side, side, 0, 0, size, size)
+      canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('No se pudo procesar la imagen')), 'image/jpeg', 0.8)
+    }
+    img.onerror = () => { URL.revokeObjectURL(objectUrl); reject(new Error('No se pudo leer la imagen')) }
+    img.src = objectUrl
+  })
+}
+
 export default function PerfilForm({
   userId,
   initialName,
@@ -58,10 +85,21 @@ export default function PerfilForm({
     setUploadingAvatar(true)
     setAvatarError('')
 
-    const ext = file.name.split('.').pop() || 'jpg'
-    const path = `${userId}/avatar.${ext}`
+    // Las fotos de móvil pueden pesar varios MB a resoluciones enormes
+    // para un círculo que como mucho se ve a 84px — se reducen aquí
+    // antes de subir para que la foto de perfil no sea la razón de que
+    // la app vaya lenta en cuanto alguien sube la suya.
+    const path = `${userId}/avatar.jpg`
+    let resized: Blob
+    try {
+      resized = await resizeImageToJpeg(file, 256)
+    } catch {
+      setAvatarError('No se pudo procesar la imagen. Prueba con otra foto.')
+      setUploadingAvatar(false)
+      return
+    }
 
-    const { error: uploadError } = await supabase.storage.from('avatars').upload(path, file, { upsert: true })
+    const { error: uploadError } = await supabase.storage.from('avatars').upload(path, resized, { upsert: true, contentType: 'image/jpeg' })
     if (uploadError) {
       setAvatarError('No se pudo subir la foto: ' + uploadError.message)
       setUploadingAvatar(false)
