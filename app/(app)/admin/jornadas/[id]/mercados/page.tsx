@@ -6,7 +6,12 @@ export default async function MercadosPage({ params }: { params: Promise<{ id: s
   const { id: roundId } = await params
   const supabase = await createClient()
 
-  const [{ data: m, error: marketsError }, { data: r, error: roundError }, { data: settlement }, { data: allTemplates }, { data: usageRows }] = await Promise.all([
+  // El total de fichas por opción se pide con el resto en paralelo (no
+  // después, en serie) vía una función que solo devuelve la suma (nunca
+  // quién apostó qué) — así se puede ver "cuánto hay en juego" en una
+  // pregunta todavía sin resolver sin exponer las apuestas individuales
+  // de los demás jugadores antes de que cierre el mercado.
+  const [{ data: m, error: marketsError }, { data: r, error: roundError }, { data: settlement }, { data: allTemplates }, { data: usageRows }, { data: betTotalsRows }] = await Promise.all([
     supabase.from('betting_markets')
       .select('*, options:betting_options!market_id(*, player:profiles(id, name)), template:betting_question_templates(*)')
       .eq('round_id', roundId)
@@ -15,19 +20,11 @@ export default async function MercadosPage({ params }: { params: Promise<{ id: s
     supabase.from('round_settlements').select('id').eq('round_id', roundId).is('voided_at', null).maybeSingle(),
     supabase.from('betting_question_templates').select('*').eq('active', true).order('text'),
     supabase.from('betting_markets').select('template_id').not('template_id', 'is', null),
+    supabase.rpc('get_round_bet_totals', { p_round_id: roundId }),
   ])
 
   const marketRows = (m as MarketWithAll[]) ?? []
 
-  // El total de fichas por opción se pide aparte, vía una función que
-  // solo devuelve la suma (nunca quién apostó qué) — así se puede ver
-  // "cuánto hay en juego" en una pregunta todavía sin resolver sin
-  // exponer las apuestas individuales de los demás jugadores antes de
-  // que cierre el mercado.
-  const marketIds = marketRows.map(mr => mr.id)
-  const { data: betTotalsRows } = marketIds.length
-    ? await supabase.rpc('get_market_bet_totals', { p_market_ids: marketIds })
-    : { data: [] as { market_id: string; option_id: string; chips: number }[] }
   for (const market of marketRows) {
     market.betTotals = {}
     for (const row of betTotalsRows ?? []) {

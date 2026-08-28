@@ -74,7 +74,7 @@ export default function MercadosClient({ roundId, initialMarkets, initialCatalog
   // la carga inicial ya viene del servidor, esto solo se usa después
   // de mutar algo, nunca al montar.
   const loadData = useCallback(async () => {
-    const [{ data: m, error: marketsError }, { data: r }, { data: settlement }, { data: allTemplates }, { data: usageRows }] = await Promise.all([
+    const [{ data: m, error: marketsError }, { data: r }, { data: settlement }, { data: allTemplates }, { data: usageRows }, { data: betTotalsRows }] = await Promise.all([
       supabase.from('betting_markets')
         .select('*, options:betting_options!market_id(*, player:profiles(id, name)), template:betting_question_templates(*)')
         .eq('round_id', roundId)
@@ -83,16 +83,13 @@ export default function MercadosClient({ roundId, initialMarkets, initialCatalog
       supabase.from('round_settlements').select('id').eq('round_id', roundId).is('voided_at', null).maybeSingle(),
       supabase.from('betting_question_templates').select('*').eq('active', true).order('text'),
       supabase.from('betting_markets').select('template_id').not('template_id', 'is', null),
+      // Suma por opción vía RPC (nunca quién apostó qué — ver el tipo
+      // MarketWithAll más arriba), pedida en paralelo con todo lo demás.
+      supabase.rpc('get_round_bet_totals', { p_round_id: roundId }),
     ])
     setLoadError(marketsError ? 'No se pudieron cargar las apuestas: ' + marketsError.message : '')
     const marketRows = (m as MarketWithAll[]) ?? []
 
-    // Suma por opción vía RPC (nunca quién apostó qué — ver el tipo
-    // MarketWithAll más arriba).
-    const marketIds = marketRows.map(mr => mr.id)
-    const { data: betTotalsRows } = marketIds.length
-      ? await supabase.rpc('get_market_bet_totals', { p_market_ids: marketIds })
-      : { data: [] as { market_id: string; option_id: string; chips: number }[] }
     for (const market of marketRows) {
       market.betTotals = {}
       for (const row of betTotalsRows ?? []) {
