@@ -2,6 +2,8 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { formatDate } from '@/lib/types'
+import { getCachedSeasonBettingRanking, getCachedSeasonCourtExpenses } from '@/lib/supabase/cached'
+import ShareSummaryButton from '@/components/ShareSummaryButton'
 
 const MEDALS = ['🥇', '🥈', '🥉', '4º']
 
@@ -9,7 +11,7 @@ export default async function HistoricoSeasonPage({ params }: { params: Promise<
   const { seasonId } = await params
   const supabase = await createClient()
 
-  const [{ data: season }, { data: rounds }, { data: individual }, { data: pairs }] = await Promise.all([
+  const [{ data: season }, { data: rounds }, { data: individual }, { data: pairs }, bettingRanking, courtExpenses] = await Promise.all([
     supabase.from('seasons').select('id, name, start_date, min_matches, status').eq('id', seasonId).maybeSingle(),
     supabase.from('rounds').select(`
       id, round_number, scheduled_date, scheduled_time, club, status,
@@ -21,9 +23,29 @@ export default async function HistoricoSeasonPage({ params }: { params: Promise<
     `).eq('season_id', seasonId).order('round_number', { ascending: true }),
     supabase.from('individual_standings').select('*').eq('season_id', seasonId).order('total_points', { ascending: false }).order('sport_points', { ascending: false }),
     supabase.from('pair_standings').select('*').eq('season_id', seasonId).order('points', { ascending: false }).order('wins', { ascending: false }),
+    getCachedSeasonBettingRanking(seasonId),
+    getCachedSeasonCourtExpenses(seasonId),
   ])
 
   if (!season) notFound()
+
+  const topBettor = bettingRanking[0]
+  const topPair = pairs?.[0]
+  const summaryLines = [
+    `🏁 Así quedó la Liga "${season.name}"`,
+    '',
+    '🏅 Clasificación individual:',
+    ...(individual ?? []).map((s, i) => `${MEDALS[i] ?? `${i + 1}º`} ${s.name} — ${s.total_points} pts`),
+  ]
+  if (topPair) summaryLines.push('', `🤝 Mejor pareja: ${topPair.p1_name} / ${topPair.p2_name} (${topPair.points} pts)`)
+  if (topBettor) summaryLines.push('', `🎰 Rey de las apuestas: ${topBettor.name} (${topBettor.points} pts, ${topBettor.correct_picks} aciertos)`)
+  if (courtExpenses.totalCost > 0) {
+    summaryLines.push('', `💸 Pista: ${courtExpenses.totalCost.toFixed(2)}€ en total (${courtExpenses.fairShare.toFixed(2)}€ por persona)`)
+    for (const t of courtExpenses.transfers) {
+      summaryLines.push(`  ${t.fromName} le debe ${t.amount.toFixed(2)}€ a ${t.toName}`)
+    }
+  }
+  const summaryText = summaryLines.join('\n')
 
   return (
     <div className="px-5 pt-5 pb-6 flex flex-col gap-4">
@@ -34,6 +56,8 @@ export default async function HistoricoSeasonPage({ params }: { params: Promise<
           Empezó el {formatDate(season.start_date)} · {season.min_matches} jornadas · Finalizada
         </p>
       </div>
+
+      <ShareSummaryButton text={summaryText} />
 
       <div>
         <h2 className="font-heading font-bold text-sm mb-2">Clasificación individual</h2>
