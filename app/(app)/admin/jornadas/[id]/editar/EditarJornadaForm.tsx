@@ -14,6 +14,7 @@ type FormState = {
   club: string
   court_booker_id: string
   status: string
+  court_cost: string
   team1_p1_id: string
   team1_p2_id: string
   team2_p1_id: string
@@ -21,11 +22,12 @@ type FormState = {
   matchId: string
 }
 
-export default function EditarJornadaForm({ roundId, players, initialForm, initialHasResult }: {
+export default function EditarJornadaForm({ roundId, players, initialForm, initialHasResult, isResponsable }: {
   roundId: string
   players: PlayerLite[]
   initialForm: FormState
   initialHasResult: boolean
+  isResponsable: boolean
 }) {
   const supabase = createClient()
   const router = useRouter()
@@ -67,6 +69,7 @@ export default function EditarJornadaForm({ roundId, players, initialForm, initi
       club: form.club || null,
       court_booker_id: form.court_booker_id || null,
       status: form.status,
+      court_cost: isResponsable ? (form.court_cost ? parseFloat(form.court_cost) : null) : undefined,
     }).eq('id', roundId)
 
     if (roundError) {
@@ -174,6 +177,22 @@ export default function EditarJornadaForm({ roundId, players, initialForm, initi
             <option value="">Sin asignar</option>
             {players.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
+        </Field>
+
+        <Field label="💸 Coste de la pista (€)">
+          <input
+            type="number" min={0} step="0.01"
+            value={form.court_cost}
+            onChange={e => setForm(f => ({ ...f, court_cost: e.target.value }))}
+            disabled={!isResponsable}
+            placeholder="Ej: 18"
+            style={{ ...inputStyle, opacity: isResponsable ? 1 : 0.6 }}
+          />
+          <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
+            {isResponsable
+              ? 'Se usa para calcular quién debe compensar a quién al terminar la liga.'
+              : 'Solo quien reservó esta pista puede registrar lo que costó.'}
+          </p>
         </Field>
 
         <div className="rounded-xl p-4" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>

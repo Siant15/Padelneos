@@ -1,6 +1,6 @@
 import { createClient, getCachedUser } from '@/lib/supabase/server'
 import PerfilForm from '@/components/PerfilForm'
-import { getCachedSeasonCompetitiveDna } from '@/lib/supabase/cached'
+import { getCachedSeasonCompetitiveDna, getCachedSeasonCourtExpenses } from '@/lib/supabase/cached'
 
 export default async function PerfilPage() {
   const supabase = await createClient()
@@ -22,11 +22,12 @@ export default async function PerfilPage() {
   // estado (determinista: siempre la misma hasta que se cree otra).
   const season = activeSeason ?? mostRecentSeason
 
-  const [{ data: standing }, dnaPlayers] = await Promise.all([
+  const [{ data: standing }, dnaPlayers, courtExpenses] = await Promise.all([
     season
       ? supabase.from('individual_standings').select('matches_played, wins, total_points').eq('season_id', season.id).eq('player_id', user.id).maybeSingle()
       : Promise.resolve({ data: null }),
     season ? getCachedSeasonCompetitiveDna(season.id) : Promise.resolve([]),
+    season ? getCachedSeasonCourtExpenses(season.id) : Promise.resolve(null),
   ])
 
   return (
@@ -40,6 +41,7 @@ export default async function PerfilPage() {
       initialStats={standing ?? { matches_played: 0, wins: 0, total_points: 0 }}
       dnaPlayers={dnaPlayers}
       seasonLabel={season?.name ?? ''}
+      courtExpenses={courtExpenses}
     />
   )
 }

@@ -1,9 +1,10 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getCachedUser } from '@/lib/supabase/server'
 import EditarJornadaForm from './EditarJornadaForm'
 
 export default async function EditarJornadaPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: roundId } = await params
   const supabase = await createClient()
+  const user = await getCachedUser()
 
   const [{ data: players }, { data: round, error }] = await Promise.all([
     supabase.from('profiles').select('id, name').order('name'),
@@ -28,12 +29,14 @@ export default async function EditarJornadaPage({ params }: { params: Promise<{ 
       roundId={roundId}
       players={players ?? []}
       initialHasResult={!!match?.winner}
+      isResponsable={!!user && user.id === round?.court_booker_id}
       initialForm={{
         scheduled_date: round?.scheduled_date ?? '',
         scheduled_time: round?.scheduled_time?.slice(0, 5) ?? '',
         club: round?.club ?? '',
         court_booker_id: round?.court_booker_id ?? '',
         status: round?.status ?? 'scheduled',
+        court_cost: round?.court_cost?.toString() ?? '',
         team1_p1_id: match?.team1_p1_id ?? '',
         team1_p2_id: match?.team1_p2_id ?? '',
         team2_p1_id: match?.team2_p1_id ?? '',

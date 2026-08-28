@@ -95,6 +95,65 @@ export const getCachedSeasonAggregates = unstable_cache(
   { revalidate: REVALIDATE_SECONDS, tags: ['liga-data'] }
 )
 
+export type CourtExpenseBalance = { playerId: string; name: string; paid: number; balance: number }
+export type CourtExpenseTransfer = { fromName: string; toName: string; amount: number }
+export type SeasonCourtExpenses = {
+  totalCost: number
+  fairShare: number
+  balances: CourtExpenseBalance[]
+  transfers: CourtExpenseTransfer[]
+}
+
+// Cuánto ha pagado cada uno de la pista en la temporada (lo paga quien
+// reserva, `court_booker_id`, y varía de precio según club/hora) y qué
+// transferencias harían falta para que todos hayan puesto lo mismo.
+export const getCachedSeasonCourtExpenses = unstable_cache(
+  async (seasonId: string): Promise<SeasonCourtExpenses> => {
+    const client = serviceClient()
+    const [{ data: players }, { data: rounds }] = await Promise.all([
+      client.from('profiles').select('id, name').order('name'),
+      client.from('rounds').select('court_booker_id, court_cost').eq('season_id', seasonId).not('court_cost', 'is', null),
+    ])
+
+    const playerList = players ?? []
+    const paidByPlayer: Record<string, number> = {}
+    let totalCost = 0
+    for (const r of rounds ?? []) {
+      if (!r.court_booker_id) continue
+      paidByPlayer[r.court_booker_id] = (paidByPlayer[r.court_booker_id] ?? 0) + r.court_cost
+      totalCost += r.court_cost
+    }
+    const fairShare = playerList.length ? totalCost / playerList.length : 0
+
+    const balances: CourtExpenseBalance[] = playerList.map(p => ({
+      playerId: p.id,
+      name: p.name,
+      paid: Math.round((paidByPlayer[p.id] ?? 0) * 100) / 100,
+      balance: Math.round(((paidByPlayer[p.id] ?? 0) - fairShare) * 100) / 100,
+    }))
+
+    // Reparto de transferencias con el menor número de movimientos: el
+    // que menos ha pagado le transfiere al que más ha pagado, hasta
+    // agotar el hueco de uno de los dos, y así sucesivamente.
+    const debtors = balances.filter(b => b.balance < -0.01).map(b => ({ ...b })).sort((a, b) => a.balance - b.balance)
+    const creditors = balances.filter(b => b.balance > 0.01).map(b => ({ ...b })).sort((a, b) => b.balance - a.balance)
+    const transfers: CourtExpenseTransfer[] = []
+    let i = 0, j = 0
+    while (i < debtors.length && j < creditors.length) {
+      const amount = Math.min(-debtors[i].balance, creditors[j].balance)
+      transfers.push({ fromName: debtors[i].name, toName: creditors[j].name, amount: Math.round(amount * 100) / 100 })
+      debtors[i].balance += amount
+      creditors[j].balance -= amount
+      if (Math.abs(debtors[i].balance) < 0.01) i++
+      if (Math.abs(creditors[j].balance) < 0.01) j++
+    }
+
+    return { totalCost: Math.round(totalCost * 100) / 100, fairShare: Math.round(fairShare * 100) / 100, balances, transfers }
+  },
+  ['season-court-expenses'],
+  { revalidate: REVALIDATE_SECONDS, tags: ['liga-data'] }
+)
+
 // El ADN competitivo de la temporada es igual para los 4 jugadores
 // (Perfil y el perfil público de cualquier jugador piden el mismo
 // cálculo), así que se cachea igual que el resto — evita recalcularlo
