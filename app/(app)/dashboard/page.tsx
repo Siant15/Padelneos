@@ -233,7 +233,7 @@ export default async function DashboardPage() {
                   >
                     {MEDALS[row.rank - 1] ?? row.rank}
                   </span>
-                  {row.name}
+                  <Link href={`/jugador/${row.id}`} className="hover:underline">{row.name}</Link>
                   <RankDelta delta={row.rankDelta} />
                 </span>
                 <span className="text-[13px] font-extrabold text-right" style={{ color: 'var(--accent)' }}>{row.points}</span>
