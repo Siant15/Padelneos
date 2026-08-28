@@ -8,7 +8,7 @@ export default async function MercadosPage({ params }: { params: Promise<{ id: s
 
   const [{ data: m, error: marketsError }, { data: r, error: roundError }, { data: settlement }, { data: allTemplates }, { data: usageRows }] = await Promise.all([
     supabase.from('betting_markets')
-      .select('*, options:betting_options!market_id(*, player:profiles(id, name)), bets(*), template:betting_question_templates(*)')
+      .select('*, options:betting_options!market_id(*, player:profiles(id, name)), template:betting_question_templates(*)')
       .eq('round_id', roundId)
       .order('created_at'),
     supabase.from('rounds').select('status, round_number, season_id').eq('id', roundId).single(),
@@ -18,6 +18,22 @@ export default async function MercadosPage({ params }: { params: Promise<{ id: s
   ])
 
   const marketRows = (m as MarketWithAll[]) ?? []
+
+  // El total de fichas por opción se pide aparte, vía una función que
+  // solo devuelve la suma (nunca quién apostó qué) — así se puede ver
+  // "cuánto hay en juego" en una pregunta todavía sin resolver sin
+  // exponer las apuestas individuales de los demás jugadores antes de
+  // que cierre el mercado.
+  const marketIds = marketRows.map(mr => mr.id)
+  const { data: betTotalsRows } = marketIds.length
+    ? await supabase.rpc('get_market_bet_totals', { p_market_ids: marketIds })
+    : { data: [] as { market_id: string; option_id: string; chips: number }[] }
+  for (const market of marketRows) {
+    market.betTotals = {}
+    for (const row of betTotalsRows ?? []) {
+      if (row.market_id === market.id) market.betTotals[row.option_id] = row.chips
+    }
+  }
 
   const usageCount: Record<string, number> = {}
   for (const row of usageRows ?? []) {

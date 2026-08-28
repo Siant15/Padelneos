@@ -9,7 +9,11 @@ import { revalidateLigaData } from '@/lib/actions'
 
 export type MarketWithAll = BettingMarket & {
   options: (BettingOption & { player?: Profile })[]
-  bets: { player_id: string; option_id: string; chips: number }[]
+  // Suma de fichas por opción (option_id -> chips), nunca quién apostó
+  // qué — así se puede mostrar "cuánto hay en juego" en una pregunta
+  // todavía abierta sin exponer las apuestas de cada jugador antes de
+  // que el mercado cierre.
+  betTotals: Record<string, number>
   template?: BettingQuestionTemplate
 }
 
@@ -72,7 +76,7 @@ export default function MercadosClient({ roundId, initialMarkets, initialCatalog
   const loadData = useCallback(async () => {
     const [{ data: m, error: marketsError }, { data: r }, { data: settlement }, { data: allTemplates }, { data: usageRows }] = await Promise.all([
       supabase.from('betting_markets')
-        .select('*, options:betting_options!market_id(*, player:profiles(id, name)), bets(*), template:betting_question_templates(*)')
+        .select('*, options:betting_options!market_id(*, player:profiles(id, name)), template:betting_question_templates(*)')
         .eq('round_id', roundId)
         .order('created_at'),
       supabase.from('rounds').select('status, round_number, season_id').eq('id', roundId).single(),
@@ -82,6 +86,20 @@ export default function MercadosClient({ roundId, initialMarkets, initialCatalog
     ])
     setLoadError(marketsError ? 'No se pudieron cargar las apuestas: ' + marketsError.message : '')
     const marketRows = (m as MarketWithAll[]) ?? []
+
+    // Suma por opción vía RPC (nunca quién apostó qué — ver el tipo
+    // MarketWithAll más arriba).
+    const marketIds = marketRows.map(mr => mr.id)
+    const { data: betTotalsRows } = marketIds.length
+      ? await supabase.rpc('get_market_bet_totals', { p_market_ids: marketIds })
+      : { data: [] as { market_id: string; option_id: string; chips: number }[] }
+    for (const market of marketRows) {
+      market.betTotals = {}
+      for (const row of betTotalsRows ?? []) {
+        if (row.market_id === market.id) market.betTotals[row.option_id] = row.chips
+      }
+    }
+
     setMarkets(marketRows)
     setRoundStatus(r?.status ?? '')
     setIsSettled(!!settlement)
@@ -301,10 +319,9 @@ function MarketCard({ market, resolving, voiding, deleting, readOnly, onResolve,
 }) {
   const [selectedOption, setSelectedOption] = useState('')
 
-  const totalChipsPerOption = (optId: string) =>
-    market.bets.filter(b => b.option_id === optId).reduce((s, b) => s + b.chips, 0)
+  const totalChipsPerOption = (optId: string) => market.betTotals[optId] ?? 0
 
-  const totalPot = market.bets.reduce((s, b) => s + b.chips, 0)
+  const totalPot = Object.values(market.betTotals).reduce((s, c) => s + c, 0)
   const noneOption = market.options?.find(o => o.is_none)
 
   return (
