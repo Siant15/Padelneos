@@ -3,9 +3,10 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
-import type { Profile } from '@/lib/types'
 import { revalidateLigaData } from '@/lib/actions'
 import ClubPicker from '@/components/ClubPicker'
+
+type PlayerLite = { id: string; name: string }
 
 type FormState = {
   scheduled_date: string
@@ -22,7 +23,7 @@ type FormState = {
 
 export default function EditarJornadaForm({ roundId, players, initialForm, initialHasResult }: {
   roundId: string
-  players: Profile[]
+  players: PlayerLite[]
   initialForm: FormState
   initialHasResult: boolean
 }) {
@@ -32,8 +33,20 @@ export default function EditarJornadaForm({ roundId, players, initialForm, initi
   const [loading, setLoading] = useState(false)
   const [saved, setSaved] = useState(false)
   const [saveError, setSaveError] = useState('')
-  const [hasResult] = useState(initialHasResult)
+  const [hasResult, setHasResult] = useState(initialHasResult)
   const [form, setForm] = useState<FormState>(initialForm)
+
+  // `hasResult` no depende de ningún input del usuario (a diferencia de
+  // `form`, que si se resincronizara aquí perdería lo que esté
+  // escribiendo si el Server Component revalida por otro motivo), así
+  // que sí conviene mantenerlo al día si vuelve a renderizar con props
+  // nuevas. Se ajusta durante el render, no en un efecto, para no sumar
+  // una pasada de render extra.
+  const [prevInitialHasResult, setPrevInitialHasResult] = useState(initialHasResult)
+  if (initialHasResult !== prevInitialHasResult) {
+    setPrevInitialHasResult(initialHasResult)
+    setHasResult(initialHasResult)
+  }
 
   const pairIds = [form.team1_p1_id, form.team1_p2_id, form.team2_p1_id, form.team2_p2_id].filter(Boolean)
   const hasDuplicatePlayers = new Set(pairIds).size !== pairIds.length
@@ -240,7 +253,7 @@ export default function EditarJornadaForm({ roundId, players, initialForm, initi
 function PlayerSelect({ value, onChange, players, exclude, label }: {
   value: string
   onChange: (v: string) => void
-  players: Profile[]
+  players: PlayerLite[]
   exclude: string[]
   label: string
 }) {

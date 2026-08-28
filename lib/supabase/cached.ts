@@ -1,6 +1,7 @@
 import { createClient as createRawClient } from '@supabase/supabase-js'
 import { unstable_cache } from 'next/cache'
 import { getRoundActa, getRoundBettingContext, getSeasonBettingRanking } from '@/lib/betting-queries'
+import { getSeasonCompetitiveDna } from '@/lib/dna-data'
 
 // Consultas de liga que son iguales para los 4 jugadores (temporada
 // activa, calendario, clasificaciones, estado de las apuestas por
@@ -77,7 +78,9 @@ export const getCachedSeasonAggregates = unstable_cache(
       roundIds.length
         ? client.from('round_settlements').select('round_id').is('voided_at', null).in('round_id', roundIds)
         : Promise.resolve({ data: [] as { round_id: string }[] }),
-      client.from('betting_round_results').select('round_id, player_id, rank, chips_net, point_bonus, player:profiles(id, name)'),
+      roundIds.length
+        ? client.from('betting_round_results').select('round_id, player_id, rank, chips_net, point_bonus, player:profiles(id, name)').in('round_id', roundIds)
+        : Promise.resolve({ data: [] as { round_id: string; player_id: string; rank: number; chips_net: number; point_bonus: number }[] }),
     ])
     return {
       allStats: allStats ?? [],
@@ -89,6 +92,16 @@ export const getCachedSeasonAggregates = unstable_cache(
     }
   },
   ['season-aggregates'],
+  { revalidate: REVALIDATE_SECONDS, tags: ['liga-data'] }
+)
+
+// El ADN competitivo de la temporada es igual para los 4 jugadores
+// (Perfil y el perfil público de cualquier jugador piden el mismo
+// cálculo), así que se cachea igual que el resto — evita recalcularlo
+// desde cero en cada visita a un perfil.
+export const getCachedSeasonCompetitiveDna = unstable_cache(
+  async (seasonId: string) => getSeasonCompetitiveDna(serviceClient(), seasonId),
+  ['season-dna'],
   { revalidate: REVALIDATE_SECONDS, tags: ['liga-data'] }
 )
 

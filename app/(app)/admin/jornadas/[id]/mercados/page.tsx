@@ -6,7 +6,7 @@ export default async function MercadosPage({ params }: { params: Promise<{ id: s
   const { id: roundId } = await params
   const supabase = await createClient()
 
-  const [{ data: m, error: marketsError }, { data: r }, { data: settlement }, { data: allTemplates }, { data: usageRows }] = await Promise.all([
+  const [{ data: m, error: marketsError }, { data: r, error: roundError }, { data: settlement }, { data: allTemplates }, { data: usageRows }] = await Promise.all([
     supabase.from('betting_markets')
       .select('*, options:betting_options!market_id(*, player:profiles(id, name)), bets(*), template:betting_question_templates(*)')
       .eq('round_id', roundId)
@@ -35,7 +35,10 @@ export default async function MercadosPage({ params }: { params: Promise<{ id: s
       initialCatalog={catalog}
       initialRoundStatus={r?.status ?? ''}
       initialIsSettled={!!settlement}
-      initialLoadError={marketsError ? 'No se pudieron cargar las apuestas: ' + marketsError.message : ''}
+      initialLoadError={
+        marketsError ? 'No se pudieron cargar las apuestas: ' + marketsError.message :
+        roundError ? 'No se pudo cargar el estado de la jornada: ' + roundError.message : ''
+      }
     />
   )
 }

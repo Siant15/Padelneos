@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import { getSeasonCompetitiveDna } from '@/lib/dna-data'
+import { getCachedSeasonCompetitiveDna } from '@/lib/supabase/cached'
 import CompetitiveDnaRadar from '@/components/CompetitiveDnaRadar'
 
 const HAND_LABEL: Record<string, string> = { diestra: 'Diestra', zurda: 'Zurda' }
@@ -11,7 +11,7 @@ export default async function JugadorPage({ params }: { params: Promise<{ id: st
   const supabase = await createClient()
 
   const [{ data: profile }, { data: activeSeason }, { data: mostRecentSeason }] = await Promise.all([
-    supabase.from('profiles').select('*').eq('id', playerId).maybeSingle(),
+    supabase.from('profiles').select('name, racket_brand, dominant_hand, preferred_side, avatar_url').eq('id', playerId).maybeSingle(),
     supabase.from('seasons').select('id, name').eq('status', 'active').order('created_at', { ascending: false }).limit(1).maybeSingle(),
     supabase.from('seasons').select('id, name').order('created_at', { ascending: false }).limit(1).maybeSingle(),
   ])
@@ -31,7 +31,7 @@ export default async function JugadorPage({ params }: { params: Promise<{ id: st
     season
       ? supabase.from('individual_standings').select('matches_played, wins, total_points').eq('season_id', season.id).eq('player_id', playerId).maybeSingle()
       : Promise.resolve({ data: null }),
-    season ? getSeasonCompetitiveDna(supabase, season.id) : Promise.resolve([]),
+    season ? getCachedSeasonCompetitiveDna(season.id) : Promise.resolve([]),
   ])
 
   const stats = standing ?? { matches_played: 0, wins: 0, total_points: 0 }

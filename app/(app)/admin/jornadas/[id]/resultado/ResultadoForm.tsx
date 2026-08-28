@@ -4,13 +4,13 @@ import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import type { Profile } from '@/lib/types'
 import { isValidSetScore } from '@/lib/types'
 import { revalidateLigaData } from '@/lib/actions'
 
 type PairForm = { team1_p1_id: string; team1_p2_id: string; team2_p1_id: string; team2_p2_id: string }
 type SetScore = { t1: string; t2: string }
 type RoundPlayer = { id: string; name: string; team: 1 | 2 }
+type PlayerLite = { id: string; name: string }
 
 type MatchStatus = {
   winner: 'team1' | 'team2' | null
@@ -59,7 +59,7 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
   matchId: string
   players: RoundPlayer[]
   sets: SetScore[]
-  allPlayers: Profile[]
+  allPlayers: PlayerLite[]
 }) {
   const supabase = createClient()
   const router = useRouter()
@@ -74,6 +74,33 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
   const [pairForm, setPairForm] = useState<PairForm>({ team1_p1_id: '', team1_p2_id: '', team2_p1_id: '', team2_p2_id: '' })
   const [creatingMatch, setCreatingMatch] = useState(false)
   const [pairError, setPairError] = useState('')
+
+  // Si el Server Component vuelve a renderizar con datos frescos (p.ej.
+  // tras un router.refresh() tras guardar), useState no recoge los
+  // nuevos props por sí solo — se resincroniza aquí (ajustando el
+  // estado durante el render, no en un efecto, para no sumar una
+  // pasada de render extra) para que este componente no se quede con
+  // el estado del primer montaje.
+  const [prevInitialMatchId, setPrevInitialMatchId] = useState(initialMatchId)
+  if (initialMatchId !== prevInitialMatchId) {
+    setPrevInitialMatchId(initialMatchId)
+    setMatchId(initialMatchId)
+  }
+  const [prevInitialRoundPlayers, setPrevInitialRoundPlayers] = useState(initialRoundPlayers)
+  if (initialRoundPlayers !== prevInitialRoundPlayers) {
+    setPrevInitialRoundPlayers(initialRoundPlayers)
+    setPlayers(initialRoundPlayers)
+  }
+  const [prevInitialSets, setPrevInitialSets] = useState(initialSets)
+  if (initialSets !== prevInitialSets) {
+    setPrevInitialSets(initialSets)
+    setSets(initialSets)
+  }
+  const [prevMode, setPrevMode] = useState(mode)
+  if (mode !== prevMode) {
+    setPrevMode(mode)
+    setLoadState(mode)
+  }
 
   const { winner, error: setsError, needsThirdSet, decidedInTwo } = evaluateSets(sets)
   const hasThirdSet = sets.length === 3
@@ -155,6 +182,12 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
       return
     }
 
+    // La jornada ya quedó "jugada" en la BD a partir de aquí — se
+    // invalida la caché ya mismo para que quede en el mismo estado
+    // aunque falle lo siguiente, en vez de esperar al final y dejar la
+    // caché mostrando "no jugada" mientras la BD ya dice lo contrario.
+    await revalidateLigaData()
+
     // Con el resultado ya guardado, las preguntas de apuestas automáticas
     // (ganador, resultado por sets, marcador exacto, tie-break...) se
     // resuelven solas; las anecdóticas se siguen resolviendo a mano
@@ -166,7 +199,6 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
       return
     }
 
-    await revalidateLigaData()
     setSaved(true)
     setLoading(false)
     router.refresh()
@@ -390,7 +422,7 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
 function PairPlayerSelect({ value, onChange, players, exclude, label }: {
   value: string
   onChange: (v: string) => void
-  players: Profile[]
+  players: PlayerLite[]
   exclude: string[]
   label: string
 }) {

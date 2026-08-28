@@ -1,6 +1,6 @@
 import { createClient, getCachedUser } from '@/lib/supabase/server'
 import PerfilForm from '@/components/PerfilForm'
-import { getSeasonCompetitiveDna } from '@/lib/dna-data'
+import { getCachedSeasonCompetitiveDna } from '@/lib/supabase/cached'
 
 export default async function PerfilPage() {
   const supabase = await createClient()
@@ -13,7 +13,7 @@ export default async function PerfilPage() {
   // una consulta de más en el caso común, pero evita un round-trip
   // extra en serie cuando no hay temporada activa.
   const [{ data: profile }, { data: activeSeason }, { data: mostRecentSeason }] = await Promise.all([
-    supabase.from('profiles').select('*').eq('id', user.id).maybeSingle(),
+    supabase.from('profiles').select('name, racket_brand, dominant_hand, preferred_side, avatar_url').eq('id', user.id).maybeSingle(),
     supabase.from('seasons').select('id, name').eq('status', 'active').order('created_at', { ascending: false }).limit(1).maybeSingle(),
     supabase.from('seasons').select('id, name').order('created_at', { ascending: false }).limit(1).maybeSingle(),
   ])
@@ -26,7 +26,7 @@ export default async function PerfilPage() {
     season
       ? supabase.from('individual_standings').select('matches_played, wins, total_points').eq('season_id', season.id).eq('player_id', user.id).maybeSingle()
       : Promise.resolve({ data: null }),
-    season ? getSeasonCompetitiveDna(supabase, season.id) : Promise.resolve([]),
+    season ? getCachedSeasonCompetitiveDna(season.id) : Promise.resolve([]),
   ])
 
   return (

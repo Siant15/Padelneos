@@ -1,22 +1,32 @@
 import { createClient } from '@/lib/supabase/server'
-import type { Profile } from '@/lib/types'
 import EditarJornadaForm from './EditarJornadaForm'
 
 export default async function EditarJornadaPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: roundId } = await params
   const supabase = await createClient()
 
-  const [{ data: players }, { data: round }] = await Promise.all([
-    supabase.from('profiles').select('*').order('name'),
+  const [{ data: players }, { data: round, error }] = await Promise.all([
+    supabase.from('profiles').select('id, name').order('name'),
     supabase.from('rounds').select('*, match:matches(*)').eq('id', roundId).maybeSingle(),
   ])
+
+  if (error || !round) {
+    return (
+      <div className="space-y-5 pb-4">
+        <h1 className="text-xl font-bold">Editar jornada</h1>
+        <div className="rounded-xl p-4 text-sm" style={{ background: 'var(--orange-bg)', color: '#7A5A1E' }}>
+          ⚠ No se pudo cargar la jornada{error ? `: ${error.message}` : ''}
+        </div>
+      </div>
+    )
+  }
 
   const match = (round?.match ?? null) as { id: string; team1_p1_id: string; team1_p2_id: string; team2_p1_id: string; team2_p2_id: string; winner: string | null } | null
 
   return (
     <EditarJornadaForm
       roundId={roundId}
-      players={(players as Profile[]) ?? []}
+      players={players ?? []}
       initialHasResult={!!match?.winner}
       initialForm={{
         scheduled_date: round?.scheduled_date ?? '',

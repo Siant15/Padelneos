@@ -182,6 +182,7 @@ export async function addManualClub(name: string, address: string, mapsUrl: stri
     .from('clubs')
     .upsert({ name: name.trim(), address: address.trim() || null, maps_url: finalMapsUrl }, { onConflict: 'name' })
   if (error) return { error: error.message }
+  updateTag('liga-data')
   return { error: null }
 }
 
@@ -190,5 +191,6 @@ export async function deleteClub(clubId: string): Promise<{ error: string | null
   const admin = adminClient()
   const { error } = await admin.from('clubs').delete().eq('id', clubId)
   if (error) return { error: error.message }
+  updateTag('liga-data')
   return { error: null }
 }

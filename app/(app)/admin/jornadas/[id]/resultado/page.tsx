@@ -1,5 +1,4 @@
 import { createClient } from '@/lib/supabase/server'
-import type { Profile } from '@/lib/types'
 import ResultadoForm from './ResultadoForm'
 
 type MatchRow = {
@@ -40,7 +39,7 @@ export default async function ResultadoPage({ params }: { params: Promise<{ id: 
   const roundNumber = data.round_number ?? 0
 
   if (!m) {
-    const { data: allPlayers } = await supabase.from('profiles').select('*').order('name')
+    const { data: allPlayers } = await supabase.from('profiles').select('id, name').order('name')
     return (
       <ResultadoForm
         roundId={roundId}
@@ -49,7 +48,7 @@ export default async function ResultadoPage({ params }: { params: Promise<{ id: 
         matchId=""
         players={[]}
         sets={[{ t1: '', t2: '' }, { t1: '', t2: '' }]}
-        allPlayers={(allPlayers as Profile[]) ?? []}
+        allPlayers={allPlayers ?? []}
       />
     )
   }

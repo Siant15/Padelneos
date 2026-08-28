@@ -39,6 +39,33 @@ export default function MercadosClient({ roundId, initialMarkets, initialCatalog
   const [loadError, setLoadError] = useState(initialLoadError)
   const [isSettled, setIsSettled] = useState(initialIsSettled)
 
+  // AddQuestionPicker (componente hermano, no hijo) hace su propia
+  // mutación y llama a router.refresh() sin pasar por el loadData() de
+  // aquí abajo — así que cuando el Server Component vuelve a renderizar
+  // con datos frescos, hay que resincronizar el estado local con las
+  // nuevas props. Ajustar el estado durante el render (en vez de en un
+  // useEffect) evita una pasada de render extra.
+  const [prevInitialMarkets, setPrevInitialMarkets] = useState(initialMarkets)
+  if (initialMarkets !== prevInitialMarkets) {
+    setPrevInitialMarkets(initialMarkets)
+    setMarkets(initialMarkets)
+  }
+  const [prevInitialCatalog, setPrevInitialCatalog] = useState(initialCatalog)
+  if (initialCatalog !== prevInitialCatalog) {
+    setPrevInitialCatalog(initialCatalog)
+    setCatalog(initialCatalog)
+  }
+  const [prevInitialRoundStatus, setPrevInitialRoundStatus] = useState(initialRoundStatus)
+  if (initialRoundStatus !== prevInitialRoundStatus) {
+    setPrevInitialRoundStatus(initialRoundStatus)
+    setRoundStatus(initialRoundStatus)
+  }
+  const [prevInitialIsSettled, setPrevInitialIsSettled] = useState(initialIsSettled)
+  if (initialIsSettled !== prevInitialIsSettled) {
+    setPrevInitialIsSettled(initialIsSettled)
+    setIsSettled(initialIsSettled)
+  }
+
   // Recarga tras cualquier acción (resolver/anular/borrar/liquidar) —
   // la carga inicial ya viene del servidor, esto solo se usa después
   // de mutar algo, nunca al montar.
