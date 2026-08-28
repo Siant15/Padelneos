@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import Avatar from '@/components/Avatar'
 
 export type JornadaViewModel = {
   id: string
@@ -14,6 +15,7 @@ export type JornadaViewModel = {
   pairALabel: string
   pairBLabel: string
   responsableName: string
+  responsableAvatarUrl: string | null
   reservaStatus: 'pendiente' | 'reservada' | 'finalizada'
   played: boolean
   isNext: boolean
@@ -58,12 +60,17 @@ export default function JornadasAccordion({ items }: { items: JornadaViewModel[]
                   {j.pairALabel}{j.pairBLabel && ` vs ${j.pairBLabel}`}
                 </div>
               </div>
-              <span
-                className="text-[10px] font-extrabold px-2.5 py-1 rounded-full whitespace-nowrap"
-                style={{ background: j.tagBg, color: j.tagColor }}
-              >
-                {j.statusLabel}
-              </span>
+              <div className="flex flex-col items-end gap-1 shrink-0">
+                <span title={`Reserva: ${j.responsableName}`}>
+                  <Avatar name={j.responsableName} avatarUrl={j.responsableAvatarUrl} size={26} />
+                </span>
+                <span
+                  className="text-[10px] font-extrabold px-2.5 py-1 rounded-full whitespace-nowrap"
+                  style={{ background: j.tagBg, color: j.tagColor }}
+                >
+                  {j.statusLabel}
+                </span>
+              </div>
             </div>
 
             {isOpen && (
@@ -71,7 +78,9 @@ export default function JornadasAccordion({ items }: { items: JornadaViewModel[]
                 className="mt-2.5 pt-2.5 text-xs flex flex-col gap-1.5"
                 style={{ borderTop: '1px dashed #EEE', color: '#555' }}
               >
-                <div>🏟️ Reserva: {j.responsableName}</div>
+                <div className="flex items-center gap-1.5">
+                  🏟️ Reserva: <Avatar name={j.responsableName} avatarUrl={j.responsableAvatarUrl} size={18} /> {j.responsableName}
+                </div>
                 {j.clubLabel && (
                   <div>📍 Club: {j.clubLabel}</div>
                 )}

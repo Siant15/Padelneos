@@ -294,13 +294,13 @@ export default async function DashboardPage() {
 function MatchAvatar({ name, avatarUrl }: { name?: string; avatarUrl?: string | null }) {
   if (avatarUrl) {
     return (
-      <img src={avatarUrl} alt="" className="rounded-full object-cover" style={{ width: 32, height: 32, border: '2px solid rgba(255,255,255,0.4)' }} />
+      <img src={avatarUrl} alt="" className="rounded-full object-cover" style={{ width: 52, height: 52, border: '2px solid rgba(255,255,255,0.4)' }} />
     )
   }
   return (
     <div
-      className="flex items-center justify-center rounded-full font-heading font-extrabold text-[11px]"
-      style={{ width: 32, height: 32, background: 'rgba(255,255,255,0.16)', border: '2px solid rgba(255,255,255,0.4)' }}
+      className="flex items-center justify-center rounded-full font-heading font-extrabold text-sm"
+      style={{ width: 52, height: 52, background: 'rgba(255,255,255,0.16)', border: '2px solid rgba(255,255,255,0.4)' }}
     >
       {(name ?? '').slice(0, 2).toUpperCase() || '🎾'}
     </div>

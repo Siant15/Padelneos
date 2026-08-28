@@ -90,6 +90,7 @@ export default async function LigaPage() {
       pairALabel: match ? `${match.team1_p1?.name ?? '?'} / ${match.team1_p2?.name ?? '?'}` : 'Por confirmar',
       pairBLabel: match ? `${match.team2_p1?.name ?? '?'} / ${match.team2_p2?.name ?? '?'}` : '',
       responsableName: round.court_booker?.name ?? 'Sin asignar',
+      responsableAvatarUrl: round.court_booker?.avatar_url ?? null,
       reservaStatus,
       played,
       isNext,
