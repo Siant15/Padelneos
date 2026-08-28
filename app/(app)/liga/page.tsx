@@ -45,7 +45,8 @@ export default async function LigaPage() {
     const match = round.match as {
       id: string; winner: string | null
       set1_t1: number | null; set1_t2: number | null; set2_t1: number | null; set2_t2: number | null; set3_t1: number | null; set3_t2: number | null
-      team1_p1?: { name: string }; team1_p2?: { name: string }; team2_p1?: { name: string }; team2_p2?: { name: string }
+      team1_p1?: { name: string; avatar_url: string | null }; team1_p2?: { name: string; avatar_url: string | null }
+      team2_p1?: { name: string; avatar_url: string | null }; team2_p2?: { name: string; avatar_url: string | null }
     } | null
 
     const stats = (allStats ?? [])
@@ -88,7 +89,16 @@ export default async function LigaPage() {
       clubLabel: effectiveClub,
       pairALabel: match ? `${match.team1_p1?.name ?? '?'} / ${match.team1_p2?.name ?? '?'}` : 'Por confirmar',
       pairBLabel: match ? `${match.team2_p1?.name ?? '?'} / ${match.team2_p2?.name ?? '?'}` : '',
+      pairAPlayers: match ? [
+        { name: match.team1_p1?.name ?? '?', avatarUrl: match.team1_p1?.avatar_url ?? null },
+        { name: match.team1_p2?.name ?? '?', avatarUrl: match.team1_p2?.avatar_url ?? null },
+      ] : [],
+      pairBPlayers: match ? [
+        { name: match.team2_p1?.name ?? '?', avatarUrl: match.team2_p1?.avatar_url ?? null },
+        { name: match.team2_p2?.name ?? '?', avatarUrl: match.team2_p2?.avatar_url ?? null },
+      ] : [],
       responsableName: round.court_booker?.name ?? 'Sin asignar',
+      responsableAvatarUrl: round.court_booker?.avatar_url ?? null,
       reservaStatus,
       played,
       isNext,

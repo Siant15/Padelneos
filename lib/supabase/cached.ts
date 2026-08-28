@@ -46,13 +46,13 @@ export const getCachedSeasonRounds = unstable_cache(
       .from('rounds')
       .select(`
         *,
-        court_booker:profiles!court_booker_id(id, name),
+        court_booker:profiles!court_booker_id(id, name, avatar_url),
         match:matches(
           id, winner, set1_t1, set1_t2, set2_t1, set2_t2, set3_t1, set3_t2,
-          team1_p1:profiles!team1_p1_id(id, name),
-          team1_p2:profiles!team1_p2_id(id, name),
-          team2_p1:profiles!team2_p1_id(id, name),
-          team2_p2:profiles!team2_p2_id(id, name)
+          team1_p1:profiles!team1_p1_id(id, name, avatar_url),
+          team1_p2:profiles!team1_p2_id(id, name, avatar_url),
+          team2_p1:profiles!team2_p1_id(id, name, avatar_url),
+          team2_p2:profiles!team2_p2_id(id, name, avatar_url)
         )
       `)
       .eq('season_id', seasonId)
