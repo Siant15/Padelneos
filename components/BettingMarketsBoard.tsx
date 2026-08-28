@@ -233,7 +233,7 @@ export default function BettingMarketsBoard({ markets, userId, chipsLeft, roundS
               />
             ) : (
               <div className="flex flex-col gap-2 mt-2.5">
-                {market.options?.map((option, idx) => {
+                {market.options?.filter(option => !(option.player_id === userId && option.is_self_negative)).map((option, idx) => {
                   const isWinner = market.winning_option_id === option.id
                   const myChips = chips[option.id] ?? 0
                   // La barra solo representa TUS fichas en esta opción (sobre
@@ -241,22 +241,20 @@ export default function BettingMarketsBoard({ markets, userId, chipsLeft, roundS
                   // apostado los demás — a propósito de que no se puede
                   // saber ni inferir cuánto o quién apostó cada cosa.
                   const pct = Math.min(100, Math.round((myChips / CHIPS_PER_ROUND) * 100))
-                  const isSelfNegativeBet = option.player_id === userId && option.is_self_negative
-                  const color = isSelfNegativeBet ? 'var(--text-muted2)' : OPTION_COLORS[idx % OPTION_COLORS.length]
+                  const color = OPTION_COLORS[idx % OPTION_COLORS.length]
 
                   return (
                     <div key={option.id}>
                       <div className="flex justify-between text-xs mb-1">
                         <span className="font-bold">
                           {isWinner && '🏆 '}{option.label}
-                          {isSelfNegativeBet && <span className="ml-1" style={{ color: 'var(--red)' }}>🚫</span>}
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
                         <div className="flex-1 h-2.5 rounded-full overflow-hidden" style={{ background: 'var(--tint)' }}>
-                          <div className="h-full rounded-full" style={{ width: `${pct}%`, background: color, opacity: isSelfNegativeBet ? 0.5 : 1 }} />
+                          <div className="h-full rounded-full" style={{ width: `${pct}%`, background: color }} />
                         </div>
-                        {canBet && !isSelfNegativeBet ? (
+                        {canBet ? (
                           <>
                             <button
                               type="button"
@@ -295,9 +293,6 @@ export default function BettingMarketsBoard({ markets, userId, chipsLeft, roundS
                           <span className="text-[11px] w-[38px] text-right" style={{ color: 'var(--text-muted2)' }}>{myChips}f</span>
                         )}
                       </div>
-                      {isSelfNegativeBet && (
-                        <p className="text-[11px] mt-1" style={{ color: 'var(--red)' }}>No puedes apostar contra ti mismo</p>
-                      )}
                     </div>
                   )
                 })}
