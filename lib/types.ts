@@ -176,7 +176,7 @@ export type PairStanding = {
 // vez de un % fijo por puesto actual, se simulan TODAS las combinaciones
 // de resultados de las jornadas que quedan (ya se conocen las parejas de
 // cada una) y se cuenta en cuántas cada jugador termina en el fondo de
-// la tabla. Misma regla de puntos que individual_standings (victoria=2,
+// la tabla. Misma regla de puntos que individual_standings (victoria=3,
 // derrota=0 por jugador; el bonus de apuestas ya acumulado se mantiene
 // fijo, porque las apuestas futuras no se pueden predecir) — para que la
 // simulación no contradiga la clasificación real que ya se muestra.
@@ -224,7 +224,7 @@ export function estimateDinnerRisk(
     for (let i = 0; i < n; i++) {
       const { pair1, pair2 } = remainingPairings[i]
       const pair1Wins = ((mask >> i) & 1) === 0
-      for (const id of pair1Wins ? pair1 : pair2) sport[id] = (sport[id] ?? 0) + 2
+      for (const id of pair1Wins ? pair1 : pair2) sport[id] = (sport[id] ?? 0) + 3
     }
 
     const ranked = players
