@@ -89,8 +89,21 @@ export default function BettingMarketsBoard({ roundId, markets, userId, roundSta
     setSelections(prev => ({ ...prev, [marketId]: { optionId, chips: prev[marketId]?.chips ?? MIN_BET } }))
   }
 
-  function setChipsFor(marketId: string, chips: number) {
-    setSelections(prev => ({ ...prev, [marketId]: { optionId: prev[marketId]?.optionId ?? '', chips } }))
+  // +10/-10 por opción: si la opción no era la elegida, "+10" la elige
+  // empezando en 10 fichas; si ya lo era, suma o resta de 10 en 10
+  // (tope en 50, y bajar de 10 la deselecciona del todo).
+  function bumpChips(marketId: string, optionId: string, delta: number) {
+    setSelections(prev => {
+      const current = prev[marketId]
+      const base = current?.optionId === optionId ? current.chips : 0
+      const next = Math.max(0, Math.min(MAX_BET, base + delta))
+      if (next <= 0) {
+        const rest = { ...prev }
+        delete rest[marketId]
+        return rest
+      }
+      return { ...prev, [marketId]: { optionId, chips: Math.max(MIN_BET, next) } }
+    })
   }
 
   async function handleSubmitBets() {
@@ -265,39 +278,52 @@ export default function BettingMarketsBoard({ roundId, markets, userId, roundSta
               {market.options?.filter(option => !(option.player_id === userId && option.is_self_negative)).map(option => {
                 const isWinner = market.winning_option_id === option.id
                 const isChosen = selection?.optionId === option.id
+                const optionChips = isChosen ? selection.chips : 0
                 return (
-                  <button
-                    key={option.id}
-                    type="button"
-                    disabled={!canBet}
-                    onClick={() => selectOption(market.id, option.id)}
-                    className="text-left px-3 py-2 rounded-xl text-xs font-semibold transition disabled:opacity-60"
-                    style={{
-                      background: isChosen ? 'var(--accent)' : 'var(--surface2)',
-                      color: isChosen ? '#fff' : 'var(--text)',
-                      border: `1px solid ${isChosen ? 'var(--accent)' : 'var(--hairline)'}`,
-                    }}
-                  >
-                    {isWinner && '🏆 '}{option.label}
-                  </button>
+                  <div key={option.id} className="flex items-center gap-1.5">
+                    {canBet && (
+                      <button
+                        type="button"
+                        onClick={() => bumpChips(market.id, option.id, 10)}
+                        disabled={isChosen && optionChips >= MAX_BET}
+                        aria-label={`Añadir 10 fichas a ${option.label}`}
+                        title="+10 fichas"
+                        className="w-8 h-8 rounded-lg text-sm font-bold shrink-0 flex items-center justify-center transition hover:opacity-90 disabled:opacity-40"
+                        style={{ background: 'var(--green)', color: '#fff' }}
+                      >
+                        +
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      disabled={!canBet}
+                      onClick={() => selectOption(market.id, option.id)}
+                      className="flex-1 text-left px-3 py-2 rounded-xl text-xs font-semibold transition disabled:opacity-60"
+                      style={{
+                        background: isChosen ? 'var(--accent)' : 'var(--surface2)',
+                        color: isChosen ? '#fff' : 'var(--text)',
+                        border: `1px solid ${isChosen ? 'var(--accent)' : 'var(--hairline)'}`,
+                      }}
+                    >
+                      {isWinner && '🏆 '}{option.label}{isChosen && ` · ${optionChips}f`}
+                    </button>
+                    {canBet && (
+                      <button
+                        type="button"
+                        onClick={() => bumpChips(market.id, option.id, -10)}
+                        disabled={!isChosen}
+                        aria-label={`Quitar 10 fichas de ${option.label}`}
+                        title="-10 fichas"
+                        className="w-8 h-8 rounded-lg text-sm font-bold shrink-0 flex items-center justify-center transition hover:opacity-90 disabled:opacity-40"
+                        style={{ background: 'var(--red)', color: '#fff' }}
+                      >
+                        −
+                      </button>
+                    )}
+                  </div>
                 )
               })}
             </div>
-
-            {canBet && selection?.optionId && (
-              <div className="flex items-center gap-2 mt-2.5">
-                <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Fichas ({MIN_BET}-{MAX_BET}):</span>
-                <input
-                  type="number"
-                  min={MIN_BET}
-                  max={MAX_BET}
-                  value={selection.chips}
-                  onChange={e => setChipsFor(market.id, Math.max(0, parseInt(e.target.value) || 0))}
-                  className="w-16 text-center text-xs rounded-lg py-1 outline-none"
-                  style={{ border: '1px solid var(--hairline)', color: 'var(--text)' }}
-                />
-              </div>
-            )}
           </div>
           </div>
         )
