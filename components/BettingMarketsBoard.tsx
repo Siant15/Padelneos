@@ -26,7 +26,24 @@ export default function BettingMarketsBoard({ roundId, markets, userId, roundSta
   const supabase = createClient()
 
   const exactScoreMarket = markets.find(m => m.type === 'exact_score') ?? null
-  const paidMarkets = markets.filter(m => m.type !== 'exact_score')
+  // Orden fijo para las preguntas "estructurales" del partido —
+  // ganador y resultado por sets primero, en ese orden — y el resto
+  // (preguntas elegidas del catálogo) después, en el orden que ya
+  // tuvieran.
+  const STRUCTURAL_ORDER = ['Ganador del partido', 'Resultado por sets']
+  const paidMarkets = markets
+    .filter(m => m.type !== 'exact_score')
+    .map((m, i) => ({ m, i }))
+    .sort((a, b) => {
+      const ra = STRUCTURAL_ORDER.indexOf(a.m.description)
+      const rb = STRUCTURAL_ORDER.indexOf(b.m.description)
+      if (ra === -1 && rb === -1) return a.i - b.i
+      if (ra === -1) return 1
+      if (rb === -1) return -1
+      return ra - rb
+    })
+    .map(({ m }) => m)
+  const lastStructuralIndex = paidMarkets.reduce((acc, m, i) => STRUCTURAL_ORDER.includes(m.description) ? i : acc, -1)
 
   // Cada pregunta de pago es una única elección (opción + fichas), no
   // un reparto libre entre varias opciones de la misma pregunta — se
@@ -163,8 +180,14 @@ export default function BettingMarketsBoard({ roundId, markets, userId, roundSta
         <ExactScoreCard
           market={exactScoreMarket}
           canBet={roundStatus === 'scheduled' && !exactScoreMarket.resolved && (() => {
+            // A diferencia del resto de preguntas, el marcador exacto se
+            // puede pronosticar aunque la jornada todavía no tenga día y
+            // hora confirmados (closeTime === null) — no hay forma de
+            // hacer trampa apostando "tarde" sobre un partido que ni
+            // siquiera está programado. En cuanto sí hay fecha, cierra
+            // igual que las demás (1h antes).
             const closeTime = marketCloseTime(exactScoreMarket, round)
-            return closeTime !== null && new Date(closeTime) > new Date()
+            return closeTime === null || new Date(closeTime) > new Date()
           })()}
           userId={userId}
           draft={exactScoreDraft}
@@ -174,7 +197,7 @@ export default function BettingMarketsBoard({ roundId, markets, userId, roundSta
         />
       )}
 
-      {paidMarkets.map(market => {
+      {paidMarkets.map((market, idx) => {
         const closeTime = marketCloseTime(market, round)
         const isClosedByTime = closeTime !== null && new Date(closeTime) <= new Date()
         const canBet = roundStatus === 'scheduled' && !market.resolved && !isClosedByTime
@@ -182,9 +205,18 @@ export default function BettingMarketsBoard({ roundId, markets, userId, roundSta
         const jackpot = (market.template_id && jackpotByTemplate[market.template_id]) || 0
         const potWithJackpot = totalMarketChips + jackpot
         const selection = selections[market.id]
+        const showDividerBefore = lastStructuralIndex !== -1 && idx === lastStructuralIndex + 1
 
         return (
-          <div key={market.id} className="rounded-2xl p-3.5" style={{ background: 'var(--surface)', boxShadow: '0 3px 10px rgba(0,0,0,0.04)' }}>
+          <div key={market.id}>
+          {showDividerBefore && (
+            <div className="flex items-center gap-2 my-1" aria-hidden>
+              <div className="flex-1 h-px" style={{ background: 'var(--hairline)' }} />
+              <span className="text-[10px] font-bold" style={{ color: 'var(--text-muted2)' }}>PREGUNTAS DE LA JORNADA</span>
+              <div className="flex-1 h-px" style={{ background: 'var(--hairline)' }} />
+            </div>
+          )}
+          <div className="rounded-2xl p-3.5" style={{ background: 'var(--surface)', boxShadow: '0 3px 10px rgba(0,0,0,0.04)' }}>
             <div className="flex items-center justify-between">
               <div className="font-heading font-bold text-[13px]">
                 {ANSWER_TYPE_ICON[market.type] ?? '🎾'} {market.description}
@@ -266,6 +298,7 @@ export default function BettingMarketsBoard({ roundId, markets, userId, roundSta
                 />
               </div>
             )}
+          </div>
           </div>
         )
       })}
