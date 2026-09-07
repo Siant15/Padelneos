@@ -12,15 +12,22 @@ export function isRoundBettable(round: RoundTiming): boolean {
   return !!(round.scheduled_date && round.scheduled_time)
 }
 
-// Hora de cierre de un mercado: la suya propia si la tiene, y si no la
-// hora del partido — o null si la jornada todavía no tiene día/hora,
-// lo que significa "no se puede apostar todavía" (no "sin límite").
-// Única función de cierre en toda la app — sustituye las copias que
-// había en apuestas/[roundId]/page.tsx y BettingMarketsBoard.tsx.
+// Cuánto antes del partido cierra el mercado de apuestas por defecto
+// (si el mercado no tiene su propio closes_at) — ya no se puede
+// apostar in extremis justo antes de empezar.
+const CLOSE_BEFORE_MATCH_MS = 60 * 60 * 1000
+
+// Hora de cierre de un mercado: la suya propia si la tiene, y si no
+// una hora antes del partido — o null si la jornada todavía no tiene
+// día/hora, lo que significa "no se puede apostar todavía" (no "sin
+// límite"). Única función de cierre en toda la app — sustituye las
+// copias que había en apuestas/[roundId]/page.tsx y
+// BettingMarketsBoard.tsx.
 export function marketCloseTime(market: { closes_at: string | null }, round: RoundTiming): string | null {
   if (market.closes_at) return market.closes_at
   if (!isRoundBettable(round)) return null
-  return `${round.scheduled_date}T${round.scheduled_time}`
+  const matchDateTime = new Date(`${round.scheduled_date}T${round.scheduled_time}`)
+  return new Date(matchDateTime.getTime() - CLOSE_BEFORE_MATCH_MS).toISOString()
 }
 
 export function isMarketOpenForBetting(market: Pick<BettingMarket, 'resolved' | 'closes_at'>, round: RoundTiming, roundStatus: string): boolean {

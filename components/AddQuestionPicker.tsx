@@ -19,17 +19,23 @@ const inputStyle: React.CSSProperties = {
   outline: 'none',
 }
 
+const MAX_PAID_QUESTIONS = 6
+
 // Catálogo de preguntas que no se aplican solas a cada jornada
 // (auto_apply = false): cualquier jugador puede añadirlas aquí para
 // no saturar la interfaz por defecto. También se puede crear una
 // pregunta totalmente nueva: se guarda en el catálogo (para poder
 // reutilizarla en futuras jornadas) y se aplica a esta a la vez.
-export default function AddQuestionPicker({ roundId, templates }: { roundId: string; templates: BettingQuestionTemplate[] }) {
+// Máximo 6 preguntas de pago por jornada (el marcador exacto no cuenta).
+export default function AddQuestionPicker({ roundId, templates, paidCount }: { roundId: string; templates: BettingQuestionTemplate[]; paidCount: number }) {
   const supabase = createClient()
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [adding, setAdding] = useState<string | null>(null)
   const [error, setError] = useState('')
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editText, setEditText] = useState('')
+  const [savingEdit, setSavingEdit] = useState(false)
 
   const [creating, setCreating] = useState(false)
   const [text, setText] = useState('')
@@ -38,7 +44,29 @@ export default function AddQuestionPicker({ roundId, templates }: { roundId: str
   const [allowNone, setAllowNone] = useState(false)
   const [savingCustom, setSavingCustom] = useState(false)
 
+  const atLimit = paidCount >= MAX_PAID_QUESTIONS
+
+  function startEdit(t: BettingQuestionTemplate) {
+    setEditingId(t.id)
+    setEditText(t.text)
+  }
+
+  async function saveEdit(templateId: string) {
+    if (!editText.trim()) return
+    setSavingEdit(true)
+    setError('')
+    const { error: updateError } = await supabase.from('betting_question_templates').update({ text: editText.trim() }).eq('id', templateId)
+    setSavingEdit(false)
+    if (updateError) {
+      setError('No se pudo guardar el cambio: ' + updateError.message)
+      return
+    }
+    setEditingId(null)
+    router.refresh()
+  }
+
   async function addTemplate(templateId: string) {
+    if (atLimit) return
     setAdding(templateId)
     setError('')
     const { error: rpcError } = await supabase.rpc('instantiate_round_questions', {
@@ -56,7 +84,7 @@ export default function AddQuestionPicker({ roundId, templates }: { roundId: str
 
   async function handleCreateCustom(e: React.FormEvent) {
     e.preventDefault()
-    if (!text.trim()) return
+    if (!text.trim() || atLimit) return
     if (answerType === 'custom_options' && options.filter(o => o.trim()).length < 2) {
       setError('Añade al menos 2 opciones.')
       return
@@ -111,26 +139,47 @@ export default function AddQuestionPicker({ roundId, templates }: { roundId: str
       {open && (
         <div className="mt-3 flex flex-col gap-2">
           {error && <p className="text-xs" style={{ color: 'var(--red)' }}>⚠ {error}</p>}
+          {atLimit && (
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+              Esta jornada ya tiene las {MAX_PAID_QUESTIONS} preguntas de pago (máximo).
+            </p>
+          )}
           {templates.map(t => (
-            <button
-              key={t.id}
-              onClick={() => addTemplate(t.id)}
-              disabled={adding === t.id}
-              className="text-left text-xs font-semibold px-3 py-2 rounded-xl transition hover:opacity-90 disabled:opacity-40"
-              style={{ background: 'var(--surface2)', color: 'var(--text)' }}
-            >
-              {adding === t.id ? 'Añadiendo...' : t.text}
-            </button>
+            editingId === t.id ? (
+              <div key={t.id} className="flex gap-1.5">
+                <input value={editText} onChange={e => setEditText(e.target.value)} style={inputStyle} />
+                <button onClick={() => saveEdit(t.id)} disabled={savingEdit} className="px-3 text-xs font-bold rounded-lg disabled:opacity-40" style={{ background: 'var(--accent)', color: '#fff' }}>
+                  {savingEdit ? '...' : '✓'}
+                </button>
+                <button onClick={() => setEditingId(null)} className="px-2 text-xs font-bold rounded-lg" style={{ background: 'var(--tint)', color: '#555' }}>✕</button>
+              </div>
+            ) : (
+              <div key={t.id} className="flex items-center gap-1.5">
+                <button
+                  onClick={() => addTemplate(t.id)}
+                  disabled={adding === t.id || atLimit}
+                  className="flex-1 text-left text-xs font-semibold px-3 py-2 rounded-xl transition hover:opacity-90 disabled:opacity-40"
+                  style={{ background: 'var(--surface2)', color: 'var(--text)' }}
+                >
+                  {adding === t.id ? 'Añadiendo...' : t.text}
+                </button>
+                <button onClick={() => startEdit(t)} aria-label="Editar pregunta" title="Editar el texto de esta pregunta" className="text-xs px-1.5 shrink-0" style={{ color: 'var(--text-muted2)' }}>
+                  ✏️
+                </button>
+              </div>
+            )
           ))}
 
           {!creating ? (
-            <button
-              onClick={() => setCreating(true)}
-              className="text-left text-xs font-bold px-3 py-2 rounded-xl transition hover:opacity-90"
-              style={{ background: 'var(--tint)', color: 'var(--accent)' }}
-            >
-              + Crear pregunta personalizada
-            </button>
+            !atLimit && (
+              <button
+                onClick={() => setCreating(true)}
+                className="text-left text-xs font-bold px-3 py-2 rounded-xl transition hover:opacity-90"
+                style={{ background: 'var(--tint)', color: 'var(--accent)' }}
+              >
+                + Crear pregunta personalizada
+              </button>
+            )
           ) : (
             <form onSubmit={handleCreateCustom} className="rounded-xl p-3 flex flex-col gap-2.5" style={{ background: 'var(--surface2)' }}>
               <input

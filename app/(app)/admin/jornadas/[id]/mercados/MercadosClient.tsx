@@ -276,7 +276,7 @@ export default function MercadosClient({ roundId, initialMarkets, initialCatalog
       )}
 
       {roundStatus !== 'played' && catalog.length > 0 && (
-        <AddQuestionPicker roundId={roundId} templates={catalog} />
+        <AddQuestionPicker roundId={roundId} templates={catalog} paidCount={markets.filter(m => m.type !== 'exact_score').length} />
       )}
 
       {allResolved && (

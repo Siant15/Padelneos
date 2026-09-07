@@ -148,16 +148,20 @@ export default function ApuestasTab({ userId, rounds, initialRoundId }: { userId
           <div className="rounded-2xl px-4 pt-4 pb-1" style={{ background: 'var(--surface)', boxShadow: '0 3px 10px rgba(0,0,0,0.04)' }}>
             <h2 className="font-heading font-bold text-sm mb-2.5">Apuestas de la jornada</h2>
             <BettingMarketsBoard
+              roundId={current.roundId}
               markets={current.markets}
               userId={userId}
-              chipsLeft={current.chipsLeft}
               roundStatus="scheduled"
               round={{ scheduled_date: current.scheduledDate, scheduled_time: current.scheduledTime }}
               jackpotByTemplate={current.jackpotByTemplate}
             />
           </div>
           {current.availableTemplates.length > 0 && (
-            <AddQuestionPicker roundId={current.roundId} templates={current.availableTemplates} />
+            <AddQuestionPicker
+              roundId={current.roundId}
+              templates={current.availableTemplates}
+              paidCount={current.markets.filter(m => m.type !== 'exact_score').length}
+            />
           )}
         </>
       )}
