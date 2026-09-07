@@ -19,3 +19,7 @@ jobs:
         run: |
           curl -sf -X GET "https://padelneos-beta.vercel.app/api/cron/notify?type=reminder90" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+      - name: Avisar a quien salga mencionado en una apuesta
+        run: |
+          curl -sf -X GET "https://padelneos-beta.vercel.app/api/cron/notify?type=marketMentions" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"

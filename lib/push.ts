@@ -51,3 +51,40 @@ export async function sendPushToAll(admin: SupabaseClient, payload: PushPayload)
 
   return { sent, removed: toDelete.length }
 }
+
+// Igual que sendPushToAll pero solo a los jugadores indicados — para
+// el aviso de "sales mencionado en una apuesta", donde cada jugador
+// necesita su propio mensaje (o ninguno, si no sale mencionado).
+export async function sendPushToPlayers(admin: SupabaseClient, playerIds: string[], payload: PushPayload): Promise<{ sent: number; removed: number }> {
+  if (!isPushConfigured() || playerIds.length === 0) return { sent: 0, removed: 0 }
+
+  const { data: subs } = await admin.from('push_subscriptions').select('*').in('player_id', playerIds)
+  if (!subs?.length) return { sent: 0, removed: 0 }
+
+  webpush.setVapidDetails(
+    process.env.VAPID_SUBJECT!,
+    process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
+    process.env.VAPID_PRIVATE_KEY!
+  )
+
+  let sent = 0
+  const toDelete: string[] = []
+  for (const sub of subs) {
+    try {
+      await webpush.sendNotification(
+        { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+        JSON.stringify({ ...payload, url: payload.url ?? '/dashboard' })
+      )
+      sent++
+    } catch (err) {
+      const statusCode = (err as { statusCode?: number })?.statusCode
+      if (statusCode === 404 || statusCode === 410) toDelete.push(sub.id)
+    }
+  }
+
+  if (toDelete.length) {
+    await admin.from('push_subscriptions').delete().in('id', toDelete)
+  }
+
+  return { sent, removed: toDelete.length }
+}

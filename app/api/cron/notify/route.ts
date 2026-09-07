@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
-import { createPushAdminClient, sendPushToAll } from '@/lib/push'
+import type { SupabaseClient } from '@supabase/supabase-js'
+import { createPushAdminClient, sendPushToAll, sendPushToPlayers } from '@/lib/push'
+import { marketCloseTime } from '@/lib/betting'
 import webpush from 'web-push'
 
 // Mensajes "picantes" según la posición en la clasificación, para el
@@ -27,11 +29,15 @@ export async function GET(request: Request) {
   }
 
   const type = new URL(request.url).searchParams.get('type')
-  if (type !== 'dayBefore' && type !== 'reminder90') {
-    return NextResponse.json({ error: 'type debe ser dayBefore o reminder90' }, { status: 400 })
+  if (type !== 'dayBefore' && type !== 'reminder90' && type !== 'marketMentions') {
+    return NextResponse.json({ error: 'type debe ser dayBefore, reminder90 o marketMentions' }, { status: 400 })
   }
 
   const admin = createPushAdminClient()
+
+  if (type === 'marketMentions') {
+    return handleMarketMentions(admin)
+  }
 
   // "Hoy" y "mañana" en huso de Madrid, no en UTC del servidor.
   const now = new Date()
@@ -148,4 +154,61 @@ export async function GET(request: Request) {
   await admin.from('rounds').update({ reminder_90_sent_at: now.toISOString() }).eq('id', round.id)
 
   return NextResponse.json({ sent, removed: toDelete.length })
+}
+
+// Aviso "sales mencionado en una apuesta" — se comprueba cada ~15 min
+// (mismo workflow de GitHub Actions que reminder90) y solo avisa una
+// vez por jornada, cuando falta menos de 1h para que cierren sus
+// preguntas de pago (nunca dice importes ni quién apostó qué).
+async function handleMarketMentions(admin: SupabaseClient) {
+  const now = new Date()
+
+  const { data: rounds } = await admin
+    .from('rounds')
+    .select('id, round_number, scheduled_date, scheduled_time, mentions_notified_at')
+    .eq('status', 'scheduled')
+    .is('mentions_notified_at', null)
+    .not('scheduled_date', 'is', null)
+    .not('scheduled_time', 'is', null)
+
+  if (!rounds?.length) return NextResponse.json({ sent: 0, reason: 'sin jornadas pendientes de aviso' })
+
+  let totalSent = 0
+  const notifiedRounds: string[] = []
+
+  for (const round of rounds) {
+    const closeTime = marketCloseTime({ closes_at: null }, { scheduled_date: round.scheduled_date, scheduled_time: round.scheduled_time })
+    if (!closeTime) continue
+    const minutesUntilClose = (new Date(closeTime).getTime() - now.getTime()) / 60000
+    // Ventana de aviso: entre 0 y 60 min antes del cierre (una vez que
+    // ya cerró, no tiene sentido avisar).
+    if (minutesUntilClose < 0 || minutesUntilClose > 60) continue
+
+    const { data: markets } = await admin
+      .from('betting_markets')
+      .select('id, type, options:betting_options(player_id)')
+      .eq('round_id', round.id)
+      .in('type', ['player', 'pair'])
+
+    const mentionedIds = new Set<string>()
+    for (const m of markets ?? []) {
+      for (const o of (m.options as { player_id: string | null }[] | null) ?? []) {
+        if (o.player_id) mentionedIds.add(o.player_id)
+      }
+    }
+
+    if (mentionedIds.size > 0) {
+      const result = await sendPushToPlayers(admin, [...mentionedIds], {
+        title: '🎲 Sales en una apuesta de esta jornada',
+        body: `Jornada ${round.round_number} — a apostar antes de que cierre el mercado.`,
+        url: '/liga?tab=apuestas',
+      })
+      totalSent += result.sent
+    }
+
+    await admin.from('rounds').update({ mentions_notified_at: now.toISOString() }).eq('id', round.id)
+    notifiedRounds.push(round.id)
+  }
+
+  return NextResponse.json({ sent: totalSent, rounds: notifiedRounds })
 }
