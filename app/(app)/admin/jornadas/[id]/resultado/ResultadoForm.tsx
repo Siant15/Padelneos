@@ -11,6 +11,8 @@ type PairForm = { team1_p1_id: string; team1_p2_id: string; team2_p1_id: string;
 type SetScore = { t1: string; t2: string }
 type RoundPlayer = { id: string; name: string; team: 1 | 2 }
 type PlayerLite = { id: string; name: string }
+type PendingOption = { id: string; label: string; is_none: boolean | null }
+type PendingMarket = { id: string; description: string; options: PendingOption[] }
 
 type MatchStatus = {
   winner: 'team1' | 'team2' | null
@@ -74,6 +76,9 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
   const [pairForm, setPairForm] = useState<PairForm>({ team1_p1_id: '', team1_p2_id: '', team2_p1_id: '', team2_p2_id: '' })
   const [creatingMatch, setCreatingMatch] = useState(false)
   const [pairError, setPairError] = useState('')
+  const [pendingMarkets, setPendingMarkets] = useState<PendingMarket[] | null>(null)
+  const [resolvingMarketId, setResolvingMarketId] = useState<string | null>(null)
+  const [pendingSelection, setPendingSelection] = useState<Record<string, string>>({})
 
   // Si el Server Component vuelve a renderizar con datos frescos (p.ej.
   // tras un router.refresh() tras guardar), useState no recoge los
@@ -175,23 +180,12 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
       return
     }
 
-    const { error: roundError } = await supabase.from('rounds').update({ status: 'played' }).eq('id', roundId)
-    if (roundError) {
-      setSaveError('Resultado guardado, pero no se pudo marcar la jornada como jugada: ' + roundError.message)
-      setLoading(false)
-      return
-    }
-
-    // La jornada ya quedó "jugada" en la BD a partir de aquí — se
-    // invalida la caché ya mismo para que quede en el mismo estado
-    // aunque falle lo siguiente, en vez de esperar al final y dejar la
-    // caché mostrando "no jugada" mientras la BD ya dice lo contrario.
-    await revalidateLigaData()
-
     // Con el resultado ya guardado, las preguntas de apuestas automáticas
     // (ganador, resultado por sets, marcador exacto, tie-break...) se
-    // resuelven solas; las anecdóticas se siguen resolviendo a mano
-    // desde Mercados/Acta.
+    // resuelven solas; las anecdóticas se siguen resolviendo a mano, y
+    // la jornada no se marca "jugada" hasta que estén todas resueltas o
+    // anuladas (si no, nunca podría liquidarse — settle_round exige que
+    // no quede ninguna pregunta sin resolver).
     const { error: autoResolveError } = await supabase.rpc('auto_resolve_round_markets', { p_round_id: roundId })
     if (autoResolveError) {
       setSaveError('Resultado guardado, pero fallaron las apuestas automáticas: ' + autoResolveError.message)
@@ -199,9 +193,47 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
       return
     }
 
-    setSaved(true)
     setLoading(false)
+    await checkPendingMarketsOrFinish()
+  }
+
+  async function checkPendingMarketsOrFinish() {
+    const { data } = await supabase
+      .from('betting_markets')
+      .select('id, description, options:betting_options(id, label, is_none)')
+      .eq('round_id', roundId)
+      .eq('resolved', false)
+
+    const pending = (data as PendingMarket[] | null) ?? []
+    if (pending.length > 0) {
+      setPendingMarkets(pending)
+      return
+    }
+
+    setPendingMarkets(null)
+    const { error: roundError } = await supabase.from('rounds').update({ status: 'played' }).eq('id', roundId)
+    if (roundError) {
+      setSaveError('Resultado guardado, pero no se pudo marcar la jornada como jugada: ' + roundError.message)
+      return
+    }
+    await revalidateLigaData()
+    setSaved(true)
     router.refresh()
+  }
+
+  async function resolvePendingMarket(marketId: string, winningOptionId: string | null, voided: boolean) {
+    setResolvingMarketId(marketId)
+    const { error } = await supabase.from('betting_markets').update({
+      resolved: true,
+      voided,
+      winning_option_id: voided ? null : winningOptionId,
+    }).eq('id', marketId)
+    setResolvingMarketId(null)
+    if (error) {
+      setSaveError('No se pudo resolver la pregunta: ' + error.message)
+      return
+    }
+    await checkPendingMarketsOrFinish()
   }
 
   const team1Players = players.filter(p => p.team === 1)
@@ -414,6 +446,69 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
             </button>
           )}
         </form>
+      )}
+
+      {pendingMarkets && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" style={{ background: 'rgba(0,0,0,0.5)' }}>
+          <div className="w-full sm:max-w-md max-h-[85vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl p-4" style={{ background: 'var(--surface)' }}>
+            <h2 className="font-bold text-base mb-1">Resuelve las preguntas pendientes</h2>
+            <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>
+              La jornada no queda marcada como jugada hasta resolver o anular todas.
+            </p>
+            <div className="flex flex-col gap-4">
+              {pendingMarkets.map(m => (
+                <div key={m.id} className="rounded-xl p-3" style={{ border: '1px solid var(--border)' }}>
+                  <p className="text-sm font-semibold mb-2">{m.description}</p>
+                  <div className="flex gap-2">
+                    <select
+                      value={pendingSelection[m.id] ?? ''}
+                      onChange={e => setPendingSelection(s => ({ ...s, [m.id]: e.target.value }))}
+                      className="flex-1 text-sm rounded-lg px-3 py-2 outline-none"
+                      style={{ background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)' }}
+                    >
+                      <option value="">Seleccionar...</option>
+                      {m.options.filter(o => !o.is_none).map(o => (
+                        <option key={o.id} value={o.id}>{o.label}</option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      disabled={!pendingSelection[m.id] || resolvingMarketId === m.id}
+                      onClick={() => resolvePendingMarket(m.id, pendingSelection[m.id], false)}
+                      className="px-3 py-2 rounded-lg text-sm font-semibold disabled:opacity-40"
+                      style={{ background: 'var(--green)', color: '#fff' }}
+                    >
+                      {resolvingMarketId === m.id ? '...' : 'Resolver'}
+                    </button>
+                  </div>
+                  <div className="flex gap-2 mt-2">
+                    {m.options.some(o => o.is_none) && (
+                      <button
+                        type="button"
+                        disabled={resolvingMarketId === m.id}
+                        onClick={() => resolvePendingMarket(m.id, m.options.find(o => o.is_none)!.id, false)}
+                        className="flex-1 text-xs font-semibold py-2 rounded-lg disabled:opacity-40"
+                        style={{ background: 'var(--surface2)', color: 'var(--text-muted)' }}
+                      >
+                        Ninguno ocurrió
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      disabled={resolvingMarketId === m.id}
+                      onClick={() => resolvePendingMarket(m.id, null, true)}
+                      className="flex-1 text-xs font-semibold py-2 rounded-lg disabled:opacity-40"
+                      style={{ background: 'var(--orange-bg)', color: '#7A5A1E' }}
+                    >
+                      Anular (devolver fichas)
+                    </button>
+                  </div>
+                </div>
+              ))}
+              {saveError && <p className="text-sm text-center" style={{ color: 'var(--red)' }}>⚠ {saveError}</p>}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
