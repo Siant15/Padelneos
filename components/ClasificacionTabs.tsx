@@ -44,7 +44,7 @@ export default function ClasificacionTabs({ individual, parejas, apuestasMatrix,
       {seg === 'individual' && (
         <div className="rounded-2xl px-3 py-1.5" style={{ background: 'var(--surface)', boxShadow: '0 3px 10px rgba(0,0,0,0.04)' }}>
           <p className="text-[11px] pt-2 px-0.5" style={{ color: 'var(--text-muted)' }}>
-            🏅 Cada partido reparte <strong style={{ color: 'var(--text)' }}>victoria = 3 pts, empate = 1 pt, derrota = 0 pts</strong> por jugador.
+            🏅 Cada partido reparte <strong style={{ color: 'var(--text)' }}>victoria = 2 pts, empate = 1 pt, derrota = 0 pts</strong> por jugador.
           </p>
           <div className="grid text-[9.5px] font-extrabold py-2 mt-1" style={{ gridTemplateColumns: '1.4fr 0.4fr 0.4fr 0.4fr 0.4fr 0.5fr 0.6fr', color: 'var(--text-muted2)', borderBottom: '1px solid var(--hairline)' }}>
             <span>JUGADOR</span><span>PJ</span><span>PG</span><span>PE</span><span>PP</span><span>APU</span><span>PTS</span>
