@@ -54,10 +54,10 @@ export default function AddQuestionPicker({ roundId, templates, paidCount }: { r
 
   async function saveEdit(templateId: string) {
     if (!editText.trim()) return
-    if (!window.confirm('Este texto es del catálogo compartido: el cambio se aplicará también a cualquier otra jornada (pasada o futura) que use esta misma pregunta, no solo a esta. ¿Continuar?')) return
+    if (!window.confirm('Este texto es del catálogo compartido: el cambio se aplicará a esta jornada y a las futuras que usen esta misma pregunta (nunca a jornadas ya jugadas). ¿Continuar?')) return
     setSavingEdit(true)
     setError('')
-    const { error: updateError } = await supabase.from('betting_question_templates').update({ text: editText.trim() }).eq('id', templateId)
+    const { error: updateError } = await supabase.rpc('update_template_text', { p_template_id: templateId, p_text: editText.trim() })
     setSavingEdit(false)
     if (updateError) {
       setError(friendlyError(updateError.message, 'No se pudo guardar el cambio. Inténtalo de nuevo.'))
@@ -165,7 +165,7 @@ export default function AddQuestionPicker({ roundId, templates, paidCount }: { r
                 >
                   {adding === t.id ? 'Añadiendo...' : t.text}
                 </button>
-                <button onClick={() => startEdit(t)} aria-label="Editar pregunta" title="Editar el texto de esta pregunta (afecta a todas las jornadas que la usen)" className="text-xs px-1.5 shrink-0" style={{ color: 'var(--text-muted2)' }}>
+                <button onClick={() => startEdit(t)} aria-label="Editar pregunta" title="Editar el texto de esta pregunta (afecta a esta jornada y a las futuras, nunca a las ya jugadas)" className="text-xs px-1.5 shrink-0" style={{ color: 'var(--text-muted2)' }}>
                   ✏️
                 </button>
               </div>
