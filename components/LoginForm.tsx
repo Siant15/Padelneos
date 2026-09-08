@@ -75,7 +75,9 @@ export default function LoginForm() {
 
       const { error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) {
-        setInfo('Cuenta creada. Ve a "Iniciar sesión" para entrar.')
+        setMode('login')
+        setPassword('')
+        setInfo('Cuenta creada. Introduce tu contraseña para entrar.')
         setLoading(false)
         return
       }

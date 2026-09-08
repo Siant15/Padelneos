@@ -56,9 +56,12 @@ export async function POST(request: Request) {
   })
 
   if (error) {
-    const message = error.message.toLowerCase().includes('already been registered')
+    const lower = error.message.toLowerCase()
+    const message = lower.includes('already been registered')
       ? 'Ese email ya está registrado.'
-      : error.message
+      : lower.includes('password')
+        ? 'La contraseña no cumple los requisitos mínimos (al menos 8 caracteres).'
+        : 'No se pudo crear la cuenta. Inténtalo de nuevo.'
     return NextResponse.json({ error: message }, { status: 400 })
   }
 
