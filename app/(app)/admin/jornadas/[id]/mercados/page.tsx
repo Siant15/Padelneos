@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import type { BettingQuestionTemplate } from '@/lib/types'
 import MercadosClient, { type MarketWithAll } from './MercadosClient'
+import { friendlyError } from '@/lib/errors'
 
 export default async function MercadosPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: roundId } = await params
@@ -49,8 +50,8 @@ export default async function MercadosPage({ params }: { params: Promise<{ id: s
       initialRoundStatus={r?.status ?? ''}
       initialIsSettled={!!settlement}
       initialLoadError={
-        marketsError ? 'No se pudieron cargar las apuestas: ' + marketsError.message :
-        roundError ? 'No se pudo cargar el estado de la jornada: ' + roundError.message : ''
+        marketsError ? friendlyError(marketsError.message, 'No se pudieron cargar las apuestas.') :
+        roundError ? friendlyError(roundError.message, 'No se pudo cargar el estado de la jornada.') : ''
       }
     />
   )
