@@ -113,6 +113,25 @@ export default function BettingMarketsBoard({ roundId, markets, userId, roundSta
     })
   }
 
+  // Escribir el número a mano (los botones +/- son solo un atajo) —
+  // no se fuerza el mínimo de 10 mientras se escribe (a medio teclear
+  // "1" de camino a "15" no tendría sentido subirlo solo a 10), el
+  // mínimo real ya lo exige el guardado.
+  function setChipsDirectly(marketId: string, optionId: string, value: number) {
+    hasInteracted.current = true
+    setError('')
+    const clamped = Math.max(0, Math.min(MAX_BET, value))
+    if (clamped <= 0) {
+      setSelections(prev => {
+        const rest = { ...prev }
+        delete rest[marketId]
+        return rest
+      })
+      return
+    }
+    setSelections(prev => ({ ...prev, [marketId]: { optionId, chips: clamped } }))
+  }
+
   async function handleSubmitBets() {
     if (!canSubmit) return
     setSaving(true)
@@ -339,9 +358,10 @@ export default function BettingMarketsBoard({ roundId, markets, userId, roundSta
                         >
                           +
                         </button>
-                        <span className="w-7 text-center text-xs font-bold shrink-0" style={{ color: 'var(--text)' }}>
-                          {optionChips}
-                        </span>
+                        <ChipInput
+                          value={optionChips}
+                          onCommit={v => setChipsDirectly(market.id, option.id, v)}
+                        />
                         <button
                           type="button"
                           onClick={() => bumpChips(market.id, option.id, -10)}
@@ -368,6 +388,36 @@ export default function BettingMarketsBoard({ roundId, markets, userId, roundSta
       })}
 
     </div>
+  )
+}
+
+// Número de fichas editable a mano (los botones +/- son solo un
+// atajo de 10 en 10) — el valor local se sincroniza con el real solo
+// al perder el foco, no en cada pulsación, para no disparar guardados
+// a medio escribir (p. ej. al pasar por "1" de camino a "15").
+function ChipInput({ value, onCommit }: { value: number; onCommit: (v: number) => void }) {
+  const [text, setText] = useState(String(value))
+  // Ajustado durante el render (no en un efecto) cuando el valor real
+  // cambia por fuera (p. ej. al pulsar +/-), para no sumar una pasada
+  // de render extra.
+  const [prevValue, setPrevValue] = useState(value)
+  if (value !== prevValue) {
+    setPrevValue(value)
+    setText(String(value))
+  }
+
+  return (
+    <input
+      type="number"
+      min={0}
+      max={MAX_BET}
+      value={text}
+      onChange={e => setText(e.target.value)}
+      onFocus={e => e.target.select()}
+      onBlur={() => onCommit(Math.max(0, parseInt(text, 10) || 0))}
+      className="w-11 text-center text-xs font-bold rounded-lg py-1 outline-none shrink-0"
+      style={{ border: '1px solid var(--hairline)', color: 'var(--text)' }}
+    />
   )
 }
 
