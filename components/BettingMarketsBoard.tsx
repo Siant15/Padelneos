@@ -349,21 +349,6 @@ export default function BettingMarketsBoard({ roundId, markets, userId, roundSta
                       <>
                         <button
                           type="button"
-                          onClick={() => bumpChips(market.id, option.id, 10)}
-                          disabled={isChosen && optionChips >= MAX_BET}
-                          aria-label={`Añadir 10 fichas a ${option.label}`}
-                          title="+10 fichas"
-                          className="w-8 h-8 rounded-lg text-sm font-bold shrink-0 flex items-center justify-center transition hover:opacity-90 disabled:opacity-40"
-                          style={{ background: 'var(--green)', color: '#fff' }}
-                        >
-                          +
-                        </button>
-                        <ChipInput
-                          value={optionChips}
-                          onCommit={v => setChipsDirectly(market.id, option.id, v)}
-                        />
-                        <button
-                          type="button"
                           onClick={() => bumpChips(market.id, option.id, -10)}
                           disabled={!isChosen}
                           aria-label={`Quitar 10 fichas de ${option.label}`}
@@ -372,6 +357,21 @@ export default function BettingMarketsBoard({ roundId, markets, userId, roundSta
                           style={{ background: 'var(--red)', color: '#fff' }}
                         >
                           −
+                        </button>
+                        <ChipInput
+                          value={optionChips}
+                          onCommit={v => setChipsDirectly(market.id, option.id, v)}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => bumpChips(market.id, option.id, 10)}
+                          disabled={isChosen && optionChips >= MAX_BET}
+                          aria-label={`Añadir 10 fichas a ${option.label}`}
+                          title="+10 fichas"
+                          className="w-8 h-8 rounded-lg text-sm font-bold shrink-0 flex items-center justify-center transition hover:opacity-90 disabled:opacity-40"
+                          style={{ background: 'var(--green)', color: '#fff' }}
+                        >
+                          +
                         </button>
                       </>
                     )}
