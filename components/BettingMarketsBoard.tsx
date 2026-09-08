@@ -281,19 +281,6 @@ export default function BettingMarketsBoard({ roundId, markets, userId, roundSta
                 const optionChips = isChosen ? selection.chips : 0
                 return (
                   <div key={option.id} className="flex items-center gap-1.5">
-                    {canBet && (
-                      <button
-                        type="button"
-                        onClick={() => bumpChips(market.id, option.id, 10)}
-                        disabled={isChosen && optionChips >= MAX_BET}
-                        aria-label={`Añadir 10 fichas a ${option.label}`}
-                        title="+10 fichas"
-                        className="w-8 h-8 rounded-lg text-sm font-bold shrink-0 flex items-center justify-center transition hover:opacity-90 disabled:opacity-40"
-                        style={{ background: 'var(--green)', color: '#fff' }}
-                      >
-                        +
-                      </button>
-                    )}
                     <button
                       type="button"
                       disabled={!canBet}
@@ -305,20 +292,39 @@ export default function BettingMarketsBoard({ roundId, markets, userId, roundSta
                         border: `1px solid ${isChosen ? 'var(--accent)' : 'var(--hairline)'}`,
                       }}
                     >
-                      {isWinner && '🏆 '}{option.label}{isChosen && ` · ${optionChips}f`}
+                      {isWinner && '🏆 '}{option.label}
                     </button>
                     {canBet && (
-                      <button
-                        type="button"
-                        onClick={() => bumpChips(market.id, option.id, -10)}
-                        disabled={!isChosen}
-                        aria-label={`Quitar 10 fichas de ${option.label}`}
-                        title="-10 fichas"
-                        className="w-8 h-8 rounded-lg text-sm font-bold shrink-0 flex items-center justify-center transition hover:opacity-90 disabled:opacity-40"
-                        style={{ background: 'var(--red)', color: '#fff' }}
-                      >
-                        −
-                      </button>
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => bumpChips(market.id, option.id, 10)}
+                          disabled={isChosen && optionChips >= MAX_BET}
+                          aria-label={`Añadir 10 fichas a ${option.label}`}
+                          title="+10 fichas"
+                          className="w-8 h-8 rounded-lg text-sm font-bold shrink-0 flex items-center justify-center transition hover:opacity-90 disabled:opacity-40"
+                          style={{ background: 'var(--green)', color: '#fff' }}
+                        >
+                          +
+                        </button>
+                        <span className="w-7 text-center text-xs font-bold shrink-0" style={{ color: 'var(--text)' }}>
+                          {optionChips}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => bumpChips(market.id, option.id, -10)}
+                          disabled={!isChosen}
+                          aria-label={`Quitar 10 fichas de ${option.label}`}
+                          title="-10 fichas"
+                          className="w-8 h-8 rounded-lg text-sm font-bold shrink-0 flex items-center justify-center transition hover:opacity-90 disabled:opacity-40"
+                          style={{ background: 'var(--red)', color: '#fff' }}
+                        >
+                          −
+                        </button>
+                      </>
+                    )}
+                    {!canBet && isChosen && (
+                      <span className="text-xs font-bold" style={{ color: 'var(--text-muted2)' }}>{optionChips}f</span>
                     )}
                   </div>
                 )
