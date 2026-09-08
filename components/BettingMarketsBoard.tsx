@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { Info } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import type { BettingMarket } from '@/lib/types'
@@ -85,7 +86,11 @@ export default function BettingMarketsBoard({ roundId, markets, userId, roundSta
   })
   const canSubmit = editableMarkets.length > 0 && allChosen && allInRange && totalChosen === ROUND_TOTAL
 
+  const hasInteracted = useRef(false)
+
   function selectOption(marketId: string, optionId: string) {
+    hasInteracted.current = true
+    setError('')
     setSelections(prev => ({ ...prev, [marketId]: { optionId, chips: prev[marketId]?.chips ?? MIN_BET } }))
   }
 
@@ -93,6 +98,8 @@ export default function BettingMarketsBoard({ roundId, markets, userId, roundSta
   // empezando en 10 fichas; si ya lo era, suma o resta de 10 en 10
   // (tope en 50, y bajar de 10 la deselecciona del todo).
   function bumpChips(marketId: string, optionId: string, delta: number) {
+    hasInteracted.current = true
+    setError('')
     setSelections(prev => {
       const current = prev[marketId]
       const base = current?.optionId === optionId ? current.chips : 0
@@ -128,6 +135,18 @@ export default function BettingMarketsBoard({ roundId, markets, userId, roundSta
     router.refresh()
     setTimeout(() => setSaved(false), 2500)
   }
+
+  // Se guarda solo en cuanto el reparto es válido (las 100 fichas
+  // repartidas entre todas las preguntas, cada una entre 10 y 50) — no
+  // hace falta bajar a un botón de "Guardar" para confirmar cada
+  // cambio. Solo se dispara tras una interacción real del jugador (no
+  // al montar el componente con una apuesta ya guardada de antes).
+  useEffect(() => {
+    if (hasInteracted.current && canSubmit && !saving) {
+      handleSubmitBets()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selections])
 
   // Marcador exacto: gratis, no cuenta fichas — busca-o-crea la opción
   // para ese marcador concreto (así dos jugadores que pronostican lo
@@ -187,6 +206,19 @@ export default function BettingMarketsBoard({ roundId, markets, userId, roundSta
 
   return (
     <div className="flex flex-col gap-3.5">
+      {editableMarkets.length > 0 && (
+        <div
+          className="sticky z-30 -mx-4 px-4 py-2 flex items-center justify-between text-xs"
+          style={{ top: 52, background: 'var(--surface)', borderBottom: '1px solid var(--hairline)' }}
+        >
+          <span style={{ color: totalChosen === ROUND_TOTAL ? 'var(--green)' : 'var(--text-muted2)' }}>
+            <strong>{totalChosen}</strong> / {ROUND_TOTAL} fichas apostadas
+          </span>
+          {saving && <span style={{ color: 'var(--text-muted)' }}>Guardando...</span>}
+          {!saving && saved && <span style={{ color: 'var(--green)' }}>✓ Guardado</span>}
+        </div>
+      )}
+
       {error && <p className="text-xs" style={{ color: 'var(--red)' }}>⚠ {error}</p>}
 
       {exactScoreMarket && (
@@ -335,22 +367,6 @@ export default function BettingMarketsBoard({ roundId, markets, userId, roundSta
         )
       })}
 
-      {editableMarkets.length > 0 && (
-        <div className="rounded-2xl p-3.5 flex flex-col gap-2" style={{ background: 'var(--surface)', boxShadow: '0 3px 10px rgba(0,0,0,0.04)' }}>
-          <p className="text-xs" style={{ color: totalChosen === ROUND_TOTAL ? 'var(--green)' : 'var(--text-muted2)' }}>
-            Llevas repartidas <strong>{totalChosen}</strong> de {ROUND_TOTAL} fichas — hay que apostar en las {editableMarkets.length} preguntas de esta jornada, entre {MIN_BET} y {MAX_BET} fichas cada una, sumando exactamente {ROUND_TOTAL}.
-          </p>
-          <button
-            type="button"
-            onClick={handleSubmitBets}
-            disabled={!canSubmit || saving}
-            className="w-full py-2.5 rounded-xl font-semibold text-sm transition hover:opacity-90 disabled:opacity-40"
-            style={{ background: saved ? 'var(--green)' : 'var(--accent)', color: '#fff' }}
-          >
-            {saving ? 'Guardando...' : saved ? '✓ Apuestas guardadas' : 'Guardar mis apuestas de la jornada'}
-          </button>
-        </div>
-      )}
     </div>
   )
 }
@@ -376,6 +392,7 @@ function ExactScoreCard({ market, canBet, draft, onDraftChange, onSubmit, saving
 }) {
   const myBetOptions = (market.options ?? []).filter(o => (market.bets ?? []).some(b => b.option_id === o.id))
   const closeTime = market.closes_at
+  const [infoOpen, setInfoOpen] = useState(false)
 
   function setSet(i: number, side: 0 | 1, value: string) {
     const next = draft.map(s => [...s]) as [string, string][]
@@ -390,12 +407,38 @@ function ExactScoreCard({ market, canBet, draft, onDraftChange, onSubmit, saving
   return (
     <div className="rounded-2xl p-3.5" style={{ background: 'var(--surface)', boxShadow: '0 3px 10px rgba(0,0,0,0.04)' }}>
       <div className="flex items-center justify-between">
-        <div className="font-heading font-bold text-[13px]">🔢 {market.description} · gratis</div>
+        <div className="font-heading font-bold text-[13px] flex items-center gap-1.5">
+          🔢 {market.description} · gratis
+          <span className="relative inline-flex items-center">
+            <button
+              type="button"
+              onClick={() => setInfoOpen(v => !v)}
+              aria-expanded={infoOpen}
+              aria-label="Cómo funciona el marcador exacto"
+              className="flex items-center justify-center rounded-full"
+              style={{ width: 16, height: 16, color: 'var(--accent)', background: 'var(--tint)' }}
+            >
+              <Info size={11} strokeWidth={2.4} />
+            </button>
+            {infoOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setInfoOpen(false)} aria-hidden="true" />
+                <div
+                  role="tooltip"
+                  className="fixed left-1/2 z-50 w-[calc(100vw-2.5rem)] max-w-sm rounded-xl p-3 text-left"
+                  style={{ top: '5rem', transform: 'translateX(-50%)', background: 'var(--surface)', boxShadow: '0 6px 20px rgba(0,0,0,0.14)', border: '1px solid var(--border)' }}
+                >
+                  <p className="text-[11px] font-bold mb-2" style={{ color: 'var(--text-muted2)' }}>Marcador exacto</p>
+                  <p className="text-[11px]" style={{ color: 'var(--text)' }}>
+                    Sin coste — se resuelve la primera de todas. Si aciertas el marcador exacto, te llevas TODAS las fichas de la jornada (las de todos, no solo las tuyas) y 1,5 puntos de clasificación — repartido a partes iguales si hay empate entre varios acertantes.
+                  </p>
+                </div>
+              </>
+            )}
+          </span>
+        </div>
         {market.resolved && !market.voided && <span className="text-xs font-bold" style={{ color: 'var(--green)' }}>✓</span>}
       </div>
-      <p className="text-[11px] mt-1" style={{ color: 'var(--text-muted2)' }}>
-        Sin coste — se resuelve la primera de todas. Si aciertas el marcador exacto, te llevas TODAS las fichas de la jornada y 1,5 puntos (repartido si hay empate).
-      </p>
       {closeTime && (
         <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted2)' }}>
           Cierra el {new Date(closeTime).toLocaleString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
