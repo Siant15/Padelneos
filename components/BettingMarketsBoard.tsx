@@ -167,6 +167,17 @@ export default function BettingMarketsBoard({ roundId, markets, userId, roundSta
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selections])
 
+  // Mientras el reparto está a medias (ya se ha tocado algo pero no
+  // suma 100 todavía) nada se ha guardado — avisa del navegador antes
+  // de cerrar la pestaña o navegar fuera, para no perder el reparto en
+  // silencio.
+  useEffect(() => {
+    if (!(hasInteracted.current && totalChosen > 0 && totalChosen !== ROUND_TOTAL)) return
+    function onBeforeUnload(e: BeforeUnloadEvent) { e.preventDefault() }
+    window.addEventListener('beforeunload', onBeforeUnload)
+    return () => window.removeEventListener('beforeunload', onBeforeUnload)
+  }, [totalChosen])
+
   // Marcador exacto: gratis, no cuenta fichas — busca-o-crea la opción
   // para ese marcador concreto (así dos jugadores que pronostican lo
   // mismo comparten opción) y guarda la predicción.
@@ -227,14 +238,25 @@ export default function BettingMarketsBoard({ roundId, markets, userId, roundSta
     <div className="flex flex-col gap-3.5">
       {editableMarkets.length > 0 && (
         <div
-          className="sticky z-30 -mx-4 px-4 py-2 flex items-center justify-between text-xs"
-          style={{ top: 52, background: 'var(--surface)', borderBottom: '1px solid var(--hairline)' }}
+          className="sticky z-30 -mx-4 px-4 py-2 flex flex-col gap-0.5"
+          style={{
+            top: 52,
+            background: totalChosen === ROUND_TOTAL ? 'var(--surface)' : 'var(--orange-bg)',
+            borderBottom: '1px solid var(--hairline)',
+          }}
         >
-          <span style={{ color: totalChosen === ROUND_TOTAL ? 'var(--green)' : 'var(--text-muted2)' }}>
-            <strong>{totalChosen}</strong> / {ROUND_TOTAL} fichas apostadas
-          </span>
-          {saving && <span style={{ color: 'var(--text-muted)' }}>Guardando...</span>}
-          {!saving && saved && <span style={{ color: 'var(--green)' }}>✓ Guardado</span>}
+          <div className="flex items-center justify-between text-xs">
+            <span style={{ color: totalChosen === ROUND_TOTAL ? 'var(--green)' : 'var(--orange)', fontWeight: 700 }}>
+              {totalChosen} / {ROUND_TOTAL} fichas apostadas
+            </span>
+            {saving && <span style={{ color: 'var(--text-muted)' }}>Guardando...</span>}
+            {!saving && saved && <span style={{ color: 'var(--green)' }}>✓ Guardado</span>}
+          </div>
+          {totalChosen !== ROUND_TOTAL && (
+            <p className="text-[11px]" style={{ color: '#7A5A1E' }}>
+              Hay que repartir las 100 fichas entre las {editableMarkets.length} preguntas ({MIN_BET}-{MAX_BET} cada una) — si sales sin completar el reparto, no se guarda nada.
+            </p>
+          )}
         </div>
       )}
 

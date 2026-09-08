@@ -451,9 +451,23 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
       {pendingMarkets && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" style={{ background: 'rgba(0,0,0,0.5)' }}>
           <div className="w-full sm:max-w-md max-h-[85vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl p-4" style={{ background: 'var(--surface)' }}>
-            <h2 className="font-bold text-base mb-1">Resuelve las preguntas pendientes</h2>
+            <div className="flex items-start justify-between gap-2 mb-1">
+              <h2 className="font-bold text-base">Resuelve las preguntas pendientes</h2>
+              <button
+                type="button"
+                onClick={() => setPendingMarkets(null)}
+                aria-label="Cerrar y resolver más tarde"
+                className="shrink-0 text-lg font-bold px-1"
+                style={{ color: 'var(--text-muted2)' }}
+              >
+                ✕
+              </button>
+            </div>
+            <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>
+              Quedan <strong>{pendingMarkets.length}</strong> por resolver o anular. La jornada no queda marcada como jugada hasta hacerlo.
+            </p>
             <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>
-              La jornada no queda marcada como jugada hasta resolver o anular todas.
+              Si ahora mismo no te acuerdas de alguna, cierra con la ✕ — el resultado ya está guardado, y puedes terminarlas más tarde desde Mercados.
             </p>
             <div className="flex flex-col gap-4">
               {pendingMarkets.map(m => (
