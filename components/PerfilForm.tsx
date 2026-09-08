@@ -15,27 +15,58 @@ type Stats = { matches_played: number; wins: number; total_points: number }
 // de píxeles) a un cuadrado de como mucho `maxSize`px en JPEG — de
 // sobra para un avatar que nunca se ve a más de ~84px, y evita que
 // subir una foto de perfil deje la app lenta para todos.
-function resizeImageToJpeg(file: File, maxSize: number): Promise<Blob> {
+//
+// `<img>` + object URL falla a veces en el iPhone (sobre todo en la
+// PWA instalada) con fotos HEIC/Live Photo o de resolución muy alta
+// (los iPhone recientes hacen fotos de 48MP) — por eso se prueba
+// primero `createImageBitmap`, que tiene mejor soporte de formatos y
+// decodifica sin bloquear el hilo principal; si falla, se cae al
+// método de `<img>` como segundo intento antes de rendirse.
+function drawToJpeg(source: CanvasImageSource, width: number, height: number, maxSize: number): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const side = Math.min(width, height)
+    const sx = (width - side) / 2
+    const sy = (height - side) / 2
+    const size = Math.min(maxSize, side)
+    const canvas = document.createElement('canvas')
+    canvas.width = size
+    canvas.height = size
+    const ctx = canvas.getContext('2d')
+    if (!ctx) { reject(new Error('No se pudo procesar la imagen')); return }
+    ctx.drawImage(source, sx, sy, side, side, 0, 0, size, size)
+    canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('No se pudo procesar la imagen')), 'image/jpeg', 0.8)
+  })
+}
+
+async function resizeViaImageBitmap(file: File, maxSize: number): Promise<Blob> {
+  const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' })
+  try {
+    return await drawToJpeg(bitmap, bitmap.width, bitmap.height, maxSize)
+  } finally {
+    bitmap.close()
+  }
+}
+
+function resizeViaImageElement(file: File, maxSize: number): Promise<Blob> {
   return new Promise((resolve, reject) => {
     const img = new Image()
     const objectUrl = URL.createObjectURL(file)
     img.onload = () => {
       URL.revokeObjectURL(objectUrl)
-      const side = Math.min(img.width, img.height)
-      const sx = (img.width - side) / 2
-      const sy = (img.height - side) / 2
-      const size = Math.min(maxSize, side)
-      const canvas = document.createElement('canvas')
-      canvas.width = size
-      canvas.height = size
-      const ctx = canvas.getContext('2d')
-      if (!ctx) { reject(new Error('No se pudo procesar la imagen')); return }
-      ctx.drawImage(img, sx, sy, side, side, 0, 0, size, size)
-      canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('No se pudo procesar la imagen')), 'image/jpeg', 0.8)
+      drawToJpeg(img, img.width, img.height, maxSize).then(resolve, reject)
     }
     img.onerror = () => { URL.revokeObjectURL(objectUrl); reject(new Error('No se pudo leer la imagen')) }
     img.src = objectUrl
   })
+}
+
+async function resizeImageToJpeg(file: File, maxSize: number): Promise<Blob> {
+  if (typeof createImageBitmap === 'function') {
+    try {
+      return await resizeViaImageBitmap(file, maxSize)
+    } catch { /* algunos navegadores no saben decodificar este formato así, probamos el otro método */ }
+  }
+  return resizeViaImageElement(file, maxSize)
 }
 
 export default function PerfilForm({
@@ -95,7 +126,7 @@ export default function PerfilForm({
     try {
       resized = await resizeImageToJpeg(file, 256)
     } catch {
-      setAvatarError('No se pudo procesar la imagen. Prueba con otra foto.')
+      setAvatarError('No se pudo procesar esta foto (pasa a veces con fotos en formato HEIC o de resolución muy alta). Prueba a hacer una captura de pantalla de la foto y sube esa, o elige otra.')
       setUploadingAvatar(false)
       return
     }
