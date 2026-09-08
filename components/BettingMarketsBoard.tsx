@@ -375,7 +375,7 @@ export default function BettingMarketsBoard({ roundId, markets, userId, roundSta
                           disabled={!isChosen}
                           aria-label={`Quitar 10 fichas de ${option.label}`}
                           title="-10 fichas"
-                          className="w-10 h-10 rounded-lg text-base font-bold shrink-0 flex items-center justify-center transition hover:opacity-90 disabled:opacity-40"
+                          className="w-11 h-11 rounded-lg text-base font-bold shrink-0 flex items-center justify-center transition hover:opacity-90 disabled:opacity-40"
                           style={{ background: 'var(--red)', color: '#fff' }}
                         >
                           −
@@ -390,7 +390,7 @@ export default function BettingMarketsBoard({ roundId, markets, userId, roundSta
                           disabled={isChosen && optionChips >= MAX_BET}
                           aria-label={`Añadir 10 fichas a ${option.label}`}
                           title="+10 fichas"
-                          className="w-10 h-10 rounded-lg text-base font-bold shrink-0 flex items-center justify-center transition hover:opacity-90 disabled:opacity-40"
+                          className="w-11 h-11 rounded-lg text-base font-bold shrink-0 flex items-center justify-center transition hover:opacity-90 disabled:opacity-40"
                           style={{ background: 'var(--green)', color: '#fff' }}
                         >
                           +
@@ -437,7 +437,7 @@ function ChipInput({ value, onCommit }: { value: number; onCommit: (v: number) =
       onChange={e => setText(e.target.value)}
       onFocus={e => e.target.select()}
       onBlur={() => onCommit(Math.max(0, parseInt(text, 10) || 0))}
-      className="w-12 h-10 text-center text-sm font-bold rounded-lg py-1 outline-none shrink-0"
+      className="w-12 h-11 text-center text-sm font-bold rounded-lg py-1 outline-none shrink-0"
       style={{ border: '1px solid var(--hairline)', color: 'var(--text)' }}
     />
   )
