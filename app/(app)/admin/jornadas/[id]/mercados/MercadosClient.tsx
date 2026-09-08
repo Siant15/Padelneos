@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import type { BettingMarket, BettingOption, BettingQuestionTemplate, Profile } from '@/lib/types'
 import AddQuestionPicker from '@/components/AddQuestionPicker'
 import { revalidateLigaData } from '@/lib/actions'
+import { friendlyError } from '@/lib/errors'
 
 export type MarketWithAll = BettingMarket & {
   options: (BettingOption & { player?: Profile })[]
@@ -87,7 +88,7 @@ export default function MercadosClient({ roundId, initialMarkets, initialCatalog
       // MarketWithAll más arriba), pedida en paralelo con todo lo demás.
       supabase.rpc('get_round_bet_totals', { p_round_id: roundId }),
     ])
-    setLoadError(marketsError ? 'No se pudieron cargar las apuestas: ' + marketsError.message : '')
+    setLoadError(marketsError ? friendlyError(marketsError.message, 'No se pudieron cargar las apuestas.') : '')
     const marketRows = (m as MarketWithAll[]) ?? []
 
     for (const market of marketRows) {
@@ -120,7 +121,7 @@ export default function MercadosClient({ roundId, initialMarkets, initialCatalog
     const { error } = await supabase.from('betting_markets').delete().eq('id', marketId)
     setDeleting(null)
     if (error) {
-      setLoadError('No se pudo borrar la pregunta: ' + error.message)
+      setLoadError(friendlyError(error.message, 'No se pudo borrar la pregunta.'))
       return
     }
     await revalidateLigaData()
@@ -135,7 +136,7 @@ export default function MercadosClient({ roundId, initialMarkets, initialCatalog
       voided: false,
       winning_option_id: winningOptionId,
     }).eq('id', market.id)
-    if (error) setResolveError('No se pudo resolver la pregunta: ' + error.message)
+    if (error) setResolveError(friendlyError(error.message, 'No se pudo resolver la pregunta.'))
     else await revalidateLigaData()
     await loadData()
     setResolving(null)
@@ -150,7 +151,7 @@ export default function MercadosClient({ roundId, initialMarkets, initialCatalog
       voided: true,
       winning_option_id: null,
     }).eq('id', market.id)
-    if (error) setResolveError('No se pudo anular la pregunta: ' + error.message)
+    if (error) setResolveError(friendlyError(error.message, 'No se pudo anular la pregunta.'))
     else await revalidateLigaData()
     await loadData()
     setVoiding(null)
@@ -161,7 +162,7 @@ export default function MercadosClient({ roundId, initialMarkets, initialCatalog
     setResolveError('')
     const { error } = await supabase.rpc('auto_resolve_round_markets', { p_round_id: roundId })
     setAutoResolving(false)
-    if (error) setResolveError('No se pudieron resolver las preguntas automáticas: ' + error.message)
+    if (error) setResolveError(friendlyError(error.message, 'No se pudieron resolver las preguntas automáticas.'))
     else await revalidateLigaData()
     await loadData()
   }
@@ -175,7 +176,7 @@ export default function MercadosClient({ roundId, initialMarkets, initialCatalog
     const { error } = await supabase.rpc('settle_round', { p_round_id: roundId })
     setCalculating(false)
     if (error) {
-      setPayoutError('No se pudo liquidar la jornada: ' + error.message)
+      setPayoutError(friendlyError(error.message, 'No se pudo liquidar la jornada.'))
       return
     }
     // Limpieza del catálogo (best-effort: si falla no bloquea la
@@ -449,7 +450,7 @@ function NewTemplateForm({ roundId, onSaved }: { roundId: string; onSaved: () =>
       .single()
 
     if (templateError || !template) {
-      setError('No se pudo crear la plantilla: ' + (templateError?.message ?? 'error desconocido'))
+      setError(friendlyError(templateError?.message, 'No se pudo crear la plantilla.'))
       setSaving(false)
       return
     }
@@ -460,7 +461,7 @@ function NewTemplateForm({ roundId, onSaved }: { roundId: string; onSaved: () =>
     })
     setSaving(false)
     if (instantiateError) {
-      setError('La plantilla se creó, pero no se pudo añadir a esta jornada: ' + instantiateError.message)
+      setError(friendlyError(instantiateError.message, 'La plantilla se creó, pero no se pudo añadir a esta jornada.'))
       return
     }
     onSaved()

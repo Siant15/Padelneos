@@ -7,6 +7,7 @@ import Link from 'next/link'
 import CompetitiveDnaRadar from '@/components/CompetitiveDnaRadar'
 import type { PlayerDna } from '@/lib/dna-data'
 import type { SeasonCourtExpenses } from '@/lib/supabase/cached'
+import { friendlyError } from '@/lib/errors'
 
 type Stats = { matches_played: number; wins: number; total_points: number }
 
@@ -101,7 +102,7 @@ export default function PerfilForm({
 
     const { error: uploadError } = await supabase.storage.from('avatars').upload(path, resized, { upsert: true, contentType: 'image/jpeg' })
     if (uploadError) {
-      setAvatarError('No se pudo subir la foto: ' + uploadError.message)
+      setAvatarError(friendlyError(uploadError.message, 'No se pudo subir la foto. Inténtalo de nuevo.'))
       setUploadingAvatar(false)
       return
     }
@@ -112,7 +113,7 @@ export default function PerfilForm({
     const { error: updateError } = await supabase.from('profiles').update({ avatar_url: url }).eq('id', userId)
     setUploadingAvatar(false)
     if (updateError) {
-      setAvatarError('Foto subida, pero no se pudo guardar: ' + updateError.message)
+      setAvatarError(friendlyError(updateError.message, 'Foto subida, pero no se pudo guardar. Inténtalo de nuevo.'))
       return
     }
     setAvatarUrl(url)
@@ -134,7 +135,7 @@ export default function PerfilForm({
 
     setSaving(false)
     if (updateError) {
-      setError('No se pudo guardar: ' + updateError.message)
+      setError(friendlyError(updateError.message, 'No se pudo guardar. Inténtalo de nuevo.'))
       return
     }
     setSaved(true)

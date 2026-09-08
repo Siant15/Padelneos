@@ -8,6 +8,7 @@ import type { BettingMarket } from '@/lib/types'
 import { isValidSetScore } from '@/lib/types'
 import { marketCloseTime, canonicalExactScore, ANSWER_TYPE_ICON } from '@/lib/betting'
 import { revalidateLigaData } from '@/lib/actions'
+import { friendlyError } from '@/lib/errors'
 
 interface Props {
   roundId: string
@@ -201,7 +202,7 @@ export default function BettingMarketsBoard({ roundId, markets, userId, roundSta
     })
 
     if (optionError || !optionId) {
-      setError('No se pudo registrar ese marcador: ' + (optionError?.message ?? 'error desconocido'))
+      setError(friendlyError(optionError?.message, 'No se pudo registrar ese marcador.'))
       setExactScoreSaving(false)
       return
     }
@@ -227,7 +228,7 @@ export default function BettingMarketsBoard({ roundId, markets, userId, roundSta
     const { error: deleteError } = await supabase.from('betting_markets').delete().eq('id', marketId)
     setDeletingMarket(null)
     if (deleteError) {
-      setError('No se pudo borrar la pregunta: ' + deleteError.message)
+      setError(friendlyError(deleteError.message, 'No se pudo borrar la pregunta.'))
       return
     }
     await revalidateLigaData()
@@ -444,11 +445,7 @@ function ChipInput({ value, onCommit }: { value: number; onCommit: (v: number) =
 }
 
 function describeBetError(message: string): string {
-  if (message.includes('Límite')) return message
-  if (message.includes('apostar por ti mismo')) return message
-  if (message.includes('cerrado') || message.includes('resuelto') || message.includes('confirmados')) return message
-  if (message.includes('fichas') || message.includes('preguntas')) return message
-  return 'No se pudo guardar la apuesta: ' + message
+  return friendlyError(message, 'No se pudo guardar la apuesta. Inténtalo de nuevo.')
 }
 
 // ─── Marcador exacto: gratis, 2-3 sets con inputs numéricos, igual

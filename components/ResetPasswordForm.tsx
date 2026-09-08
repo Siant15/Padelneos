@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
+import { friendlyError } from '@/lib/errors'
 
 export default function ResetPasswordForm() {
   const [password, setPassword] = useState('')
@@ -22,7 +23,7 @@ export default function ResetPasswordForm() {
 
     setLoading(false)
     if (error) {
-      setError('No se pudo cambiar la contraseña: ' + error.message)
+      setError(friendlyError(error.message, 'No se pudo cambiar la contraseña. Inténtalo de nuevo.'))
       return
     }
     setSaved(true)

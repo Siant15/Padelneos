@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import type { BettingQuestionTemplate } from '@/lib/types'
 import { revalidateLigaData } from '@/lib/actions'
+import { friendlyError } from '@/lib/errors'
 
 type CustomAnswerType = 'yes_no' | 'player' | 'custom_options'
 
@@ -53,12 +54,13 @@ export default function AddQuestionPicker({ roundId, templates, paidCount }: { r
 
   async function saveEdit(templateId: string) {
     if (!editText.trim()) return
+    if (!window.confirm('Este texto es del catálogo compartido: el cambio se aplicará también a cualquier otra jornada (pasada o futura) que use esta misma pregunta, no solo a esta. ¿Continuar?')) return
     setSavingEdit(true)
     setError('')
     const { error: updateError } = await supabase.from('betting_question_templates').update({ text: editText.trim() }).eq('id', templateId)
     setSavingEdit(false)
     if (updateError) {
-      setError('No se pudo guardar el cambio: ' + updateError.message)
+      setError(friendlyError(updateError.message, 'No se pudo guardar el cambio. Inténtalo de nuevo.'))
       return
     }
     setEditingId(null)
@@ -75,7 +77,7 @@ export default function AddQuestionPicker({ roundId, templates, paidCount }: { r
     })
     setAdding(null)
     if (rpcError) {
-      setError('No se pudo añadir la pregunta: ' + rpcError.message)
+      setError(friendlyError(rpcError.message, 'No se pudo añadir la pregunta. Inténtalo de nuevo.'))
       return
     }
     await revalidateLigaData()
@@ -111,7 +113,7 @@ export default function AddQuestionPicker({ roundId, templates, paidCount }: { r
 
     if (insertError || !newTemplate) {
       setSavingCustom(false)
-      setError('No se pudo guardar la pregunta: ' + (insertError?.message ?? ''))
+      setError(friendlyError(insertError?.message, 'No se pudo guardar la pregunta. Inténtalo de nuevo.'))
       return
     }
 
@@ -121,7 +123,7 @@ export default function AddQuestionPicker({ roundId, templates, paidCount }: { r
     })
     setSavingCustom(false)
     if (rpcError) {
-      setError('La pregunta se guardó en el catálogo, pero no se pudo añadir a esta jornada: ' + rpcError.message)
+      setError(friendlyError(rpcError.message, 'La pregunta se guardó en el catálogo, pero no se pudo añadir a esta jornada.'))
       return
     }
 
@@ -163,7 +165,7 @@ export default function AddQuestionPicker({ roundId, templates, paidCount }: { r
                 >
                   {adding === t.id ? 'Añadiendo...' : t.text}
                 </button>
-                <button onClick={() => startEdit(t)} aria-label="Editar pregunta" title="Editar el texto de esta pregunta" className="text-xs px-1.5 shrink-0" style={{ color: 'var(--text-muted2)' }}>
+                <button onClick={() => startEdit(t)} aria-label="Editar pregunta" title="Editar el texto de esta pregunta (afecta a todas las jornadas que la usen)" className="text-xs px-1.5 shrink-0" style={{ color: 'var(--text-muted2)' }}>
                   ✏️
                 </button>
               </div>

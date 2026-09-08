@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { friendlyError } from '@/lib/errors'
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>
@@ -113,7 +114,7 @@ export default function PwaSetup() {
         ? err.message
         : (err && typeof err === 'object' && 'message' in err) ? String((err as { message: unknown }).message) : String(err)
       setPushOk(false)
-      setPushError(`No se pudo activar: ${message}`)
+      setPushError(friendlyError(message, 'No se pudo activar las notificaciones. Inténtalo de nuevo.'))
     } finally {
       setSubscribing(false)
     }

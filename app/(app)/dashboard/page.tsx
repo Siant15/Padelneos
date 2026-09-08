@@ -324,9 +324,9 @@ function MatchAvatar({ name, avatarUrl }: { name?: string; avatarUrl?: string | 
 }
 
 function RankDelta({ delta }: { delta: number }) {
-  if (delta > 0) return <span className="flex items-center text-[11px] font-extrabold" style={{ color: 'var(--green)' }}><ArrowUp size={11} />{delta}</span>
-  if (delta < 0) return <span className="flex items-center text-[11px] font-extrabold" style={{ color: 'oklch(0.6 0.19 30)' }}><ArrowDown size={11} />{Math.abs(delta)}</span>
-  return <Minus size={11} style={{ color: 'var(--text-muted2)' }} />
+  if (delta > 0) return <span className="flex items-center text-[11px] font-extrabold" style={{ color: 'var(--green)' }} title={`Sube ${delta} puesto${delta === 1 ? '' : 's'} en la clasificación`}><ArrowUp size={11} aria-label="Sube en la clasificación" />{delta}</span>
+  if (delta < 0) return <span className="flex items-center text-[11px] font-extrabold" style={{ color: 'oklch(0.6 0.19 30)' }} title={`Baja ${Math.abs(delta)} puesto${Math.abs(delta) === 1 ? '' : 's'} en la clasificación`}><ArrowDown size={11} aria-label="Baja en la clasificación" />{Math.abs(delta)}</span>
+  return <span title="Sin cambios en la clasificación"><Minus size={11} style={{ color: 'var(--text-muted2)' }} aria-label="Sin cambios en la clasificación" /></span>
 }
 
 function StreakBadge({ row }: { row: { activeStreak: { type: 'V' | 'D'; length: number } | null; results: ('V' | 'D')[] } }) {
@@ -336,8 +336,9 @@ function StreakBadge({ row }: { row: { activeStreak: { type: 'V' | 'D'; length: 
       <span
         className="flex items-center gap-1 text-[11px] font-extrabold px-2 py-1 rounded-full"
         style={{ background: isWin ? 'var(--green-bg)' : 'oklch(0.95 0.04 55)', color: isWin ? 'var(--green)' : 'oklch(0.55 0.15 40)' }}
+        title={isWin ? `Racha de ${row.activeStreak.length} victorias seguidas` : `Racha de ${row.activeStreak.length} derrotas seguidas`}
       >
-        {isWin ? <Flame size={11} /> : <Snowflake size={11} />} {row.activeStreak.length}{row.activeStreak.type}
+        {isWin ? <Flame size={11} aria-label="Racha de victorias" /> : <Snowflake size={11} aria-label="Racha de derrotas" />} {row.activeStreak.length}{row.activeStreak.type}
       </span>
     )
   }

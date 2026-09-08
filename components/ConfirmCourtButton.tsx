@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { confirmCourtReservation } from '@/lib/court-actions'
+import { friendlyError } from '@/lib/errors'
 
 export default function ConfirmCourtButton({ roundId }: { roundId: string }) {
   const [loading, setLoading] = useState(false)
@@ -15,7 +16,7 @@ export default function ConfirmCourtButton({ roundId }: { roundId: string }) {
     const { error } = await confirmCourtReservation(roundId)
     setLoading(false)
     if (error) {
-      setError('No se pudo confirmar: ' + error)
+      setError(friendlyError(error, 'No se pudo confirmar la reserva. Inténtalo de nuevo.'))
       return
     }
     router.refresh()

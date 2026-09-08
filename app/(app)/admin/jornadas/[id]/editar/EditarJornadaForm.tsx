@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { revalidateLigaData } from '@/lib/actions'
 import ClubPicker from '@/components/ClubPicker'
+import { friendlyError } from '@/lib/errors'
 
 type PlayerLite = { id: string; name: string }
 
@@ -73,7 +74,7 @@ export default function EditarJornadaForm({ roundId, players, initialForm, initi
     }).eq('id', roundId)
 
     if (roundError) {
-      setSaveError('No se pudo guardar la jornada: ' + roundError.message)
+      setSaveError(friendlyError(roundError.message, 'No se pudo guardar la jornada. Inténtalo de nuevo.'))
       setLoading(false)
       return
     }
@@ -87,7 +88,7 @@ export default function EditarJornadaForm({ roundId, players, initialForm, initi
       }).eq('id', form.matchId)
 
       if (matchError) {
-        setSaveError('Jornada guardada, pero las parejas fallaron: ' + matchError.message)
+        setSaveError(friendlyError(matchError.message, 'Jornada guardada, pero las parejas fallaron.'))
         setLoading(false)
         return
       }
@@ -101,7 +102,7 @@ export default function EditarJornadaForm({ roundId, players, initialForm, initi
       }).select().single()
 
       if (matchError) {
-        setSaveError('Jornada guardada, pero las parejas fallaron: ' + matchError.message)
+        setSaveError(friendlyError(matchError.message, 'Jornada guardada, pero las parejas fallaron.'))
         setLoading(false)
         return
       }
@@ -115,7 +116,7 @@ export default function EditarJornadaForm({ roundId, players, initialForm, initi
     // decide en vivo por el partido real — solo el texto mostrado.
     const { error: refreshError } = await supabase.rpc('refresh_round_option_labels', { p_round_id: roundId })
     if (refreshError) {
-      setSaveError('Jornada guardada, pero los textos de las apuestas no se pudieron actualizar: ' + refreshError.message)
+      setSaveError(friendlyError(refreshError.message, 'Jornada guardada, pero los textos de las apuestas no se pudieron actualizar.'))
       setLoading(false)
       return
     }

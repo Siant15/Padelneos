@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { isValidSetScore } from '@/lib/types'
 import { revalidateLigaData } from '@/lib/actions'
+import { friendlyError } from '@/lib/errors'
 
 type PairForm = { team1_p1_id: string; team1_p2_id: string; team2_p1_id: string; team2_p2_id: string }
 type SetScore = { t1: string; t2: string }
@@ -141,7 +142,7 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
 
     setCreatingMatch(false)
     if (error || !newMatch) {
-      setPairError('No se pudo crear el partido: ' + (error?.message ?? 'error desconocido'))
+      setPairError(friendlyError(error?.message, 'No se pudo crear el partido.'))
       return
     }
 
@@ -175,7 +176,7 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
     }).eq('id', matchId)
 
     if (matchError) {
-      setSaveError('No se pudo guardar el resultado: ' + matchError.message)
+      setSaveError(friendlyError(matchError.message, 'No se pudo guardar el resultado.'))
       setLoading(false)
       return
     }
@@ -188,7 +189,7 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
     // no quede ninguna pregunta sin resolver).
     const { error: autoResolveError } = await supabase.rpc('auto_resolve_round_markets', { p_round_id: roundId })
     if (autoResolveError) {
-      setSaveError('Resultado guardado, pero fallaron las apuestas automáticas: ' + autoResolveError.message)
+      setSaveError(friendlyError(autoResolveError.message, 'Resultado guardado, pero fallaron las apuestas automáticas.'))
       setLoading(false)
       return
     }
@@ -213,7 +214,7 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
     setPendingMarkets(null)
     const { error: roundError } = await supabase.from('rounds').update({ status: 'played' }).eq('id', roundId)
     if (roundError) {
-      setSaveError('Resultado guardado, pero no se pudo marcar la jornada como jugada: ' + roundError.message)
+      setSaveError(friendlyError(roundError.message, 'Resultado guardado, pero no se pudo marcar la jornada como jugada.'))
       return
     }
     await revalidateLigaData()
@@ -230,7 +231,7 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
     }).eq('id', marketId)
     setResolvingMarketId(null)
     if (error) {
-      setSaveError('No se pudo resolver la pregunta: ' + error.message)
+      setSaveError(friendlyError(error.message, 'No se pudo resolver la pregunta.'))
       return
     }
     await checkPendingMarketsOrFinish()

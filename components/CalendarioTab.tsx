@@ -7,6 +7,7 @@ import Link from 'next/link'
 import JornadasAccordion, { type JornadaViewModel } from '@/components/JornadasAccordion'
 import MiniCalendar from '@/components/MiniCalendar'
 import { revalidateLigaData } from '@/lib/actions'
+import { friendlyError } from '@/lib/errors'
 
 type PlayerLite = { id: string; name: string }
 
@@ -131,7 +132,7 @@ function SeasonForm({ mode, players, onCancel }: {
 
     setLoading(false)
     if (rpcError) {
-      setError('No se pudo crear la liga: ' + rpcError.message)
+      setError(friendlyError(rpcError.message, 'No se pudo crear la liga. Inténtalo de nuevo.'))
       return
     }
     await revalidateLigaData()
@@ -225,7 +226,7 @@ function ExtendForm({ currentMin, onCancel }: { currentMin: number; onCancel: ()
 
     setLoading(false)
     if (rpcError) {
-      setError('No se pudo ampliar el calendario: ' + rpcError.message)
+      setError(friendlyError(rpcError.message, 'No se pudo ampliar el calendario. Inténtalo de nuevo.'))
       return
     }
     await revalidateLigaData()

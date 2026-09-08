@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import PwaSetup from '@/components/PwaSetup'
+import { friendlyError } from '@/lib/errors'
 
 export default function AjustesForm() {
   const supabase = createClient()
@@ -25,7 +26,7 @@ export default function AjustesForm() {
 
     setPasswordSaving(false)
     if (updateError) {
-      setPasswordError('No se pudo cambiar la contraseña: ' + updateError.message)
+      setPasswordError(friendlyError(updateError.message, 'No se pudo cambiar la contraseña. Inténtalo de nuevo.'))
       return
     }
     setNewPassword('')

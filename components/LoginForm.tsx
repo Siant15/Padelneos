@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
+import { friendlyError } from '@/lib/errors'
 
 export default function LoginForm() {
   const [mode, setMode] = useState<'login' | 'signup' | 'forgot'>('login')
@@ -100,7 +101,7 @@ export default function LoginForm() {
 
       setLoading(false)
       if (error) {
-        setError('No se pudo enviar el email: ' + error.message)
+        setError(friendlyError(error.message, 'No se pudo enviar el email. Inténtalo de nuevo.'))
         return
       }
       setInfo('Si ese email está registrado, te hemos enviado un enlace para cambiar la contraseña.')
