@@ -175,6 +175,9 @@ export default function LoginForm() {
                 <label className="block text-sm font-bold mb-1" style={{ color: 'var(--text-muted)' }}>
                   Código de invitación
                 </label>
+                <p className="text-xs mb-1.5" style={{ color: 'var(--text-muted)' }}>
+                  Es un código único para todo el grupo (no personal) — te lo da quien ya usa la app.
+                </p>
                 <input
                   type="text"
                   value={inviteCode}

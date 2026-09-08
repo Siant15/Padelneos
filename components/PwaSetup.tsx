@@ -162,14 +162,21 @@ export default function PwaSetup() {
             : '🔔 Este navegador no admite notificaciones.'}
         </p>
       ) : (
-        <button
-          onClick={handleEnableNotifications}
-          disabled={subscribing || permission === 'denied'}
-          className="font-heading w-full py-2.5 rounded-[14px] font-bold text-sm transition hover:opacity-90 disabled:opacity-50"
-          style={{ background: pushOk ? 'var(--green)' : 'var(--surface2)', color: pushOk ? '#fff' : 'var(--accent)' }}
-        >
-          {subscribing ? 'Activando...' : pushOk ? '✓ Notificaciones activadas' : '🔔 Activar notificaciones'}
-        </button>
+        <div>
+          {!pushOk && (
+            <p className="text-xs mb-2" style={{ color: 'var(--text-muted)' }}>
+              Te avisamos cuando falte poco para el partido, cuando te toque confirmar la pista, cuando salgas mencionado en una pregunta de apuestas y cuando se liquide una jornada.
+            </p>
+          )}
+          <button
+            onClick={handleEnableNotifications}
+            disabled={subscribing || permission === 'denied'}
+            className="font-heading w-full py-2.5 rounded-[14px] font-bold text-sm transition hover:opacity-90 disabled:opacity-50"
+            style={{ background: pushOk ? 'var(--green)' : 'var(--surface2)', color: pushOk ? '#fff' : 'var(--accent)' }}
+          >
+            {subscribing ? 'Activando...' : pushOk ? '✓ Notificaciones activadas' : '🔔 Activar notificaciones'}
+          </button>
+        </div>
       )}
       {permission === 'denied' && (
         <p className="text-xs" style={{ color: 'var(--text-muted)' }}>

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import PwaSetup from '@/components/PwaSetup'
 
 export default function AjustesForm() {
@@ -40,6 +41,7 @@ export default function AjustesForm() {
 
   return (
     <div className="px-5 pt-5 pb-6">
+      <Link href="/perfil" className="text-sm inline-block mb-2" style={{ color: 'var(--text-muted)' }}>← Perfil</Link>
       <h1 className="font-heading text-[22px] font-extrabold mb-4">⚙️ Ajustes</h1>
 
       <form

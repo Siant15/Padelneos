@@ -43,6 +43,11 @@ export default async function DashboardPage() {
     team2_p1?: { name: string; avatar_url: string | null }; team2_p2?: { name: string; avatar_url: string | null }
   } | undefined
   const effectiveTime = round?.scheduled_time?.slice(0, 5)
+  // El botón de "Resultado" solo tiene sentido una vez el partido ya
+  // pudo jugarse — antes de esa hora sería un atajo a una acción
+  // imposible, mezclada con "Apostar" sin ningún orden.
+  const matchMayHaveHappened = !!(round?.scheduled_date && round.scheduled_time &&
+    new Date(`${round.scheduled_date}T${round.scheduled_time}`).getTime() < Date.now())
   const effectiveClub = round?.club
 
   // Ninguna de estas tres depende del resultado de las otras dos —
@@ -113,8 +118,11 @@ export default async function DashboardPage() {
                 </StopPropagation>
               )}
             </p>
-            <p className="text-xs -mt-1.5 opacity-90">
-              Responsable (reserva y pelotas): {round.court_booker?.name ?? '-'}
+            <p className="text-xs -mt-1.5 opacity-90 flex items-center gap-2">
+              <span>Responsable (reserva y pelotas): {round.court_booker?.name ?? '-'}</span>
+              <StopPropagation>
+                <Link href="/perfil" className="underline font-bold shrink-0">💸 Gastos</Link>
+              </StopPropagation>
             </p>
 
             {match && (
@@ -152,7 +160,11 @@ export default async function DashboardPage() {
                   color: round.court_confirmed ? '#fff' : 'oklch(0.32 0.08 70)',
                 }}
               >
-                {round.court_confirmed ? 'Reserva confirmada' : `Reserva pendiente · ${round.court_booker?.name ?? 'sin asignar'}`}
+                {round.court_confirmed
+                  ? 'Reserva confirmada'
+                  : round.court_booker?.name
+                    ? `Reserva pendiente · ${round.court_booker.name}`
+                    : 'Reserva pendiente · sin asignar (toca para asignar)'}
               </span>
             </div>
 
@@ -164,17 +176,21 @@ export default async function DashboardPage() {
 
             <StopPropagation>
               <div className="flex gap-2 mt-1">
-                <Link
-                  href={`/admin/jornadas/${round.id}/resultado`}
-                  className="flex-1 text-center text-sm font-bold py-2.5 rounded-xl transition hover:opacity-90"
-                  style={{ background: '#fff', color: 'oklch(0.4 0.09 155)' }}
-                >
-                  Resultado
-                </Link>
+                {matchMayHaveHappened && (
+                  <Link
+                    href={`/admin/jornadas/${round.id}/resultado`}
+                    className="flex-1 text-center text-sm font-bold py-2.5 rounded-xl transition hover:opacity-90"
+                    style={{ background: '#fff', color: 'oklch(0.4 0.09 155)' }}
+                  >
+                    Resultado
+                  </Link>
+                )}
                 <Link
                   href={`/liga?tab=apuestas&round=${round.id}`}
                   className="flex-1 text-center text-sm font-bold py-2.5 rounded-xl transition hover:opacity-90 flex items-center justify-center gap-1.5"
-                  style={{ background: 'rgba(255,255,255,0.16)', color: '#fff' }}
+                  style={matchMayHaveHappened
+                    ? { background: 'rgba(255,255,255,0.16)', color: '#fff' }
+                    : { background: '#fff', color: 'oklch(0.4 0.09 155)' }}
                 >
                   Apostar · {bettingContext?.chipsLeft ?? 100} fichas
                 </Link>

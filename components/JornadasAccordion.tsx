@@ -79,6 +79,7 @@ export default function JornadasAccordion({ items }: { items: JornadaViewModel[]
               >
                 <div className="flex items-center gap-1.5">
                   🏟️ Reserva: <Avatar name={j.responsableName} avatarUrl={j.responsableAvatarUrl} size={18} /> {j.responsableName}
+                  <Link href="/perfil" className="font-bold" style={{ color: 'var(--accent)' }} onClick={e => e.stopPropagation()}>· 💸 Gastos</Link>
                 </div>
                 {j.clubLabel && (
                   <div>📍 Club: {j.clubLabel}</div>
