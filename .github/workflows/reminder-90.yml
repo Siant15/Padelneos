@@ -1,4 +1,4 @@
-name: Recordatorio 90 min antes del partido
+name: Recordatorio 120 min antes del partido
 
 # El plan Hobby de Vercel solo permite crons de una vez al día, y este
 # aviso necesita comprobarse cada pocos minutos porque la hora del
@@ -17,9 +17,9 @@ jobs:
     steps:
       - name: Comprobar y enviar recordatorio si toca
         run: |
-          curl -sf -X GET "https://padelneos-beta.vercel.app/api/cron/notify?type=reminder90" \
+          curl -sf -X GET "https://padelneos-beta.vercel.app/api/cron/notify?type=reminder120" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
-      - name: Avisar a quien salga mencionado en una apuesta
+      - name: Avisar si alguien ha apostado en tu contra
         run: |
-          curl -sf -X GET "https://padelneos-beta.vercel.app/api/cron/notify?type=marketMentions" \
+          curl -sf -X GET "https://padelneos-beta.vercel.app/api/cron/notify?type=betAgainstYou" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"

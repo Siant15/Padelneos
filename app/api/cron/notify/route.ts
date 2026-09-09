@@ -1,8 +1,17 @@
 import { NextResponse } from 'next/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createPushAdminClient, sendPushToAll, sendPushToPlayers } from '@/lib/push'
-import { marketCloseTime, madridDateTimeToUtc } from '@/lib/betting'
+import { madridDateTimeToUtc } from '@/lib/betting'
 import webpush from 'web-push'
+
+// Una jornada solo cuenta como "reserva confirmada" cuando tiene las
+// 4 cosas a la vez: fecha, hora, club y precio de la pista. Sin las
+// 4, no se manda ningún aviso de "toca partido" — la fecha sola (la
+// que deja `generate_season_rounds` al crear el calendario) no es
+// suficiente, todavía puede cambiar o cancelarse.
+function isRoundConfirmed(round: { scheduled_date: string | null; scheduled_time: string | null; club: string | null; court_cost: number | null }): boolean {
+  return !!(round.scheduled_date && round.scheduled_time && round.club && round.court_cost != null)
+}
 
 // Mensajes "picantes" según la posición en la clasificación, para el
 // recordatorio de última hora. Nunca los mismos dos veces seguidas sería
@@ -29,17 +38,18 @@ export async function GET(request: Request) {
   }
 
   const type = new URL(request.url).searchParams.get('type')
-  if (type !== 'dayBefore' && type !== 'reminder90' && type !== 'marketMentions') {
-    return NextResponse.json({ error: 'type debe ser dayBefore, reminder90 o marketMentions' }, { status: 400 })
+  if (type !== 'dayBefore' && type !== 'reminder120' && type !== 'betAgainstYou') {
+    return NextResponse.json({ error: 'type debe ser dayBefore, reminder120 o betAgainstYou' }, { status: 400 })
   }
 
   const admin = createPushAdminClient()
 
-  if (type === 'marketMentions') {
-    return handleMarketMentions(admin)
+  if (type === 'betAgainstYou') {
+    return handleBetAgainstYou(admin)
   }
 
-  // "Hoy" y "mañana" en huso de Madrid, no en UTC del servidor.
+  // "Hoy" y "mañana" en huso de Barcelona/Madrid (España solo tiene un
+  // huso, Europe/Madrid), no en UTC del servidor.
   const now = new Date()
   const today = now.toLocaleDateString('en-CA', { timeZone: 'Europe/Madrid' })
   const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000).toLocaleDateString('en-CA', { timeZone: 'Europe/Madrid' })
@@ -79,15 +89,22 @@ export async function GET(request: Request) {
 
   const { data: round } = await admin
     .from('rounds')
-    .select('id, round_number, scheduled_date, scheduled_time, club, reminder_90_sent_at, day_before_sent_at, court_booker:profiles!court_booker_id(name), match:matches(team1_p1:profiles!team1_p1_id(name), team1_p2:profiles!team1_p2_id(name), team2_p1:profiles!team2_p1_id(name), team2_p2:profiles!team2_p2_id(name))')
+    .select('id, round_number, scheduled_date, scheduled_time, club, court_cost, reminder_120_sent_at, day_before_sent_at, court_booker:profiles!court_booker_id(name), match:matches(team1_p1:profiles!team1_p1_id(name), team1_p2:profiles!team1_p2_id(name), team2_p1:profiles!team2_p1_id(name), team2_p2:profiles!team2_p2_id(name))')
     .eq('season_id', season.id)
     .eq('scheduled_date', targetDate)
     .maybeSingle()
 
   if (!round) return NextResponse.json({ sent: 0, reason: type === 'dayBefore' ? 'no hay jornada mañana' : 'no hay jornada hoy' })
 
-  const time = (round.scheduled_time ?? season.match_time)?.slice(0, 5) ?? ''
-  const club = round.club ?? season.default_club ?? ''
+  // Sin las 4 cosas confirmadas (fecha, hora, club y precio de pista)
+  // no se manda ningún aviso — solo tener la fecha (p. ej. recién
+  // generada al crear el calendario) no cuenta como partido confirmado.
+  if (!isRoundConfirmed(round)) {
+    return NextResponse.json({ sent: 0, reason: 'la reserva todavía no está confirmada (falta fecha, hora, club o precio de pista)' })
+  }
+
+  const time = round.scheduled_time!.slice(0, 5)
+  const club = round.club!
   const match = round.match as unknown as { team1_p1?: { name: string }; team1_p2?: { name: string }; team2_p1?: { name: string }; team2_p2?: { name: string } } | null
   const booker = (Array.isArray(round.court_booker) ? round.court_booker[0] : round.court_booker) as { name: string } | null
 
@@ -96,23 +113,22 @@ export async function GET(request: Request) {
     const pairing = match
       ? `${match.team1_p1?.name} & ${match.team1_p2?.name} vs ${match.team2_p1?.name} & ${match.team2_p2?.name}`
       : `Emparejamiento por confirmar (reserva: ${booker?.name ?? 'sin asignar'})`
-    const body = [pairing, [time && `⏰ ${time}`, club && `📍 ${club}`].filter(Boolean).join(' · ')].filter(Boolean).join('\n')
+    const body = [pairing, `⏰ ${time} · 📍 ${club}`].filter(Boolean).join('\n')
     const result = await sendPushToAll(admin, { title: `🎾 Mañana toca partido · Jornada ${round.round_number}`, body, url: '/dashboard' })
     await admin.from('rounds').update({ day_before_sent_at: now.toISOString() }).eq('id', round.id)
     return NextResponse.json(result)
   }
 
-  // "reminder90": se llama cada ~15 min (GitHub Actions, no cron de
+  // "reminder120": se llama cada ~15 min (GitHub Actions, no cron de
   // Vercel — el plan Hobby no permite crons más frecuentes que 1/día).
   // Solo manda el aviso si el partido empieza dentro de los próximos
-  // 75-105 min (ventana centrada en 90 y con margen para el propio
+  // 105-135 min (ventana centrada en 120 y con margen para el propio
   // intervalo de 15 min entre comprobaciones) y todavía no se avisó.
-  if (!round.scheduled_time) return NextResponse.json({ sent: 0, reason: 'la jornada de hoy no tiene hora confirmada' })
-  if (round.reminder_90_sent_at) return NextResponse.json({ sent: 0, reason: 'ya se avisó para esta jornada' })
+  if (round.reminder_120_sent_at) return NextResponse.json({ sent: 0, reason: 'ya se avisó para esta jornada' })
 
-  const matchDateTime = madridDateTimeToUtc(round.scheduled_date, round.scheduled_time)
+  const matchDateTime = madridDateTimeToUtc(round.scheduled_date!, round.scheduled_time!)
   const minutesUntil = (matchDateTime.getTime() - now.getTime()) / 60000
-  if (minutesUntil < 75 || minutesUntil > 105) {
+  if (minutesUntil < 105 || minutesUntil > 135) {
     return NextResponse.json({ sent: 0, reason: `fuera de ventana (quedan ${Math.round(minutesUntil)} min)` })
   }
 
@@ -137,7 +153,7 @@ export async function GET(request: Request) {
   for (const sub of subs) {
     const rank = ranked.findIndex(r => r.player_id === sub.player_id)
     const line = rank === -1 ? 'Esta noche, a por todas 🎾' : pickLine(rank, ranked.length)
-    const payload = { title: '⏰ El partido empieza en 90 min', body: line, url: '/dashboard' }
+    const payload = { title: '⏰ El partido empieza en 120 min', body: line, url: '/dashboard' }
     try {
       await webpush.sendNotification(
         { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
@@ -150,23 +166,24 @@ export async function GET(request: Request) {
     }
   }
   if (toDelete.length) await admin.from('push_subscriptions').delete().in('id', toDelete)
-  await admin.from('rounds').update({ reminder_90_sent_at: now.toISOString() }).eq('id', round.id)
+  await admin.from('rounds').update({ reminder_120_sent_at: now.toISOString() }).eq('id', round.id)
 
   return NextResponse.json({ sent, removed: toDelete.length })
 }
 
-// Aviso "sales mencionado en una apuesta" — se comprueba cada ~15 min
-// (mismo workflow de GitHub Actions que reminder90) y solo avisa una
-// vez por jornada, cuando falta menos de 1h para que cierren sus
-// preguntas de pago (nunca dice importes ni quién apostó qué).
-async function handleMarketMentions(admin: SupabaseClient) {
+// Aviso "alguien ha apostado en tu contra" — se comprueba cada ~15 min
+// (mismo workflow de GitHub Actions) y solo avisa una vez por
+// jornada, a los 60 min del partido, y solo si de verdad hay al menos
+// una apuesta hecha sobre la opción de ese jugador en una pregunta de
+// tipo "jugador" (nunca dice quién apostó ni cuántas fichas).
+async function handleBetAgainstYou(admin: SupabaseClient) {
   const now = new Date()
 
   const { data: rounds } = await admin
     .from('rounds')
-    .select('id, round_number, scheduled_date, scheduled_time, mentions_notified_at')
+    .select('id, round_number, scheduled_date, scheduled_time, bet_against_notified_at')
     .eq('status', 'scheduled')
-    .is('mentions_notified_at', null)
+    .is('bet_against_notified_at', null)
     .not('scheduled_date', 'is', null)
     .not('scheduled_time', 'is', null)
 
@@ -176,36 +193,44 @@ async function handleMarketMentions(admin: SupabaseClient) {
   const notifiedRounds: string[] = []
 
   for (const round of rounds) {
-    const closeTime = marketCloseTime({ closes_at: null }, { scheduled_date: round.scheduled_date, scheduled_time: round.scheduled_time })
-    if (!closeTime) continue
-    const minutesUntilClose = (new Date(closeTime).getTime() - now.getTime()) / 60000
-    // Ventana de aviso: entre 0 y 60 min antes del cierre (una vez que
-    // ya cerró, no tiene sentido avisar).
-    if (minutesUntilClose < 0 || minutesUntilClose > 60) continue
+    const matchDateTime = madridDateTimeToUtc(round.scheduled_date!, round.scheduled_time!)
+    const minutesUntilMatch = (matchDateTime.getTime() - now.getTime()) / 60000
+    // Ventana de aviso: centrada en 60 min antes del partido, con
+    // margen de ±15 min para el propio intervalo entre comprobaciones.
+    if (minutesUntilMatch < 45 || minutesUntilMatch > 75) continue
 
     const { data: markets } = await admin
       .from('betting_markets')
-      .select('id, type, options:betting_options(player_id)')
+      .select('id, options:betting_options(id, player_id)')
       .eq('round_id', round.id)
-      .in('type', ['player', 'pair'])
+      .eq('type', 'player')
 
-    const mentionedIds = new Set<string>()
+    const optionToPlayer = new Map<string, string>()
     for (const m of markets ?? []) {
-      for (const o of (m.options as { player_id: string | null }[] | null) ?? []) {
-        if (o.player_id) mentionedIds.add(o.player_id)
+      for (const o of (m.options as { id: string; player_id: string | null }[] | null) ?? []) {
+        if (o.player_id) optionToPlayer.set(o.id, o.player_id)
       }
     }
 
-    if (mentionedIds.size > 0) {
-      const result = await sendPushToPlayers(admin, [...mentionedIds], {
-        title: '🎲 Sales en una apuesta de esta jornada',
-        body: `Jornada ${round.round_number} — a apostar antes de que cierre el mercado.`,
+    const targetPlayerIds = new Set<string>()
+    if (optionToPlayer.size > 0) {
+      const { data: betRows } = await admin.from('bets').select('option_id').in('option_id', [...optionToPlayer.keys()])
+      for (const b of betRows ?? []) {
+        const playerId = optionToPlayer.get(b.option_id)
+        if (playerId) targetPlayerIds.add(playerId)
+      }
+    }
+
+    if (targetPlayerIds.size > 0) {
+      const result = await sendPushToPlayers(admin, [...targetPlayerIds], {
+        title: '🎲 Alguien ha apostado en tu contra',
+        body: `Jornada ${round.round_number} — se ha hecho una apuesta sobre ti antes del partido.`,
         url: '/liga?tab=apuestas',
       })
       totalSent += result.sent
     }
 
-    await admin.from('rounds').update({ mentions_notified_at: now.toISOString() }).eq('id', round.id)
+    await admin.from('rounds').update({ bet_against_notified_at: now.toISOString() }).eq('id', round.id)
     notifiedRounds.push(round.id)
   }
 
