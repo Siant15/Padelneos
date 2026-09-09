@@ -88,3 +88,43 @@ export async function sendPushToPlayers(admin: SupabaseClient, playerIds: string
 
   return { sent, removed: toDelete.length }
 }
+
+// Un mensaje DISTINTO por jugador (p. ej. "liquidada tu jornada", donde
+// cada uno necesita ver su propio resultado) — a diferencia de
+// sendPushToPlayers, que manda el mismo payload a una lista de gente.
+export async function sendPersonalizedPush(admin: SupabaseClient, items: { playerId: string; payload: PushPayload }[]): Promise<{ sent: number; removed: number }> {
+  if (!isPushConfigured() || items.length === 0) return { sent: 0, removed: 0 }
+
+  const { data: subs } = await admin.from('push_subscriptions').select('*').in('player_id', items.map(i => i.playerId))
+  if (!subs?.length) return { sent: 0, removed: 0 }
+
+  webpush.setVapidDetails(
+    process.env.VAPID_SUBJECT!,
+    process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
+    process.env.VAPID_PRIVATE_KEY!
+  )
+
+  const payloadByPlayer = new Map(items.map(i => [i.playerId, i.payload]))
+  let sent = 0
+  const toDelete: string[] = []
+  for (const sub of subs) {
+    const payload = payloadByPlayer.get(sub.player_id)
+    if (!payload) continue
+    try {
+      await webpush.sendNotification(
+        { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+        JSON.stringify({ ...payload, url: payload.url ?? '/dashboard' })
+      )
+      sent++
+    } catch (err) {
+      const statusCode = (err as { statusCode?: number })?.statusCode
+      if (statusCode === 404 || statusCode === 410) toDelete.push(sub.id)
+    }
+  }
+
+  if (toDelete.length) {
+    await admin.from('push_subscriptions').delete().in('id', toDelete)
+  }
+
+  return { sent, removed: toDelete.length }
+}

@@ -166,7 +166,7 @@ export default function PwaSetup() {
         <div>
           {!pushOk && (
             <p className="text-xs mb-2" style={{ color: 'var(--text-muted)' }}>
-              Te avisamos cuando falte poco para el partido, cuando te toque confirmar la pista, cuando salgas mencionado en una pregunta de apuestas y cuando se liquide una jornada.
+              Te avisamos el día antes y 2h antes de cada partido, si alguien apuesta en tu contra 1h antes, cuando se abren las apuestas y cuando se liquida tu jornada.
             </p>
           )}
           <button
