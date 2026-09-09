@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createPushAdminClient, sendPushToAll, sendPushToPlayers } from '@/lib/push'
-import { marketCloseTime } from '@/lib/betting'
+import { marketCloseTime, madridDateTimeToUtc } from '@/lib/betting'
 import webpush from 'web-push'
 
 // Mensajes "picantes" según la posición en la clasificación, para el
@@ -79,7 +79,7 @@ export async function GET(request: Request) {
 
   const { data: round } = await admin
     .from('rounds')
-    .select('id, round_number, scheduled_date, scheduled_time, club, reminder_90_sent_at, court_booker:profiles!court_booker_id(name), match:matches(team1_p1:profiles!team1_p1_id(name), team1_p2:profiles!team1_p2_id(name), team2_p1:profiles!team2_p1_id(name), team2_p2:profiles!team2_p2_id(name))')
+    .select('id, round_number, scheduled_date, scheduled_time, club, reminder_90_sent_at, day_before_sent_at, court_booker:profiles!court_booker_id(name), match:matches(team1_p1:profiles!team1_p1_id(name), team1_p2:profiles!team1_p2_id(name), team2_p1:profiles!team2_p1_id(name), team2_p2:profiles!team2_p2_id(name))')
     .eq('season_id', season.id)
     .eq('scheduled_date', targetDate)
     .maybeSingle()
@@ -92,11 +92,13 @@ export async function GET(request: Request) {
   const booker = (Array.isArray(round.court_booker) ? round.court_booker[0] : round.court_booker) as { name: string } | null
 
   if (type === 'dayBefore') {
+    if (round.day_before_sent_at) return NextResponse.json({ sent: 0, reason: 'ya se avisó para esta jornada' })
     const pairing = match
       ? `${match.team1_p1?.name} & ${match.team1_p2?.name} vs ${match.team2_p1?.name} & ${match.team2_p2?.name}`
       : `Emparejamiento por confirmar (reserva: ${booker?.name ?? 'sin asignar'})`
     const body = [pairing, [time && `⏰ ${time}`, club && `📍 ${club}`].filter(Boolean).join(' · ')].filter(Boolean).join('\n')
     const result = await sendPushToAll(admin, { title: `🎾 Mañana toca partido · Jornada ${round.round_number}`, body, url: '/dashboard' })
+    await admin.from('rounds').update({ day_before_sent_at: now.toISOString() }).eq('id', round.id)
     return NextResponse.json(result)
   }
 
@@ -108,10 +110,7 @@ export async function GET(request: Request) {
   if (!round.scheduled_time) return NextResponse.json({ sent: 0, reason: 'la jornada de hoy no tiene hora confirmada' })
   if (round.reminder_90_sent_at) return NextResponse.json({ sent: 0, reason: 'ya se avisó para esta jornada' })
 
-  // +02:00 asume horario de verano (CEST) como el resto de este cron
-  // (tampoco calculaba DST antes) — en horario de invierno (CET,
-  // UTC+1) esto adelanta el aviso una hora real.
-  const matchDateTime = new Date(`${round.scheduled_date}T${round.scheduled_time}+02:00`)
+  const matchDateTime = madridDateTimeToUtc(round.scheduled_date, round.scheduled_time)
   const minutesUntil = (matchDateTime.getTime() - now.getTime()) / 60000
   if (minutesUntil < 75 || minutesUntil > 105) {
     return NextResponse.json({ sent: 0, reason: `fuera de ventana (quedan ${Math.round(minutesUntil)} min)` })
