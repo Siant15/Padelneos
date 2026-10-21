@@ -19,6 +19,7 @@ interface Props {
   jackpotByTemplate: Record<string, number>
 }
 
+const MIN_PAID_QUESTIONS = 6
 const MIN_BET = 10
 const MAX_BET = 50
 const ROUND_TOTAL = 100
@@ -313,7 +314,7 @@ export default function BettingMarketsBoard({ roundId, markets, userId, roundSta
               {!market.resolved && isClosedByTime && (
                 <span className="text-xs font-bold" style={{ color: 'var(--red)' }}>🔒 Cerrado</span>
               )}
-              {!market.resolved && totalMarketChips === 0 && (
+              {!market.resolved && totalMarketChips === 0 && paidMarkets.length > MIN_PAID_QUESTIONS && (
                 <button
                   type="button"
                   onClick={() => deleteMarket(market.id)}

@@ -270,6 +270,7 @@ export default function MercadosClient({ roundId, initialMarkets, initialCatalog
                     onResolve={optId => resolveMarket(market, optId)}
                     onVoid={() => voidMarket(market)}
                     onDelete={() => deleteMarket(market.id)}
+                    canDelete={markets.filter(m => m.type !== 'exact_score').length > 6}
                   />
                 ))}
               </div>
@@ -307,12 +308,13 @@ export default function MercadosClient({ roundId, initialMarkets, initialCatalog
 }
 
 // ─── Tarjeta de pregunta ───────────────────────────────────────
-function MarketCard({ market, resolving, voiding, deleting, readOnly, onResolve, onVoid, onDelete }: {
+function MarketCard({ market, resolving, voiding, deleting, readOnly, canDelete = true, onResolve, onVoid, onDelete }: {
   market: MarketWithAll
   resolving?: boolean
   voiding?: boolean
   deleting: boolean
   readOnly?: boolean
+  canDelete?: boolean
   onResolve?: (optId: string) => void
   onVoid?: () => void
   onDelete: () => void
@@ -337,7 +339,7 @@ function MarketCard({ market, resolving, voiding, deleting, readOnly, onResolve,
               ? <span className="text-xs font-semibold" style={{ color: 'var(--green)' }}>✓ Resuelta</span>
               : <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{totalPot} fichas en juego</span>
           }
-          {!readOnly && !market.resolved && totalPot === 0 && (
+          {!readOnly && canDelete && !market.resolved && totalPot === 0 && (
             <button onClick={onDelete} disabled={deleting} aria-label="Borrar pregunta"
               className="text-xs px-1.5 disabled:opacity-40" style={{ color: 'var(--red)' }}>
               {deleting ? '...' : '🗑️'}

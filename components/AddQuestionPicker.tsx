@@ -20,14 +20,14 @@ const inputStyle: React.CSSProperties = {
   outline: 'none',
 }
 
-const MAX_PAID_QUESTIONS = 6
+const MAX_PAID_QUESTIONS = 10
 
 // Catálogo de preguntas que no se aplican solas a cada jornada
 // (auto_apply = false): cualquier jugador puede añadirlas aquí para
 // no saturar la interfaz por defecto. También se puede crear una
 // pregunta totalmente nueva: se guarda en el catálogo (para poder
 // reutilizarla en futuras jornadas) y se aplica a esta a la vez.
-// Máximo 6 preguntas de pago por jornada (el marcador exacto no cuenta).
+// Entre 6 y 10 preguntas de pago por jornada (el marcador exacto no cuenta).
 export default function AddQuestionPicker({ roundId, templates, paidCount }: { roundId: string; templates: BettingQuestionTemplate[]; paidCount: number }) {
   const supabase = createClient()
   const router = useRouter()
@@ -64,6 +64,7 @@ export default function AddQuestionPicker({ roundId, templates, paidCount }: { r
       return
     }
     setEditingId(null)
+    await revalidateLigaData()
     router.refresh()
   }
 
