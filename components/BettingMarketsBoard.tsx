@@ -81,12 +81,13 @@ export default function BettingMarketsBoard({ roundId, markets, userId, roundSta
   })
 
   const totalChosen = editableMarkets.reduce((s, m) => s + (selections[m.id]?.chips ?? 0), 0)
-  const allChosen = editableMarkets.every(m => !!selections[m.id]?.optionId)
   const allInRange = editableMarkets.every(m => {
-    const c = selections[m.id]?.chips ?? 0
-    return c >= MIN_BET && c <= MAX_BET
+    const sel = selections[m.id]
+    return !sel || (sel.chips >= MIN_BET && sel.chips <= MAX_BET)
   })
-  const canSubmit = editableMarkets.length > 0 && allChosen && allInRange && totalChosen === ROUND_TOTAL
+  // Se guarda también a medias: basta con que lo apostado sea válido
+  // (cada pregunta 10-50 fichas, total hasta 100).
+  const canSubmit = editableMarkets.length > 0 && allInRange && totalChosen <= ROUND_TOTAL
 
   const hasInteracted = useRef(false)
 
@@ -139,7 +140,7 @@ export default function BettingMarketsBoard({ roundId, markets, userId, roundSta
     setSaving(true)
     setError('')
 
-    const bets = editableMarkets.map(m => ({
+    const bets = editableMarkets.filter(m => selections[m.id]).map(m => ({
       market_id: m.id,
       option_id: selections[m.id].optionId,
       chips: selections[m.id].chips,
@@ -157,28 +158,17 @@ export default function BettingMarketsBoard({ roundId, markets, userId, roundSta
     setTimeout(() => setSaved(false), 2500)
   }
 
-  // Se guarda solo en cuanto el reparto es válido (las 100 fichas
-  // repartidas entre todas las preguntas, cada una entre 10 y 50) — no
-  // hace falta bajar a un botón de "Guardar" para confirmar cada
-  // cambio. Solo se dispara tras una interacción real del jugador (no
-  // al montar el componente con una apuesta ya guardada de antes).
+  // Autoguardado: cada cambio válido se guarda al momento (también si
+  // el reparto está a medias), y así se recupera al volver. Solo tras
+  // una interacción real del jugador, no al montar. Si había un guardado
+  // en curso, se reintenta al terminar.
   useEffect(() => {
     if (hasInteracted.current && canSubmit && !saving) {
+      hasInteracted.current = false
       handleSubmitBets()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selections])
-
-  // Mientras el reparto está a medias (ya se ha tocado algo pero no
-  // suma 100 todavía) nada se ha guardado — avisa del navegador antes
-  // de cerrar la pestaña o navegar fuera, para no perder el reparto en
-  // silencio.
-  useEffect(() => {
-    if (!(hasInteracted.current && totalChosen > 0 && totalChosen !== ROUND_TOTAL)) return
-    function onBeforeUnload(e: BeforeUnloadEvent) { e.preventDefault() }
-    window.addEventListener('beforeunload', onBeforeUnload)
-    return () => window.removeEventListener('beforeunload', onBeforeUnload)
-  }, [totalChosen])
+  }, [selections, saving])
 
   // Marcador exacto: gratis, no cuenta fichas — busca-o-crea la opción
   // para ese marcador concreto (así dos jugadores que pronostican lo
@@ -222,6 +212,18 @@ export default function BettingMarketsBoard({ roundId, markets, userId, roundSta
     router.refresh()
   }
 
+  // Autoguardado del marcador exacto: en cuanto todas las casillas
+  // tienen un marcador válido (y tras una pausa breve al teclear).
+  const exactScoreTouched = useRef(false)
+  useEffect(() => {
+    if (!exactScoreTouched.current || !exactScoreMarket || exactScoreSaving) return
+    const parsed = exactScoreDraft.map(([a, b]) => ({ t1: parseInt(a, 10), t2: parseInt(b, 10) }))
+    if (parsed.some(s => Number.isNaN(s.t1) || Number.isNaN(s.t2) || !isValidSetScore(s.t1, s.t2))) return
+    const t = setTimeout(() => { betExactScore() }, 600)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [exactScoreDraft])
+
   async function deleteMarket(marketId: string) {
     if (!confirm('¿Borrar esta pregunta? Todavía no tiene fichas apostadas.')) return
     setDeletingMarket(marketId)
@@ -256,7 +258,7 @@ export default function BettingMarketsBoard({ roundId, markets, userId, roundSta
           </div>
           {totalChosen !== ROUND_TOTAL && (
             <p className="text-[11px]" style={{ color: '#7A5A1E' }}>
-              Hay que repartir las 100 fichas entre las {editableMarkets.length} preguntas ({MIN_BET}-{MAX_BET} cada una) — si sales sin completar el reparto, no se guarda nada.
+              Reparte las 100 fichas entre las {editableMarkets.length} preguntas ({MIN_BET}-{MAX_BET} cada una). Lo que apuestes se guarda solo, aunque lo dejes a medias.
             </p>
           )}
         </div>
@@ -279,7 +281,7 @@ export default function BettingMarketsBoard({ roundId, markets, userId, roundSta
           })()}
           userId={userId}
           draft={exactScoreDraft}
-          onDraftChange={setExactScoreDraft}
+          onDraftChange={d => { exactScoreTouched.current = true; setExactScoreDraft(d) }}
           onSubmit={betExactScore}
           saving={exactScoreSaving}
         />
@@ -464,10 +466,19 @@ function ExactScoreCard({ market, canBet, draft, onDraftChange, onSubmit, saving
   const closeTime = market.closes_at
   const [infoOpen, setInfoOpen] = useState(false)
 
-  function setSet(i: number, side: 0 | 1, value: string) {
+  const inputRefs = useRef<(HTMLInputElement | null)[]>([])
+
+  // Un set no pasa de 7, así que cada casilla admite un solo dígito:
+  // se queda con el último tecleado y salta a la siguiente casilla.
+  function setSet(i: number, side: 0 | 1, raw: string) {
+    const value = raw.slice(-1)
     const next = draft.map(s => [...s]) as [string, string][]
     next[i][side] = value
     onDraftChange(next)
+    if (value !== '') {
+      const nextInput = inputRefs.current[i * 2 + side + 1]
+      if (nextInput) { nextInput.focus(); nextInput.select() }
+    }
   }
 
   function toggleThirdSet() {
@@ -529,10 +540,10 @@ function ExactScoreCard({ market, canBet, draft, onDraftChange, onSubmit, saving
         <div className="flex items-center gap-2 mt-2.5">
           {draft.map((s, i) => (
             <div key={i} className="flex items-center gap-1">
-              <input type="number" min={0} max={7} value={s[0]} onChange={e => setSet(i, 0, e.target.value)}
+              <input ref={el => { inputRefs.current[i * 2] = el }} type="number" inputMode="numeric" min={0} max={7} value={s[0]} onFocus={e => e.target.select()} onChange={e => setSet(i, 0, e.target.value)}
                 className="w-9 text-center text-xs rounded-lg py-1.5 outline-none" style={{ border: '1px solid var(--hairline)' }} />
               <span className="text-xs">-</span>
-              <input type="number" min={0} max={7} value={s[1]} onChange={e => setSet(i, 1, e.target.value)}
+              <input ref={el => { inputRefs.current[i * 2 + 1] = el }} type="number" inputMode="numeric" min={0} max={7} value={s[1]} onFocus={e => e.target.select()} onChange={e => setSet(i, 1, e.target.value)}
                 className="w-9 text-center text-xs rounded-lg py-1.5 outline-none" style={{ border: '1px solid var(--hairline)' }} />
             </div>
           ))}
