@@ -193,6 +193,7 @@ export default async function LigaPage() {
       markets: ctx.markets,
       chipsLeft: ctx.chipsLeft,
       jackpotByTemplate: openBetting.jackpotByTemplate,
+      bettorsByMarket: openBetting.bettorsByMarket,
       availableTemplates,
     }
   }) : []

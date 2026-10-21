@@ -17,6 +17,7 @@ interface Props {
   roundStatus: string
   round: { scheduled_date: string | null; scheduled_time: string | null }
   jackpotByTemplate: Record<string, number>
+  bettorsByMarket: Record<string, number>
 }
 
 const MIN_PAID_QUESTIONS = 6
@@ -24,7 +25,7 @@ const MIN_BET = 10
 const MAX_BET = 50
 const ROUND_TOTAL = 100
 
-export default function BettingMarketsBoard({ roundId, markets, userId, roundStatus, round, jackpotByTemplate }: Props) {
+export default function BettingMarketsBoard({ roundId, markets, userId, roundStatus, round, jackpotByTemplate, bettorsByMarket }: Props) {
   const router = useRouter()
   const supabase = createClient()
 
@@ -280,6 +281,7 @@ export default function BettingMarketsBoard({ roundId, markets, userId, roundSta
             return closeTime === null || new Date(closeTime) > new Date()
           })()}
           userId={userId}
+          bettors={bettorsByMarket[exactScoreMarket.id] ?? 0}
           draft={exactScoreDraft}
           onDraftChange={d => { exactScoreTouched.current = true; setExactScoreDraft(d) }}
           onSubmit={betExactScore}
@@ -316,7 +318,7 @@ export default function BettingMarketsBoard({ roundId, markets, userId, roundSta
               {!market.resolved && isClosedByTime && (
                 <span className="text-xs font-bold" style={{ color: 'var(--red)' }}>🔒 Cerrado</span>
               )}
-              {!market.resolved && totalMarketChips === 0 && paidMarkets.length > MIN_PAID_QUESTIONS && (
+              {!market.resolved && totalMarketChips === 0 && (bettorsByMarket[market.id] ?? 0) === 0 && paidMarkets.length > MIN_PAID_QUESTIONS && (
                 <button
                   type="button"
                   onClick={() => deleteMarket(market.id)}
@@ -345,6 +347,7 @@ export default function BettingMarketsBoard({ roundId, markets, userId, roundSta
                 🎰 Jackpot acumulado: {jackpot} fichas (nadie acertó la última vez)
               </p>
             )}
+            <BettorsBadge count={bettorsByMarket[market.id] ?? 0} />
             {totalMarketChips > 0 && (
               <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted2)' }}>
                 Bote: {totalMarketChips}{jackpot > 0 ? ` + ${jackpot} de jackpot = ${potWithJackpot}` : ''} fichas
@@ -453,9 +456,10 @@ function describeBetError(message: string): string {
 
 // ─── Marcador exacto: gratis, 2-3 sets con inputs numéricos, igual
 // que en el registro de resultado, en vez de una lista de opciones.
-function ExactScoreCard({ market, canBet, draft, onDraftChange, onSubmit, saving }: {
+function ExactScoreCard({ market, canBet, bettors, draft, onDraftChange, onSubmit, saving }: {
   market: BettingMarket
   canBet: boolean
+  bettors: number
   userId: string
   draft: [string, string][]
   onDraftChange: (d: [string, string][]) => void
@@ -526,6 +530,8 @@ function ExactScoreCard({ market, canBet, draft, onDraftChange, onSubmit, saving
         </p>
       )}
 
+      <BettorsBadge count={bettors} />
+
       {myBetOptions.length > 0 && (
         <div className="mt-2 flex flex-col gap-1">
           {myBetOptions.map(o => (
@@ -558,5 +564,14 @@ function ExactScoreCard({ market, canBet, draft, onDraftChange, onSubmit, saving
         </div>
       )}
     </div>
+  )
+}
+
+// Solo cuántos jugadores han apostado en la pregunta, sin decir quién.
+function BettorsBadge({ count }: { count: number }) {
+  return (
+    <p className="text-[11px] mt-0.5" style={{ color: count > 0 ? 'var(--green)' : 'var(--text-muted2)' }}>
+      {count === 0 ? 'Nadie ha apostado todavía' : count === 1 ? '👤 1 jugador ya ha apostado' : `👥 ${count} jugadores ya han apostado`}
+    </p>
   )
 }

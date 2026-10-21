@@ -201,7 +201,19 @@ export const getCachedOpenRoundsBetting = unstable_cache(
     const jackpotByTemplate: Record<string, number> = {}
     for (const j of jackpots ?? []) jackpotByTemplate[j.template_id] = j.chips
 
-    return { contexts, catalogTemplates: sortedCatalog, jackpotByTemplate }
+    // Cuántos jugadores han apostado en cada pregunta (solo el número,
+    // nunca quién): la lectura va con service role porque RLS oculta las
+    // apuestas ajenas hasta el cierre.
+    const marketIds = contexts.flatMap(ctx => ctx.markets.map(m => m.id))
+    const { data: betRows } = marketIds.length
+      ? await client.from('bets').select('market_id, player_id').in('market_id', marketIds)
+      : { data: [] as { market_id: string; player_id: string }[] }
+    const bettorSets: Record<string, Set<string>> = {}
+    for (const b of betRows ?? []) (bettorSets[b.market_id] ??= new Set()).add(b.player_id)
+    const bettorsByMarket: Record<string, number> = {}
+    for (const [id, set] of Object.entries(bettorSets)) bettorsByMarket[id] = set.size
+
+    return { contexts, catalogTemplates: sortedCatalog, jackpotByTemplate, bettorsByMarket }
   },
   ['open-rounds-betting'],
   { revalidate: REVALIDATE_SECONDS, tags: ['liga-data'] }
