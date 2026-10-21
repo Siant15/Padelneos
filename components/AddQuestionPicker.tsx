@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { ArrowUp, Pencil } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import type { BettingQuestionTemplate } from '@/lib/types'
@@ -229,26 +230,27 @@ export default function AddQuestionPicker({ roundId, templates, paidCount }: { r
                 <button onClick={() => setEditingId(null)} className="px-2 text-xs font-bold rounded-lg" style={{ background: 'var(--tint)', color: '#555' }}>✕</button>
               </div>
             ) : (
-              <div key={t.id} className="rounded-xl px-3 py-2 flex flex-col gap-2" style={{ background: 'var(--surface2)' }}>
-                <span className="text-xs font-semibold" style={{ color: 'var(--text)' }}>{t.text}</span>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => startEdit(t)}
-                    title="Cambia el texto de esta pregunta (afecta a esta jornada y a las futuras, nunca a las ya jugadas)"
-                    className="flex-1 text-xs font-bold py-2 rounded-lg transition hover:opacity-90"
-                    style={{ background: 'var(--tint)', color: '#555' }}
-                  >
-                    ✏️ Modificar
-                  </button>
-                  <button
-                    onClick={() => startAdd(t)}
-                    disabled={adding === t.id || atLimit}
-                    className="flex-1 text-xs font-bold py-2 rounded-lg transition hover:opacity-90 disabled:opacity-40"
-                    style={{ background: 'var(--accent)', color: '#fff' }}
-                  >
-                    {adding === t.id ? 'Añadiendo...' : '➕ Añadir a las apuestas'}
-                  </button>
-                </div>
+              <div key={t.id} className="rounded-xl pl-3 pr-1.5 py-1.5 flex items-center gap-1.5" style={{ background: 'var(--surface2)' }}>
+                <span className="flex-1 text-xs font-semibold" style={{ color: 'var(--text)' }}>{t.text}</span>
+                <button
+                  onClick={() => startEdit(t)}
+                  aria-label="Modificar pregunta"
+                  title="Modificar el texto (afecta a esta jornada y a las futuras, nunca a las ya jugadas)"
+                  className="shrink-0 w-11 h-11 flex items-center justify-center rounded-lg transition hover:opacity-90"
+                  style={{ background: 'var(--tint)', color: '#555' }}
+                >
+                  <Pencil size={16} />
+                </button>
+                <button
+                  onClick={() => startAdd(t)}
+                  disabled={adding === t.id || atLimit}
+                  aria-label="Subir a las apuestas"
+                  title="Subir a las apuestas de esta jornada"
+                  className="shrink-0 w-11 h-11 flex items-center justify-center rounded-lg transition hover:opacity-90 disabled:opacity-40"
+                  style={{ background: 'var(--accent)', color: '#fff' }}
+                >
+                  {adding === t.id ? '…' : <ArrowUp size={18} />}
+                </button>
               </div>
             )
           ))}
