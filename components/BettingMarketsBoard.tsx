@@ -511,7 +511,7 @@ function ExactScoreCard({ market, canBet, draft, onDraftChange, onSubmit, saving
                 >
                   <p className="text-[11px] font-bold mb-2" style={{ color: 'var(--text-muted2)' }}>Marcador exacto</p>
                   <p className="text-[11px]" style={{ color: 'var(--text)' }}>
-                    Sin coste — se resuelve la primera de todas. Si aciertas el marcador exacto, te llevas TODAS las fichas de la jornada (las de todos, no solo las tuyas) y 1,5 puntos de clasificación — repartido a partes iguales si hay empate entre varios acertantes.
+                    Sin coste — se resuelve la primera de todas. Si aciertas el marcador exacto, te llevas TODAS las fichas de la jornada (las de todos, no solo las tuyas) y 1,5 puntos de clasificación — repartido a partes iguales si hay empate entre varios acertantes. Si aciertan los 4, la pregunta no cuenta y la jornada se liquida con normalidad.
                   </p>
                 </div>
               </>
