@@ -40,7 +40,19 @@ export async function getRoundBettingContext(supabase: SupabaseClient, roundId: 
     supabase.from('round_settlements').select('id').eq('round_id', roundId).is('voided_at', null).maybeSingle(),
   ])
 
-  const marketList = (markets as BettingMarket[] | null) ?? []
+  // Esta lectura va con service role (se salta RLS), así que aquí se
+  // reproduce la regla de la 042: hasta que la pregunta se resuelve, las
+  // apuestas ajenas no revelan quién apostó ni qué marcador. Se conservan
+  // anonimizadas (fichas por opción → bote) y, en el marcador exacto, las
+  // opciones que solo han elegido otros jugadores se descartan.
+  const marketList: BettingMarket[] = ((markets as BettingMarket[] | null) ?? []).map(m => {
+    if (m.resolved || m.voided) return m
+    const bets = (m.bets ?? []).map(b => b.player_id === userId ? b : { ...b, player_id: 'hidden' })
+    const options = m.type === 'exact_score'
+      ? (m.options ?? []).filter(o => bets.some(b => b.option_id === o.id && b.player_id === userId))
+      : m.options
+    return { ...m, bets, options }
+  })
   const chipsUsed = round
     ? marketList.reduce((sum, m) => sum + (m.bets?.filter(b => b.player_id === userId).reduce((s, b) => s + b.chips, 0) ?? 0), 0)
     : 0

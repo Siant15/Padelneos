@@ -456,7 +456,7 @@ function describeBetError(message: string): string {
 
 // ─── Marcador exacto: gratis, 2-3 sets con inputs numéricos, igual
 // que en el registro de resultado, en vez de una lista de opciones.
-function ExactScoreCard({ market, canBet, bettors, draft, onDraftChange, onSubmit, saving }: {
+function ExactScoreCard({ market, canBet, bettors, userId, draft, onDraftChange, onSubmit, saving }: {
   market: BettingMarket
   canBet: boolean
   bettors: number
@@ -466,7 +466,7 @@ function ExactScoreCard({ market, canBet, bettors, draft, onDraftChange, onSubmi
   onSubmit: () => void
   saving: boolean
 }) {
-  const myBetOptions = (market.options ?? []).filter(o => (market.bets ?? []).some(b => b.option_id === o.id))
+  const myBetOptions = (market.options ?? []).filter(o => (market.bets ?? []).some(b => b.option_id === o.id && b.player_id === userId))
   const closeTime = market.closes_at
   const [infoOpen, setInfoOpen] = useState(false)
 
