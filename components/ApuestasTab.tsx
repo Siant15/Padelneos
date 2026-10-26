@@ -129,6 +129,7 @@ export default function ApuestasTab({ userId, rounds, initialRoundId }: { userId
             pair1Label={current.acta.pair1Label}
             pair2Label={current.acta.pair2Label}
             scoreLabel={current.acta.scoreLabel}
+            setsDetail={current.acta.setsDetail}
             userId={userId}
           />
         </>
@@ -152,7 +153,7 @@ export default function ApuestasTab({ userId, rounds, initialRoundId }: { userId
               markets={current.markets}
               userId={userId}
               roundStatus="scheduled"
-              round={{ scheduled_date: current.scheduledDate, scheduled_time: current.scheduledTime }}
+              round={{ scheduled_date: current.scheduledDate, scheduled_time: current.scheduledTime, club: current.club }}
               jackpotByTemplate={current.jackpotByTemplate}
               bettorsByMarket={current.bettorsByMarket}
             />

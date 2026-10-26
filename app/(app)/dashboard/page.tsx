@@ -43,11 +43,9 @@ export default async function DashboardPage() {
     team2_p1?: { name: string; avatar_url: string | null }; team2_p2?: { name: string; avatar_url: string | null }
   } | undefined
   const effectiveTime = round?.scheduled_time?.slice(0, 5)
-  // El botón de "Resultado" solo tiene sentido una vez el partido ya
-  // pudo jugarse — antes de esa hora sería un atajo a una acción
-  // imposible, mezclada con "Apostar" sin ningún orden.
-  const matchMayHaveHappened = !!(round?.scheduled_date && round.scheduled_time &&
-    new Date(`${round.scheduled_date}T${round.scheduled_time}`).getTime() < Date.now())
+  // La jornada sigue abierta todo el día del partido: "Resultado" está
+  // disponible desde ese día (no solo tras la hora de inicio).
+  const matchMayHaveHappened = !!(round?.scheduled_date && round.scheduled_date <= new Date().toISOString().slice(0, 10))
   const effectiveClub = round?.club
 
   // Ninguna de estas tres depende del resultado de las otras dos —

@@ -3,7 +3,7 @@ import type { BettingMarket } from '@/lib/types'
 export const CHIPS_PER_ROUND = 100
 export const QUICK_BET_AMOUNT = 10
 
-type RoundTiming = { scheduled_date: string | null; scheduled_time: string | null }
+type RoundTiming = { scheduled_date: string | null; scheduled_time: string | null; club: string | null }
 
 // Interpreta una fecha+hora como hora local de Madrid (con o sin
 // verano, calculado para esa fecha concreta) y devuelve el instante
@@ -26,11 +26,11 @@ export function madridDateTimeToUtc(dateStr: string, timeStr: string): Date {
   return new Date(guess.getTime() - offsetMs)
 }
 
-// Una jornada solo admite apuestas si tiene día y hora confirmados —
-// si no, no hay hora de cierre por defecto y no se puede apostar
-// (antes se dejaba abierto hasta una hora ficticia de las 23:59:59).
+// Una jornada solo admite apuestas con la reserva completa: día, hora
+// y club — si no, no hay hora de cierre por defecto y no se puede
+// apostar (antes se dejaba abierto hasta una hora ficticia de las 23:59:59).
 export function isRoundBettable(round: RoundTiming): boolean {
-  return !!(round.scheduled_date && round.scheduled_time)
+  return !!(round.scheduled_date && round.scheduled_time && round.club)
 }
 
 // Cuánto antes del partido cierra el mercado de apuestas por defecto

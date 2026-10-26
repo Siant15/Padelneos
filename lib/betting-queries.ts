@@ -22,7 +22,7 @@ function setsWonLabel(match: Match): string | null {
 // tanto /apuestas/[roundId] como las dos zonas de Inicio, así nunca
 // hay saldos ni preguntas calculadas dos veces por separado.
 export type RoundBettingContext = {
-  round: { id: string; round_number: number; scheduled_date: string | null; scheduled_time: string | null; status: string; season_id: string } | null
+  round: { id: string; round_number: number; scheduled_date: string | null; scheduled_time: string | null; club: string | null; status: string; season_id: string } | null
   markets: BettingMarket[]
   openMarketsCount: number
   chipsUsed: number
@@ -32,7 +32,7 @@ export type RoundBettingContext = {
 
 export async function getRoundBettingContext(supabase: SupabaseClient, roundId: string, userId: string): Promise<RoundBettingContext> {
   const [{ data: round }, { data: markets }, { data: settlement }] = await Promise.all([
-    supabase.from('rounds').select('id, round_number, scheduled_date, scheduled_time, status, season_id').eq('id', roundId).maybeSingle(),
+    supabase.from('rounds').select('id, round_number, scheduled_date, scheduled_time, club, status, season_id').eq('id', roundId).maybeSingle(),
     supabase.from('betting_markets')
       .select('*, options:betting_options!market_id(*, player:profiles(id, name)), bets(*)')
       .eq('round_id', roundId)
@@ -146,6 +146,7 @@ export type RoundActa = {
   pair1Label: string | null
   pair2Label: string | null
   scoreLabel: string | null
+  setsDetail: string | null
   isSettled: boolean
   markets: ActaMarket[]
   closure: ActaClosureRow[]
@@ -176,7 +177,7 @@ export async function getRoundActa(supabase: SupabaseClient, roundId: string, pr
   const players = playersResult.data
 
   if (!round) {
-    return { round: null, pair1Label: null, pair2Label: null, scoreLabel: null, isSettled: false, markets: [], closure: [] }
+    return { round: null, pair1Label: null, pair2Label: null, scoreLabel: null, setsDetail: null, isSettled: false, markets: [], closure: [] }
   }
 
   const match = round.match as unknown as (Match & { team1_p1: { name: string }; team1_p2: { name: string }; team2_p1: { name: string }; team2_p2: { name: string } }) | null
@@ -241,6 +242,13 @@ export async function getRoundActa(supabase: SupabaseClient, roundId: string, pr
     pair1Label: match ? getPairName(match as Match, 'team1') : null,
     pair2Label: match ? getPairName(match as Match, 'team2') : null,
     scoreLabel: match ? setsWonLabel(match as Match) : null,
+    // Juegos set a set ("6-3, 4-6, 6-4"), en el orden pareja 1 - pareja 2.
+    setsDetail: match && match.set1_t1 !== null
+      ? [[match.set1_t1, match.set1_t2], [match.set2_t1, match.set2_t2], [match.set3_t1, match.set3_t2]]
+          .filter(([a, b]) => a !== null && b !== null)
+          .map(([a, b]) => `${a}-${b}`)
+          .join(', ')
+      : null,
     isSettled,
     markets: actaMarkets,
     closure,

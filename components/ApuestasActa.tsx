@@ -6,12 +6,13 @@ const MEDALS: Record<number, string> = { 1: '🥇', 2: '🥈' }
 // apuestas, no un dashboard — una sola columna, lectura continua, sin
 // tarjetas por pregunta ni gráficos. El resultado propio del jugador
 // autenticado siempre se destaca primero, antes que la tabla del grupo.
-export default function ApuestasActa({ markets, closure, pair1Label, pair2Label, scoreLabel, userId }: {
+export default function ApuestasActa({ markets, closure, pair1Label, pair2Label, scoreLabel, setsDetail, userId }: {
   markets: ActaMarket[]
   closure: ActaClosureRow[]
   pair1Label: string | null
   pair2Label: string | null
   scoreLabel: string | null
+  setsDetail: string | null
   userId: string
 }) {
   const me = closure.find(c => c.playerId === userId)
@@ -24,12 +25,17 @@ export default function ApuestasActa({ markets, closure, pair1Label, pair2Label,
           <div className="flex items-center justify-between gap-2 mt-2">
             <span className="text-sm font-bold flex-1 min-w-0 truncate">{pair1Label}</span>
             {scoreLabel && (
-              <span
-                className="shrink-0 px-3 py-1.5 rounded-full font-heading font-extrabold text-base"
-                style={{ background: 'var(--green)', color: '#fff' }}
-              >
-                {scoreLabel}
-              </span>
+              <div className="shrink-0 flex flex-col items-center gap-1">
+                <span
+                  className="px-3 py-1.5 rounded-full font-heading font-extrabold text-base"
+                  style={{ background: 'var(--green)', color: '#fff' }}
+                >
+                  {scoreLabel}
+                </span>
+                {setsDetail && (
+                  <span className="text-[11px] font-bold whitespace-nowrap" style={{ color: 'var(--green)' }}>{setsDetail}</span>
+                )}
+              </div>
             )}
             <span className="text-sm font-bold flex-1 min-w-0 truncate text-right">{pair2Label}</span>
           </div>

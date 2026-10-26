@@ -15,7 +15,7 @@ interface Props {
   markets: BettingMarket[]
   userId: string
   roundStatus: string
-  round: { scheduled_date: string | null; scheduled_time: string | null }
+  round: { scheduled_date: string | null; scheduled_time: string | null; club: string | null }
   jackpotByTemplate: Record<string, number>
   bettorsByMarket: Record<string, number>
 }
@@ -78,7 +78,7 @@ export default function BettingMarketsBoard({ roundId, markets, userId, roundSta
   const editableMarkets = paidMarkets.filter(m => {
     const closeTime = marketCloseTime(m, round)
     const isClosedByTime = closeTime !== null && new Date(closeTime) <= new Date()
-    return roundStatus === 'scheduled' && !m.resolved && !isClosedByTime
+    return roundStatus === 'scheduled' && !m.resolved && closeTime !== null && !isClosedByTime
   })
 
   const totalChosen = editableMarkets.reduce((s, m) => s + (selections[m.id]?.chips ?? 0), 0)
@@ -271,14 +271,10 @@ export default function BettingMarketsBoard({ roundId, markets, userId, roundSta
         <ExactScoreCard
           market={exactScoreMarket}
           canBet={roundStatus === 'scheduled' && !exactScoreMarket.resolved && (() => {
-            // A diferencia del resto de preguntas, el marcador exacto se
-            // puede pronosticar aunque la jornada todavía no tenga día y
-            // hora confirmados (closeTime === null) — no hay forma de
-            // hacer trampa apostando "tarde" sobre un partido que ni
-            // siquiera está programado. En cuanto sí hay fecha, cierra
-            // igual que las demás (1h antes).
+            // Como el resto: solo abre con la reserva completa (día, hora
+            // y club) y cierra 1h antes del partido.
             const closeTime = marketCloseTime(exactScoreMarket, round)
-            return closeTime === null || new Date(closeTime) > new Date()
+            return closeTime !== null && new Date(closeTime) > new Date()
           })()}
           userId={userId}
           bettors={bettorsByMarket[exactScoreMarket.id] ?? 0}
@@ -292,7 +288,7 @@ export default function BettingMarketsBoard({ roundId, markets, userId, roundSta
       {paidMarkets.map((market, idx) => {
         const closeTime = marketCloseTime(market, round)
         const isClosedByTime = closeTime !== null && new Date(closeTime) <= new Date()
-        const canBet = roundStatus === 'scheduled' && !market.resolved && !isClosedByTime
+        const canBet = roundStatus === 'scheduled' && !market.resolved && closeTime !== null && !isClosedByTime
         const totalMarketChips = (market.options ?? []).reduce((s, o) => s + getTotalChipsOnOption(market, o.id), 0)
         const jackpot = (market.template_id && jackpotByTemplate[market.template_id]) || 0
         const potWithJackpot = totalMarketChips + jackpot
@@ -339,7 +335,7 @@ export default function BettingMarketsBoard({ roundId, markets, userId, roundSta
             )}
             {!market.resolved && !isClosedByTime && !closeTime && (
               <p className="text-[11px] mt-1" style={{ color: 'var(--orange)' }}>
-                Se abrirá cuando esta jornada tenga día y hora confirmados
+                Se abrirá cuando esta jornada tenga día, hora y club confirmados
               </p>
             )}
             {jackpot > 0 && (
