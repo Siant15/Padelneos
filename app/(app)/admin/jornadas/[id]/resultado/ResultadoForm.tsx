@@ -8,6 +8,7 @@ import { isValidSetScore } from '@/lib/types'
 import { revalidateLigaData } from '@/lib/actions'
 import { friendlyError } from '@/lib/errors'
 import { notifySettlementResults } from '@/lib/settlement-actions'
+import { rescheduleFollowingRounds } from '@/lib/schedule-actions'
 
 type PairForm = { team1_p1_id: string; team1_p2_id: string; team2_p1_id: string; team2_p2_id: string }
 type SetScore = { t1: string; t2: string }
@@ -115,6 +116,7 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
     if (statusError) {
       setSettleError(friendlyError(statusError.message, 'Jornada liquidada, pero no se pudo marcar como jugada. Vuelve a guardar el resultado.'))
     }
+    await rescheduleFollowingRounds(roundId)
     await revalidateLigaData()
     await loadBetsStatus()
     setSettling(false)
@@ -282,6 +284,7 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
       setSaveError(friendlyError(roundError.message, 'Resultado guardado, pero no se pudo marcar la jornada como jugada.'))
       return
     }
+    await rescheduleFollowingRounds(roundId)
     await revalidateLigaData()
     setSaved(true)
     router.refresh()

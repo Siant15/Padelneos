@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { revalidateLigaData } from '@/lib/actions'
+import { rescheduleFollowingRounds } from '@/lib/schedule-actions'
 import ClubPicker from '@/components/ClubPicker'
 import { friendlyError } from '@/lib/errors'
 
@@ -52,6 +53,7 @@ export default function ReservaForm({ roundId, roundNumber, bookerName, isRespon
       setLoading(false)
       return
     }
+    await rescheduleFollowingRounds(roundId)
     await revalidateLigaData()
     setSaved(true)
     setLoading(false)

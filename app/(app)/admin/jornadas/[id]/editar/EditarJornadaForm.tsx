@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { revalidateLigaData } from '@/lib/actions'
+import { rescheduleFollowingRounds } from '@/lib/schedule-actions'
 import ClubPicker from '@/components/ClubPicker'
 import { friendlyError } from '@/lib/errors'
 
@@ -78,6 +79,8 @@ export default function EditarJornadaForm({ roundId, players, initialForm, initi
       setLoading(false)
       return
     }
+
+    await rescheduleFollowingRounds(roundId)
 
     if (form.matchId) {
       const { error: matchError } = await supabase.from('matches').update({
