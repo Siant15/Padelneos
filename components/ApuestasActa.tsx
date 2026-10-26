@@ -33,6 +33,20 @@ export default function ApuestasActa({ markets, closure, pair1Label, pair2Label,
             )}
             <span className="text-sm font-bold flex-1 min-w-0 truncate text-right">{pair2Label}</span>
           </div>
+          {closure.length > 0 && (
+            <ol className="mt-3 flex flex-col gap-1">
+              {[...closure].sort((x, y) => y.chipsReceived - x.chipsReceived || x.rank - y.rank).map((c, i) => (
+                <li
+                  key={c.playerId}
+                  className="flex items-center justify-between gap-2 text-[13px] rounded-lg px-2.5 py-1.5"
+                  style={{ background: c.playerId === userId ? 'rgba(255,255,255,0.7)' : 'transparent', fontWeight: c.playerId === userId ? 800 : 600 }}
+                >
+                  <span className="min-w-0 truncate">{i + 1}. {c.playerName}{c.playerId === userId && <span style={{ color: 'var(--text-muted2)', fontWeight: 500 }}> · tú</span>}</span>
+                  <span className="shrink-0" style={{ color: 'var(--green)' }}>{c.chipsReceived} fichas</span>
+                </li>
+              ))}
+            </ol>
+          )}
           {me && (
             <p className="text-xs mt-2.5" style={{ color: 'var(--text)' }}>
               Tu jornada, {me.playerName} · {me.correctCount} acierto{me.correctCount === 1 ? '' : 's'} · {me.chipsReceived} fichas recibidas
