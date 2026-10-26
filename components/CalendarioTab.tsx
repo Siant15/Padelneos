@@ -38,9 +38,11 @@ export default function CalendarioTab({
 
   return (
     <div className="flex flex-col gap-3.5">
-      {!!items.length && <MiniCalendar matchDates={items.map(j => j.rawDate).filter((d): d is string => !!d)} />}
+      {!!items.length && <MiniCalendar matches={items.filter(j => !!j.rawDate).map(j => ({ date: j.rawDate as string, played: j.played }))} />}
       {!!items.length && (
         <p className="text-[11px] flex flex-wrap gap-x-3 gap-y-1" style={{ color: 'var(--text-muted)' }}>
+          <span><span style={{ color: 'var(--green)' }}>●</span> <strong>Verde</strong>: día en que hubo partido</span>
+          <span><span style={{ color: 'var(--red)' }}>●</span> <strong>Rojo</strong>: fecha prevista del próximo partido</span>
           <span>⏳ <strong>Pendiente de reserva</strong>: falta día, hora o club</span>
           <span>📅 <strong>Reservada</strong>: ya tiene día, hora y club</span>
           <span>✔ <strong>Finalizada</strong>: ya se jugó</span>

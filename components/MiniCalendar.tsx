@@ -4,9 +4,10 @@ import { useState } from 'react'
 
 const DAY_LABELS = ['L', 'M', 'X', 'J', 'V', 'S', 'D']
 
-type Cell = { key: number; label: number; muted: boolean; match: boolean }
+type Kind = 'played' | 'upcoming' | null
+type Cell = { key: number; label: number; muted: boolean; kind: Kind }
 
-function buildMonthGrid(year: number, month: number, matchDays: Set<number>): Cell[] {
+function buildMonthGrid(year: number, month: number, kindByDay: Map<number, Kind>): Cell[] {
   const first = new Date(year, month, 1)
   const startOffset = (first.getDay() + 6) % 7 // lunes = 0
   const daysInMonth = new Date(year, month + 1, 0).getDate()
@@ -14,19 +15,21 @@ function buildMonthGrid(year: number, month: number, matchDays: Set<number>): Ce
 
   const cells: Omit<Cell, 'key'>[] = []
   for (let i = 0; i < startOffset; i++) {
-    cells.push({ label: daysInPrev - startOffset + 1 + i, muted: true, match: false })
+    cells.push({ label: daysInPrev - startOffset + 1 + i, muted: true, kind: null })
   }
   for (let d = 1; d <= daysInMonth; d++) {
-    cells.push({ label: d, muted: false, match: matchDays.has(d) })
+    cells.push({ label: d, muted: false, kind: kindByDay.get(d) ?? null })
   }
   let nextDay = 1
   while (cells.length % 7 !== 0 || cells.length < 42) {
-    cells.push({ label: nextDay++, muted: true, match: false })
+    cells.push({ label: nextDay++, muted: true, kind: null })
   }
   return cells.map((c, i) => ({ ...c, key: i }))
 }
 
-export default function MiniCalendar({ matchDates }: { matchDates: string[] }) {
+// Verde: día en que ya hubo partido. Rojo: fecha prevista de un partido
+// por jugar.
+export default function MiniCalendar({ matches }: { matches: { date: string; played: boolean }[] }) {
   const today = new Date()
   const [monthOffset, setMonthOffset] = useState(0)
 
@@ -34,14 +37,16 @@ export default function MiniCalendar({ matchDates }: { matchDates: string[] }) {
   const year = base.getFullYear()
   const month = base.getMonth()
 
-  const matchDays = new Set(
-    matchDates
-      .map(d => new Date(d + 'T12:00:00'))
-      .filter(d => d.getFullYear() === year && d.getMonth() === month)
-      .map(d => d.getDate())
-  )
+  const kindByDay = new Map<number, Kind>()
+  for (const m of matches) {
+    const d = new Date(m.date + 'T12:00:00')
+    if (d.getFullYear() !== year || d.getMonth() !== month) continue
+    const day = d.getDate()
+    // Si un mismo día tiene un partido jugado y otro previsto, manda el jugado.
+    if (m.played || !kindByDay.has(day)) kindByDay.set(day, m.played ? 'played' : 'upcoming')
+  }
 
-  const cells = buildMonthGrid(year, month, matchDays)
+  const cells = buildMonthGrid(year, month, kindByDay)
   const monthLabel = base.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })
 
   return (
@@ -60,9 +65,11 @@ export default function MiniCalendar({ matchDates }: { matchDates: string[] }) {
             key={c.key}
             className="text-[12.5px] py-1.5 rounded-lg"
             style={
-              c.match
-                ? { background: 'var(--accent)', color: '#fff', fontWeight: 800 }
-                : c.muted
+              c.kind === 'played'
+                ? { background: 'var(--green)', color: '#fff', fontWeight: 800 }
+                : c.kind === 'upcoming'
+                  ? { background: 'var(--red)', color: '#fff', fontWeight: 800 }
+                  : c.muted
                   ? { color: 'var(--text-muted2)', opacity: 0.5 }
                   : { color: 'var(--text)', fontWeight: 600 }
             }
