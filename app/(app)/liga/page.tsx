@@ -4,7 +4,7 @@ import type { IndividualStanding, PairStanding } from '@/lib/types'
 import { formatDate, getJornadaReservaStatus } from '@/lib/types'
 import LigaTabs from '@/components/LigaTabs'
 import type { JornadaViewModel } from '@/components/JornadasAccordion'
-import { getCachedActiveSeason, getCachedPlayers, getCachedSeasonRounds, getCachedSeasonAggregates, getCachedSettledActas, getCachedOpenRoundsBetting } from '@/lib/supabase/cached'
+import { getCachedActiveSeason, getCachedPlayers, getCachedSeasonRounds, getCachedSeasonAggregates, getCachedSettledActas, getCachedOpenRoundsBetting, getCachedMyBetsForRounds } from '@/lib/supabase/cached'
 import type { ApuestasRoundEntry } from '@/components/ApuestasTab'
 
 const MEDALS = ['🥇', '🥈', '🥉', '4º']
@@ -198,6 +198,9 @@ export default async function LigaPage() {
     }
   }) : []
 
+  const awaitingIds = pendingRoundRefs.filter(r => r.status === 'played').map(r => r.id)
+  const myBetsByRound = awaitingIds.length ? await getCachedMyBetsForRounds(awaitingIds, userId) : {}
+
   const pendingEntries: ApuestasRoundEntry[] = pendingRoundRefs.map(r => ({
     kind: 'pending' as const,
     roundId: r.id,
@@ -207,6 +210,7 @@ export default async function LigaPage() {
     scheduledTime: r.scheduled_time,
     club: r.club,
     reason: r.status === 'played' ? 'awaiting_settlement' as const : 'no_questions' as const,
+    myBets: myBetsByRound[r.id] ?? [],
   }))
 
   const apuestasRounds: ApuestasRoundEntry[] = [...settledEntries, ...openEntries, ...pendingEntries]

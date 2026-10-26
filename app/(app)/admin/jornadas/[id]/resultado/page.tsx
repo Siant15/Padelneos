@@ -49,6 +49,7 @@ export default async function ResultadoPage({ params }: { params: Promise<{ id: 
         players={[]}
         sets={[{ t1: '', t2: '' }, { t1: '', t2: '' }]}
         allPlayers={allPlayers ?? []}
+        initialBets={null}
       />
     )
   }
@@ -68,10 +69,18 @@ export default async function ResultadoPage({ params }: { params: Promise<{ id: 
     sets.push({ t1: m.set3_t1.toString(), t2: m.set3_t2?.toString() ?? '' })
   }
 
+  const [{ data: pendingRows }, { data: settlement }] = await Promise.all([
+    supabase.from('betting_markets')
+      .select('id, description, options:betting_options(id, label, is_none)')
+      .eq('round_id', roundId).eq('resolved', false),
+    supabase.from('round_settlements').select('id').eq('round_id', roundId).is('voided_at', null).maybeSingle(),
+  ])
+
   return (
     <ResultadoForm
       roundId={roundId}
       roundNumber={roundNumber}
+      initialBets={{ pending: (pendingRows as unknown as { id: string; description: string; options: { id: string; label: string; is_none: boolean | null }[] }[] | null) ?? [], settled: !!settlement }}
       mode="ready"
       matchId={m.id}
       players={players}

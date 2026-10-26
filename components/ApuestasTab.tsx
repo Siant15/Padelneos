@@ -13,7 +13,7 @@ type BaseRound = { roundId: string; roundNumber: number; pair1Label: string | nu
 
 export type SettledRoundEntry = { kind: 'settled'; roundId: string; roundNumber: number; acta: RoundActa }
 export type OpenRoundEntry = BaseRound & { kind: 'open'; markets: BettingMarket[]; chipsLeft: number; jackpotByTemplate: Record<string, number>; bettorsByMarket: Record<string, number>; availableTemplates: BettingQuestionTemplate[] }
-export type PendingRoundEntry = BaseRound & { kind: 'pending'; reason: 'awaiting_settlement' | 'no_questions' }
+export type PendingRoundEntry = BaseRound & { kind: 'pending'; reason: 'awaiting_settlement' | 'no_questions'; myBets: { question: string; answer: string; chips: number; resolved: boolean; voided: boolean; won: boolean }[] }
 export type ApuestasRoundEntry = SettledRoundEntry | OpenRoundEntry | PendingRoundEntry
 
 const STATUS_LABEL: Record<ApuestasRoundEntry['kind'], string> = {
@@ -183,6 +183,27 @@ export default function ApuestasTab({ userId, rounds, initialRoundId }: { userId
               ? 'Jornada pendiente de liquidar.'
               : 'Todavía no se han generado las preguntas de apuestas para esta jornada.'}
           </div>
+          {current.reason === 'awaiting_settlement' && current.myBets.length > 0 && (
+            <div className="rounded-2xl p-3.5 flex flex-col gap-2" style={{ background: 'var(--surface)', boxShadow: '0 3px 10px rgba(0,0,0,0.04)' }}>
+              <h3 className="font-heading font-bold text-[13px]">Tus apuestas</h3>
+              {current.myBets.map((b, i) => (
+                <div key={i} className="flex items-center justify-between gap-2 text-xs">
+                  <div className="min-w-0">
+                    <div className="font-semibold truncate">{b.question}</div>
+                    <div style={{ color: 'var(--text-muted)' }}>{b.answer}{b.chips > 0 ? ` · ${b.chips} fichas` : ''}</div>
+                  </div>
+                  <span className="shrink-0 font-bold" style={{ color: b.voided ? 'var(--text-muted2)' : b.resolved ? (b.won ? 'var(--green)' : 'var(--red)') : 'var(--orange)' }}>
+                    {b.voided ? 'Anulada' : b.resolved ? (b.won ? '✓ Acertada' : '✗ Fallada') : 'Pendiente'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+          {current.reason === 'awaiting_settlement' && (
+            <a href={`/admin/jornadas/${current.roundId}/resultado`} className="block text-center text-sm font-bold py-3 rounded-xl" style={{ background: 'var(--orange-bg)', color: 'var(--orange)' }}>
+              📝 Resolver apuestas de esta jornada
+            </a>
+          )}
         </>
       )}
 

@@ -1,12 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { isValidSetScore } from '@/lib/types'
 import { revalidateLigaData } from '@/lib/actions'
 import { friendlyError } from '@/lib/errors'
+import { notifySettlementResults } from '@/lib/settlement-actions'
 
 type PairForm = { team1_p1_id: string; team1_p2_id: string; team2_p1_id: string; team2_p2_id: string }
 type SetScore = { t1: string; t2: string }
@@ -55,7 +56,7 @@ function evaluateSets(sets: SetScore[]): MatchStatus {
   return { winner: w3, error: null, needsThirdSet: false, decidedInTwo: false }
 }
 
-export default function ResultadoForm({ roundId, roundNumber, mode, matchId: initialMatchId, players: initialRoundPlayers, sets: initialSets, allPlayers }: {
+export default function ResultadoForm({ roundId, roundNumber, mode, matchId: initialMatchId, players: initialRoundPlayers, sets: initialSets, allPlayers, initialBets }: {
   roundId: string
   roundNumber: number
   mode: 'ready' | 'no-match'
@@ -63,6 +64,7 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
   players: RoundPlayer[]
   sets: SetScore[]
   allPlayers: PlayerLite[]
+  initialBets: { pending: PendingMarket[]; settled: boolean } | null
 }) {
   const supabase = createClient()
   const router = useRouter()
@@ -80,6 +82,39 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
   const [pendingMarkets, setPendingMarkets] = useState<PendingMarket[] | null>(null)
   const [resolvingMarketId, setResolvingMarketId] = useState<string | null>(null)
   const [pendingSelection, setPendingSelection] = useState<Record<string, string>>({})
+  const [betsStatus, setBetsStatus] = useState<{ pending: PendingMarket[]; settled: boolean } | null>(initialBets)
+  const [settling, setSettling] = useState(false)
+  const [settleError, setSettleError] = useState('')
+
+  // Estado de las apuestas de la jornada (preguntas sin resolver y si
+  // ya está liquidada) para el bloque "Apuestas" de esta pantalla.
+  const loadBetsStatus = useCallback(async () => {
+    const [{ data: pending }, { data: settlement }] = await Promise.all([
+      supabase.from('betting_markets')
+        .select('id, description, options:betting_options(id, label, is_none)')
+        .eq('round_id', roundId).eq('resolved', false),
+      supabase.from('round_settlements').select('id').eq('round_id', roundId).is('voided_at', null).maybeSingle(),
+    ])
+    setBetsStatus({ pending: (pending as PendingMarket[] | null) ?? [], settled: !!settlement })
+  }, [roundId, supabase])
+
+  async function handleSettle() {
+    setSettling(true)
+    setSettleError('')
+    const { error } = await supabase.rpc('settle_round', { p_round_id: roundId })
+    if (error) {
+      setSettling(false)
+      setSettleError(friendlyError(error.message, 'No se pudo liquidar la jornada.'))
+      return
+    }
+    await supabase.rpc('prune_stale_question_templates')
+    await notifySettlementResults(roundId)
+    await supabase.from('rounds').update({ status: 'played' }).eq('id', roundId)
+    await revalidateLigaData()
+    await loadBetsStatus()
+    setSettling(false)
+    router.refresh()
+  }
 
   // Si el Server Component vuelve a renderizar con datos frescos (p.ej.
   // tras un router.refresh() tras guardar), useState no recoge los
@@ -199,6 +234,7 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
   }
 
   async function checkPendingMarketsOrFinish() {
+    loadBetsStatus()
     const { data } = await supabase
       .from('betting_markets')
       .select('id, description, options:betting_options(id, label, is_none)')
@@ -235,6 +271,7 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
       return
     }
     await checkPendingMarketsOrFinish()
+    await loadBetsStatus()
   }
 
   const team1Players = players.filter(p => p.team === 1)
@@ -447,6 +484,36 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
             </button>
           )}
         </form>
+      )}
+
+      {loadState === 'ready' && winner && betsStatus && (
+        <div className="rounded-xl p-4 space-y-3" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
+          <p className="text-sm font-semibold">🎰 Apuestas de la jornada</p>
+          {betsStatus.pending.length > 0 ? (
+            <>
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                Quedan <strong>{betsStatus.pending.length}</strong> preguntas por resolver. Se guarda el resultado primero y luego las resuelves aquí mismo.
+              </p>
+              <button type="button" onClick={() => setPendingMarkets(betsStatus.pending)}
+                className="w-full py-3 rounded-xl font-semibold transition hover:opacity-90"
+                style={{ background: 'var(--accent)', color: '#fff' }}>
+                🎯 Resolver apuestas
+              </button>
+            </>
+          ) : betsStatus.settled ? (
+            <p className="text-sm font-semibold" style={{ color: 'var(--green)' }}>✓ Jornada liquidada — fichas repartidas y puntos asignados.</p>
+          ) : (
+            <>
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Todas las preguntas están resueltas. Falta repartir las fichas y asignar los puntos.</p>
+              {settleError && <p className="text-xs" style={{ color: 'var(--red)' }}>⚠ {settleError}</p>}
+              <button type="button" onClick={handleSettle} disabled={settling}
+                className="w-full py-3 rounded-xl font-semibold transition hover:opacity-90 disabled:opacity-50"
+                style={{ background: 'var(--green)', color: '#fff' }}>
+                {settling ? 'Liquidando...' : '🏆 Liquidar jornada'}
+              </button>
+            </>
+          )}
+        </div>
       )}
 
       {pendingMarkets && (

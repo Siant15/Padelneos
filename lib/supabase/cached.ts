@@ -228,3 +228,24 @@ export const getCachedSeasonBettingRanking = unstable_cache(
   ['season-betting-ranking'],
   { revalidate: REVALIDATE_SECONDS, tags: ['liga-data'] }
 )
+
+// Las apuestas propias de jornadas ya jugadas pero sin liquidar: así el
+// jugador ve lo que apostó mientras se resuelven las preguntas.
+export const getCachedMyBetsForRounds = unstable_cache(
+  async (roundIds: string[], userId: string) => {
+    const client = serviceClient()
+    const contexts = await Promise.all(roundIds.map(id => getRoundBettingContext(client, id, userId)))
+    const out: Record<string, { question: string; answer: string; chips: number; resolved: boolean; voided: boolean; won: boolean }[]> = {}
+    roundIds.forEach((id, i) => {
+      out[id] = contexts[i].markets.flatMap(m => {
+        const bet = (m.bets ?? []).find(b => b.player_id === userId)
+        if (!bet) return []
+        const opt = (m.options ?? []).find(o => o.id === bet.option_id)
+        return [{ question: m.description, answer: opt?.label ?? '—', chips: bet.chips, resolved: m.resolved, voided: !!m.voided, won: m.winning_option_id === bet.option_id }]
+      })
+    })
+    return out
+  },
+  ['my-bets-for-rounds'],
+  { revalidate: REVALIDATE_SECONDS, tags: ['liga-data'] }
+)

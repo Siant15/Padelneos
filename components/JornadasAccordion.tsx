@@ -91,6 +91,22 @@ export default function JornadasAccordion({ items }: { items: JornadaViewModel[]
                     {j.betWinner && (
                       <div>💰 Mejor apostador: <strong>{j.betWinner}</strong> (+1){j.betSecond && ` · ${j.betSecond} (+0.5)`}</div>
                     )}
+                    <div className="flex gap-2 mt-1">
+                      <Link
+                        href={`/admin/jornadas/${j.id}/resultado`}
+                        className="flex-1 text-center text-xs font-bold py-2 rounded-xl"
+                        style={{ background: 'var(--tint)', color: '#555' }}
+                      >
+                        📝 Resultado y apuestas
+                      </Link>
+                      <Link
+                        href={`/liga?tab=apuestas&round=${j.id}`}
+                        className="flex-1 text-center text-xs font-bold py-2 rounded-xl"
+                        style={{ background: 'var(--surface2)', color: 'var(--accent)' }}
+                      >
+                        🎰 Ver apuestas
+                      </Link>
+                    </div>
                   </>
                 )}
 
