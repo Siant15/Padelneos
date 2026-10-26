@@ -1,6 +1,5 @@
 import { createClient, getCachedUser } from '@/lib/supabase/server'
 import type { Round } from '@/lib/types'
-import { formatDate } from '@/lib/types'
 import Link from 'next/link'
 import { Calendar, Clock, MapPin, ArrowUp, ArrowDown, Minus, Flame, Snowflake, Flag, Pencil } from 'lucide-react'
 import ConfirmCourtButton from '@/components/ConfirmCourtButton'
@@ -9,6 +8,7 @@ import StopPropagation from '@/components/StopPropagation'
 import DinnerRiskInfo from '@/components/DinnerRiskInfo'
 import PiquesCarousel from '@/components/PiquesCarousel'
 import { getRoundBettingContext } from '@/lib/betting-queries'
+import { isRoundBettable } from '@/lib/betting'
 import { getCachedActiveSeason, getCachedSeasonRounds } from '@/lib/supabase/cached'
 import { getInicioData } from '@/lib/inicio-data'
 import { estimateDinnerRisk } from '@/lib/types'
@@ -61,11 +61,14 @@ export default async function DashboardPage() {
   const seasonRoundDates = rounds.filter(r => r.status !== 'played').map(r => r.scheduled_date)
   const today = new Date().toISOString().slice(0, 10)
   const remainingJornadas = seasonRoundDates.length
-  const futureDates = seasonRoundDates.filter((d): d is string => !!d && d >= today)
-  const lastDate = futureDates.at(-1)
-  const remainingMonths = lastDate
-    ? Math.max(1, Math.round((new Date(lastDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24 * 30)))
-    : 0
+  const lastDate = seasonRoundDates.filter((d): d is string => !!d).sort().at(-1)
+  const lastDateLabel = lastDate ? new Date(`${lastDate}T12:00:00`).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }) : null
+  // Con la reserva incompleta, o con la fecha ya pasada, el mercado de apuestas está cerrado.
+  const betsOpen = !!round && isRoundBettable(round) && !!round.scheduled_date && round.scheduled_date >= today
+  const betsClosedReason = !round ? '' : !isRoundBettable(round) ? 'faltan día, hora o club' : 'la fecha ya pasó'
+  const nextDateLabel = round?.scheduled_date
+    ? new Date(`${round.scheduled_date}T12:00:00`).toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' }).replace(',', '')
+    : '-'
 
   // El riesgo de cena se calcula sobre los puntos actuales ya resueltos
   // por getInicioData (sport+apuestas ya sumados en `points`) y los
@@ -87,7 +90,7 @@ export default async function DashboardPage() {
         <span className="font-heading text-lg font-bold">Hola, {profile?.name ?? '...'}</span>
         {seasonId && (
           <span className="text-xs font-bold" style={{ color: 'var(--accent)' }}>
-            {remainingJornadas} jornada{remainingJornadas === 1 ? '' : 's'}{remainingMonths > 0 ? ` · ~${remainingMonths} mes${remainingMonths === 1 ? '' : 'es'}` : ''}
+            {remainingJornadas > 0 ? `Quedan ${remainingJornadas} jornada${remainingJornadas === 1 ? '' : 's'}${lastDateLabel ? ` · hasta el ${lastDateLabel}` : ''}` : 'Liga terminada'}
           </span>
         )}
       </div>
@@ -104,7 +107,7 @@ export default async function DashboardPage() {
 
             <div className="flex items-center gap-3 text-xs font-bold opacity-95">
               <span className="flex items-center gap-1"><Calendar size={13} /> J{round.round_number} <Pencil size={11} className="opacity-80" /></span>
-              <span className="flex items-center gap-1"><Clock size={13} /> {round.scheduled_date ? formatDate(round.scheduled_date).split(',')[0] : '-'} · {effectiveTime || '-'}</span>
+              <span className="flex items-center gap-1"><Clock size={13} /> {nextDateLabel} · {effectiveTime || '-'}</span>
             </div>
             <p className="text-xs flex items-center gap-1 -mt-1.5 opacity-90">
               <MapPin size={13} /> {effectiveClub || 'Falta elegir club'}
@@ -150,6 +153,9 @@ export default async function DashboardPage() {
               </div>
             )}
 
+            {/* El chip solo aparece cuando aporta algo: reserva confirmada o sin responsable.
+                Con responsable asignado, "Responsable: …" y el botón de reservar ya lo dicen. */}
+            {(round.court_confirmed || !round.court_booker?.name) && (
             <div className="flex justify-center">
               <span
                 className="text-[11px] font-extrabold px-3 py-1 rounded-full"
@@ -165,6 +171,7 @@ export default async function DashboardPage() {
                     : 'Reserva pendiente · sin asignar (toca para asignar)'}
               </span>
             </div>
+            )}
 
             {!round.court_confirmed && round.court_booker_id === user?.id && (
               <StopPropagation>
@@ -193,15 +200,25 @@ export default async function DashboardPage() {
                     Resultado
                   </Link>
                 )}
-                <Link
-                  href={`/liga?tab=apuestas&round=${round.id}`}
-                  className="flex-1 text-center text-sm font-bold py-2.5 rounded-xl transition hover:opacity-90 flex items-center justify-center gap-1.5"
-                  style={matchMayHaveHappened
-                    ? { background: 'rgba(255,255,255,0.16)', color: '#fff' }
-                    : { background: '#fff', color: 'oklch(0.4 0.09 155)' }}
-                >
-                  Apostar · {bettingContext?.chipsLeft ?? 100} fichas
-                </Link>
+                {betsOpen ? (
+                  <Link
+                    href={`/liga?tab=apuestas&round=${round.id}`}
+                    className="flex-1 text-center text-sm font-bold py-2.5 rounded-xl transition hover:opacity-90 flex items-center justify-center gap-1.5"
+                    style={matchMayHaveHappened
+                      ? { background: 'rgba(255,255,255,0.16)', color: '#fff' }
+                      : { background: '#fff', color: 'oklch(0.4 0.09 155)' }}
+                  >
+                    Apostar · {bettingContext?.chipsLeft ?? 100} fichas
+                  </Link>
+                ) : (
+                  <Link
+                    href={`/liga?tab=apuestas&round=${round.id}`}
+                    className="flex-1 text-center text-xs font-bold py-2.5 rounded-xl transition hover:opacity-90 flex items-center justify-center gap-1.5"
+                    style={{ background: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.8)' }}
+                  >
+                    🔒 Apuestas cerradas: {betsClosedReason}
+                  </Link>
+                )}
               </div>
             </StopPropagation>
           </div>
@@ -283,7 +300,7 @@ export default async function DashboardPage() {
             </div>
           )}
           {!!rows.length && (
-            <p className="text-[10.5px] pb-2.5" style={{ color: 'var(--text-muted2)' }}>Racha · últimos 3 partidos</p>
+            <p className="text-[10.5px] pb-2.5" style={{ color: 'var(--text-muted2)' }}>Racha: últimos 3 partidos · ↑↓ puestos que ha subido o bajado en la última jornada</p>
           )}
         </div>
       </div>

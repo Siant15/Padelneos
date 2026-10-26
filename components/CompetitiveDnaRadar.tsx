@@ -139,10 +139,12 @@ export default function CompetitiveDnaRadar({ players, viewerId, seasonLabel }: 
 
       <div className="relative mx-auto" style={{ width: '100%', maxWidth: 280, aspectRatio: '1 / 1' }}>
         <svg viewBox="0 0 200 200" className="w-full h-full" role="img" aria-labelledby="dna-radar-title dna-radar-desc">
-          <title id="dna-radar-title">Radar de ADN competitivo de {viewer.playerName}</title>
+          {/* Un solo texto por elemento: varios trozos de JSX dentro de <title>/<desc> se
+              fusionan en el HTML del servidor y provocan un error de hidratación. */}
+          <title id="dna-radar-title">{`Radar de ADN competitivo de ${viewer.playerName}`}</title>
           <desc id="dna-radar-desc">
-            {DNA_AXES.map(a => `${a.label} ${viewer.axes[a.key].value} de 100`).join(', ')}
-            {compare && compareValues ? `. Comparado con ${compare.playerName}: ${DNA_AXES.map(a => `${a.label} ${compare.axes[a.key].value}`).join(', ')}` : ''}
+            {DNA_AXES.map(a => `${a.label} ${viewer.axes[a.key].value} de 100`).join(', ') +
+              (compare && compareValues ? `. Comparado con ${compare.playerName}: ${DNA_AXES.map(a => `${a.label} ${compare.axes[a.key].value}`).join(', ')}` : '')}
           </desc>
 
           {[25, 50, 75, 100].map(pct => (
@@ -224,21 +226,23 @@ export default function CompetitiveDnaRadar({ players, viewerId, seasonLabel }: 
           Ref. nivel 2–3
         </span>
       </div>
+      <p className="text-[11px] text-center mt-1.5" style={{ color: 'var(--text-muted2)' }}>
+        Toca una sigla (VIC, FOR…) para ver qué mide.
+      </p>
 
       <div className="mt-3 pt-3" style={{ borderTop: '1px solid var(--hairline)' }}>
         <p className="text-[11px] font-bold mb-1.5" style={{ color: 'var(--text-muted2)' }}>🤝 Pareja ideal (más % de victorias juntos)</p>
-        <div className="flex flex-col gap-1">
-          {players.map(p => (
-            <p key={p.playerId} className="text-xs">
-              <strong>{p.playerName}</strong>
-              {p.bestPartner ? (
-                <> + <strong>{p.bestPartner.partnerName}</strong> <span style={{ color: 'var(--text-muted)' }}>({p.bestPartner.winPct}% en {p.bestPartner.matchesTogether} partidos)</span></>
-              ) : (
-                <span style={{ color: 'var(--text-muted)' }}> — todavía sin suficientes partidos juntos con nadie</span>
-              )}
-            </p>
-          ))}
-        </div>
+        {players.some(p => p.bestPartner) ? (
+          <div className="flex flex-col gap-1">
+            {players.filter(p => p.bestPartner).map(p => (
+              <p key={p.playerId} className="text-xs">
+                <strong>{p.playerName}</strong> + <strong>{p.bestPartner!.partnerName}</strong> <span style={{ color: 'var(--text-muted)' }}>({p.bestPartner!.winPct}% en {p.bestPartner!.matchesTogether} partidos)</span>
+              </p>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Todavía no hay suficientes partidos juntos para elegir una pareja ideal.</p>
+        )}
       </div>
 
       <div aria-live="polite">

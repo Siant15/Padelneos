@@ -204,11 +204,12 @@ export default function PerfilForm({
         <StatCard value={stats.total_points} label="Puntos" accent />
       </div>
 
+      {/* Lo accionable primero: cuánto debes o te deben, antes que el radar. */}
+      {courtExpenses && <CourtExpensesCard userId={userId} expenses={courtExpenses} />}
+
       {dnaPlayers.length > 0 && (
         <CompetitiveDnaRadar players={dnaPlayers} viewerId={userId} seasonLabel={seasonLabel} />
       )}
-
-      {courtExpenses && <CourtExpensesCard userId={userId} expenses={courtExpenses} />}
 
       <form
         onSubmit={handleSubmit}
@@ -297,6 +298,11 @@ export default function PerfilForm({
 // El pago de la pista lo adelanta cada semana quien reserva, a precio
 // distinto según club/hora — esta tarjeta muestra cuánto ha puesto
 // cada uno y quién debe compensar a quién para que quede a la par.
+// Importes en formato español: 10,40 €
+function eur(n: number): string {
+  return `${n.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`
+}
+
 function CourtExpensesCard({ userId, expenses }: { userId: string; expenses: SeasonCourtExpenses }) {
   if (expenses.totalCost === 0) {
     return (
@@ -310,7 +316,7 @@ function CourtExpensesCard({ userId, expenses }: { userId: string; expenses: Sea
     <div className="rounded-2xl p-4 mb-5" style={{ background: 'var(--surface)', boxShadow: '0 3px 10px rgba(0,0,0,0.04)' }}>
       <p className="font-heading text-sm font-bold mb-1">💸 Gastos de pista</p>
       <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>
-        {expenses.totalCost.toFixed(2)}€ en total esta temporada · {expenses.fairShare.toFixed(2)}€ por persona
+        {eur(expenses.totalCost)} en total esta temporada · {eur(expenses.fairShare)} por persona
       </p>
 
       <div className="flex flex-col gap-1.5 mb-3">
@@ -318,9 +324,9 @@ function CourtExpensesCard({ userId, expenses }: { userId: string; expenses: Sea
           <div key={b.playerId} className="flex items-center justify-between text-xs">
             <span className={b.playerId === userId ? 'font-bold' : ''}>{b.name}{b.playerId === userId ? ' (tú)' : ''}</span>
             <span className="flex items-center gap-2">
-              <span style={{ color: 'var(--text-muted)' }}>pagado: {b.paid.toFixed(2)}€</span>
+              <span style={{ color: 'var(--text-muted)' }}>pagado: {eur(b.paid)}</span>
               <span className="font-bold" style={{ color: b.balance > 0.01 ? 'var(--green)' : b.balance < -0.01 ? 'var(--red)' : 'var(--text-muted)' }}>
-                {b.balance > 0.01 ? `le deben ${b.balance.toFixed(2)}€` : b.balance < -0.01 ? `debe ${Math.abs(b.balance).toFixed(2)}€` : 'al día'}
+                {b.balance > 0.01 ? `le deben ${eur(b.balance)}` : b.balance < -0.01 ? `debe ${eur(Math.abs(b.balance))}` : 'al día'}
               </span>
             </span>
           </div>
@@ -332,7 +338,7 @@ function CourtExpensesCard({ userId, expenses }: { userId: string; expenses: Sea
           <p className="text-xs font-semibold mb-1" style={{ color: 'var(--text-muted)' }}>Para quedar en paz:</p>
           {expenses.transfers.map((t, i) => (
             <p key={i} className="text-xs">
-              <strong>{t.fromName}</strong> le debe <strong>{t.amount.toFixed(2)}€</strong> a <strong>{t.toName}</strong>
+              <strong>{t.fromName}</strong> le debe <strong>{eur(t.amount)}</strong> a <strong>{t.toName}</strong>
             </p>
           ))}
         </div>

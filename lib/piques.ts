@@ -231,16 +231,18 @@ export function computePiques(
 
   // Bajo presión: quien necesita ganar para no perder posición (menor
   // diferencia de puntos con quien tiene justo debajo en la tabla).
-  let underPressure: { row: PlayerRow; gap: number } | null = null
+  let underPressure: { row: PlayerRow; next: PlayerRow; gap: number } | null = null
   for (let i = 0; i < byRank.length - 1; i++) {
     const gap = byRank[i].points - byRank[i + 1].points
-    if (!underPressure || gap < underPressure.gap) underPressure = { row: byRank[i], gap }
+    if (!underPressure || gap < underPressure.gap) underPressure = { row: byRank[i], next: byRank[i + 1], gap }
   }
   if (underPressure) {
     candidates.push({
       type: 'bajo_presion', category: 'Bajo presión',
       title: `${underPressure.row.name} bajo presión`,
-      text: underPressure.gap === 0 ? 'Empatado con quien le pisa los talones' : `Solo ${underPressure.gap} punto${underPressure.gap === 1 ? '' : 's'} de ventaja sobre el siguiente`,
+      text: underPressure.gap === 0
+        ? `Empatado a ${underPressure.row.points} pts con ${underPressure.next.name}`
+        : `Solo ${underPressure.gap} punto${underPressure.gap === 1 ? '' : 's'} de ventaja sobre ${underPressure.next.name}`,
       score: Math.min(1, 1 - underPressure.gap / 4),
     })
   }
