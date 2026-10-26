@@ -53,10 +53,12 @@ export default function LigaTabs({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex rounded-[14px] p-1" style={{ background: 'var(--tint)' }}>
+      <div role="tablist" className="flex rounded-[14px] p-1" style={{ background: 'var(--tint)' }}>
         {SECTIONS.map(s => (
           <button
             key={s.key}
+            role="tab"
+            aria-selected={section === s.key}
             onClick={() => setSection(s.key)}
             className="flex-1 rounded-[11px] py-2 font-heading font-bold text-xs transition"
             style={{
@@ -84,6 +86,7 @@ export default function LigaTabs({
           parejas={clasificacionParejas}
           apuestasMatrix={clasificacionApuestasMatrix}
           apuestasRoundLabels={clasificacionApuestasRoundLabels}
+          userId={userId}
         />
       )}
 

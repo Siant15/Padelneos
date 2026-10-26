@@ -21,6 +21,7 @@ type MatchStatus = {
   error: string | null
   needsThirdSet: boolean
   decidedInTwo: boolean
+  badSet: number | null
 }
 
 function evaluateSets(sets: SetScore[]): MatchStatus {
@@ -29,31 +30,31 @@ function evaluateSets(sets: SetScore[]): MatchStatus {
     t2: s.t2.trim() === '' ? null : parseInt(s.t2, 10),
   }))
   const [s1, s2, s3] = parsed
-  const notDecided = { winner: null, error: null, needsThirdSet: false, decidedInTwo: false } as const
+  const notDecided = { winner: null, error: null, needsThirdSet: false, decidedInTwo: false, badSet: null } as const
 
   if (s1.t1 === null || s1.t2 === null || s2.t1 === null || s2.t2 === null) {
     return notDecided
   }
   if (!isValidSetScore(s1.t1, s1.t2)) {
-    return { ...notDecided, error: 'El set 1 no es un resultado válido de pádel (6-0 a 6-4, 7-5 o 7-6)' }
+    return { ...notDecided, badSet: 0, error: `El set 1 (${s1.t1}-${s1.t2}) no es un resultado válido de pádel: 6-0 a 6-4, 7-5 o 7-6` }
   }
   if (!isValidSetScore(s2.t1, s2.t2)) {
-    return { ...notDecided, error: 'El set 2 no es un resultado válido de pádel (6-0 a 6-4, 7-5 o 7-6)' }
+    return { ...notDecided, badSet: 1, error: `El set 2 (${s2.t1}-${s2.t2}) no es un resultado válido de pádel: 6-0 a 6-4, 7-5 o 7-6` }
   }
 
   const w1 = s1.t1 > s1.t2 ? 'team1' : 'team2'
   const w2 = s2.t1 > s2.t2 ? 'team1' : 'team2'
-  if (w1 === w2) return { winner: w1, error: null, needsThirdSet: false, decidedInTwo: true }
+  if (w1 === w2) return { winner: w1, error: null, needsThirdSet: false, decidedInTwo: true, badSet: null }
 
   // 1-1: hace falta un tercer set decisivo
   if (!s3 || s3.t1 === null || s3.t2 === null) {
     return { ...notDecided, needsThirdSet: true }
   }
   if (!isValidSetScore(s3.t1, s3.t2)) {
-    return { ...notDecided, error: 'El set 3 no es un resultado válido de pádel (6-0 a 6-4, 7-5 o 7-6)' }
+    return { ...notDecided, badSet: 2, error: `El set 3 (${s3.t1}-${s3.t2}) no es un resultado válido de pádel: 6-0 a 6-4, 7-5 o 7-6` }
   }
   const w3 = s3.t1 > s3.t2 ? 'team1' : 'team2'
-  return { winner: w3, error: null, needsThirdSet: false, decidedInTwo: false }
+  return { winner: w3, error: null, needsThirdSet: false, decidedInTwo: false, badSet: null }
 }
 
 export default function ResultadoForm({ roundId, roundNumber, mode, matchId: initialMatchId, players: initialRoundPlayers, sets: initialSets, allPlayers, initialBets }: {
@@ -99,6 +100,7 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
   }, [roundId, supabase])
 
   async function handleSettle() {
+    if (!window.confirm('¿Liquidar la jornada? Se repartirán las fichas, se asignarán los puntos de apuestas y se avisará a los jugadores. No se puede deshacer desde aquí.')) return
     setSettling(true)
     setSettleError('')
     const { error } = await supabase.rpc('settle_round', { p_round_id: roundId })
@@ -108,8 +110,11 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
       return
     }
     await supabase.rpc('prune_stale_question_templates')
-    await notifySettlementResults(roundId)
-    await supabase.from('rounds').update({ status: 'played' }).eq('id', roundId)
+    try { await notifySettlementResults(roundId) } catch { /* el aviso es secundario: la liquidación ya está hecha */ }
+    const { error: statusError } = await supabase.from('rounds').update({ status: 'played' }).eq('id', roundId)
+    if (statusError) {
+      setSettleError(friendlyError(statusError.message, 'Jornada liquidada, pero no se pudo marcar como jugada. Vuelve a guardar el resultado.'))
+    }
     await revalidateLigaData()
     await loadBetsStatus()
     setSettling(false)
@@ -143,11 +148,33 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
     setLoadState(mode)
   }
 
-  const { winner, error: setsError, needsThirdSet, decidedInTwo } = evaluateSets(sets)
+  const { winner, error: setsError, needsThirdSet, decidedInTwo, badSet } = evaluateSets(sets)
   const hasThirdSet = sets.length === 3
+  const alreadySettled = !!betsStatus?.settled
 
-  function setScore(setIdx: number, team: 't1' | 't2', value: string) {
-    setSets(prev => prev.map((s, i) => i === setIdx ? { ...s, [team]: value } : s))
+  // Orden natural al teclear un marcador: set 1 (pareja 1, pareja 2), set 2, set 3.
+  function nextInputId(setIdx: number, team: 't1' | 't2', total: number) {
+    if (team === 't1') return `set-${setIdx}-t2`
+    return setIdx + 1 < total ? `set-${setIdx + 1}-t1` : null
+  }
+
+  function setScore(setIdx: number, team: 't1' | 't2', raw: string) {
+    // Un set de pádel nunca pasa de 7 juegos: se aceptan solo cifras 0-7.
+    const value = raw.replace(/\D/g, '').slice(-1)
+    if (value !== '' && parseInt(value, 10) > 7) return
+    const next = sets.map((s, i) => i === setIdx ? { ...s, [team]: value } : s)
+    // 1-1 en sets: se abre solo el 3.º set para no tener que pulsar nada.
+    const withThird = next.length === 2 && evaluateSets(next).needsThirdSet ? [...next, { t1: '', t2: '' }] : next
+    setSets(withThird)
+    if (value !== '') {
+      const id = nextInputId(setIdx, team, withThird.length)
+      if (id) {
+        // Casilla ya montada: foco inmediato. Si es el 3.º set recién abierto, espera a que se pinte.
+        const el = document.getElementById(id)
+        if (el) el.focus()
+        else setTimeout(() => document.getElementById(id)?.focus(), 0)
+      }
+    }
   }
 
   function toggleThirdSet() {
@@ -194,6 +221,7 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!matchId || !winner) return
+    if (alreadySettled && !window.confirm('Esta jornada ya está liquidada. Si cambias el resultado, las apuestas automáticas se recalcularán y puede cambiar la clasificación. ¿Guardar igualmente?')) return
     setLoading(true)
     setSaveError('')
 
@@ -243,6 +271,7 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
 
     const pending = (data as PendingMarket[] | null) ?? []
     if (pending.length > 0) {
+      setSaved(true)
       setPendingMarkets(pending)
       return
     }
@@ -305,7 +334,7 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
     <div className="space-y-5 pb-4">
       <div className="flex items-center gap-3">
         <button onClick={() => router.back()} className="text-sm" style={{ color: 'var(--text-muted)' }}>← Volver</button>
-        <h1 className="text-xl font-bold">Resultado del partido</h1>
+        <h1 className="text-xl font-bold">Resultado · J{roundNumber}</h1>
       </div>
 
       {loadState === 'no-match' && (
@@ -373,6 +402,11 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
 
       {loadState === 'ready' && (
         <form onSubmit={handleSubmit} className="space-y-6">
+          {alreadySettled && (
+            <div className="rounded-xl p-3 text-xs font-semibold" style={{ background: 'var(--orange-bg)', color: 'var(--orange)' }}>
+              🔒 Esta jornada ya está liquidada. Cambiar el resultado recalcula las apuestas automáticas y puede mover la clasificación.
+            </div>
+          )}
 
           {/* Sets */}
           <div className="rounded-xl p-4" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
@@ -387,26 +421,30 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
             </div>
 
             <div className="grid gap-2 items-center mb-2" style={{ gridTemplateColumns: `1fr repeat(${sets.length}, 3rem)` }}>
-              <span className="text-sm font-semibold truncate" style={{ color: 'var(--accent)' }}>
+              <span className="text-sm font-semibold leading-tight break-words min-w-0" style={{ color: 'var(--accent)' }}>
                 {team1Players.map(p => p.name).join(' & ')}
               </span>
               {sets.map((s, i) => (
-                <input key={i} type="number" min={0} max={7} value={s.t1}
+                <input key={i} id={`set-${i}-t1`} type="text" inputMode="numeric" maxLength={2} value={s.t1}
+                  aria-label={`Set ${i + 1}, juegos de ${team1Players.map(p => p.name).join(' y ')}`}
                   onChange={e => setScore(i, 't1', e.target.value)}
+                  onFocus={e => e.target.select()}
                   className="text-center rounded-lg py-2 text-sm font-bold outline-none"
-                  style={{ background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)' }} />
+                  style={{ background: 'var(--surface2)', border: `1px solid ${badSet === i ? 'var(--red)' : 'var(--border)'}`, color: 'var(--text)' }} />
               ))}
             </div>
 
             <div className="grid gap-2 items-center" style={{ gridTemplateColumns: `1fr repeat(${sets.length}, 3rem)` }}>
-              <span className="text-sm font-semibold truncate" style={{ color: 'var(--orange)' }}>
+              <span className="text-sm font-semibold leading-tight break-words min-w-0" style={{ color: 'var(--orange)' }}>
                 {team2Players.map(p => p.name).join(' & ')}
               </span>
               {sets.map((s, i) => (
-                <input key={i} type="number" min={0} max={7} value={s.t2}
+                <input key={i} id={`set-${i}-t2`} type="text" inputMode="numeric" maxLength={2} value={s.t2}
+                  aria-label={`Set ${i + 1}, juegos de ${team2Players.map(p => p.name).join(' y ')}`}
                   onChange={e => setScore(i, 't2', e.target.value)}
+                  onFocus={e => e.target.select()}
                   className="text-center rounded-lg py-2 text-sm font-bold outline-none"
-                  style={{ background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)' }} />
+                  style={{ background: 'var(--surface2)', border: `1px solid ${badSet === i ? 'var(--red)' : 'var(--border)'}`, color: 'var(--text)' }} />
               ))}
             </div>
 
@@ -428,7 +466,7 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
             )}
             {needsThirdSet && (
               <p className="mt-3 text-sm font-semibold" style={{ color: 'var(--orange)' }}>
-                1-1 en sets: añade el 3.º set para decidir el ganador.
+                1-1 en sets: rellena el 3.º set para decidir el ganador.
               </p>
             )}
 
@@ -459,11 +497,18 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
                   smash al cristal...) no se pueden deducir del marcador —
                   hay que resolverlas a mano, o la jornada se queda sin
                   poder liquidarse nunca. */}
-              <Link href={`/admin/jornadas/${roundId}/mercados`}
-                className="block w-full py-3 rounded-xl font-semibold text-center transition hover:opacity-90"
-                style={{ background: 'var(--orange-bg)', color: 'var(--orange)' }}>
-                ⚠️ Resolver las preguntas de apuestas pendientes →
-              </Link>
+              {betsStatus && betsStatus.pending.length > 0 && (
+                <Link href={`/admin/jornadas/${roundId}/mercados`}
+                  className="block w-full py-3 rounded-xl font-semibold text-center transition hover:opacity-90"
+                  style={{ background: 'var(--orange-bg)', color: 'var(--orange)' }}>
+                  ⚠️ Resolver las {betsStatus.pending.length} preguntas de apuestas pendientes →
+                </Link>
+              )}
+              <button type="button" onClick={() => setSaved(false)}
+                className="w-full py-2 text-sm font-semibold text-center"
+                style={{ color: 'var(--text-muted)' }}>
+                ✏️ Corregir resultado
+              </button>
               <button type="button" onClick={handleShare}
                 className="w-full py-3 rounded-xl font-semibold transition hover:opacity-90"
                 style={{ background: '#25D366', color: '#fff' }}>
@@ -479,8 +524,10 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
             <button type="submit" disabled={loading || !winner}
               className="w-full py-3 rounded-xl font-semibold transition hover:opacity-90 disabled:opacity-40"
               style={{ background: 'var(--accent)', color: '#fff' }}>
-              {!winner ? 'Completa el marcador primero' :
-                loading ? 'Guardando...' : 'Guardar resultado'}
+              {setsError ? 'Revisa el marcador' :
+                needsThirdSet ? 'Falta el 3.º set' :
+                !winner ? 'Completa el marcador primero' :
+                loading ? 'Guardando...' : alreadySettled ? 'Guardar cambio de resultado' : 'Guardar resultado'}
             </button>
           )}
         </form>
@@ -520,7 +567,7 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" style={{ background: 'rgba(0,0,0,0.5)' }}>
           <div className="w-full sm:max-w-md max-h-[85vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl p-4" style={{ background: 'var(--surface)' }}>
             <div className="flex items-start justify-between gap-2 mb-1">
-              <h2 className="font-bold text-base">Resuelve las preguntas pendientes</h2>
+              <h2 className="font-bold text-base">✓ Resultado guardado · resuelve las preguntas pendientes</h2>
               <button
                 type="button"
                 onClick={() => setPendingMarkets(null)}

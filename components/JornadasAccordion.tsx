@@ -53,11 +53,11 @@ export default function JornadasAccordion({ items }: { items: JornadaViewModel[]
             style={{ background: 'var(--surface)', boxShadow: '0 3px 10px rgba(0,0,0,0.04)' }}
           >
             <div className="flex justify-between items-center cursor-pointer" onClick={() => toggle(j.id)}>
-              <div>
+              <div className="min-w-0 flex-1 pr-2">
                 <div className="text-[13px] font-extrabold capitalize">
                   Jornada {j.numLabel} · {j.dateLabel}{j.timeLabel && ` · ${j.timeLabel}`}
                 </div>
-                <div className="text-xs mt-0.5" style={{ color: 'var(--text-muted2)' }}>
+                <div className="text-xs mt-0.5 break-words" style={{ color: 'var(--text-muted2)' }}>
                   {j.pairALabel}{j.pairBLabel && ` vs ${j.pairBLabel}`}
                 </div>
               </div>
@@ -91,13 +91,18 @@ export default function JornadasAccordion({ items }: { items: JornadaViewModel[]
                 </div>
                 {!j.played && j.isPastDate && (
                   <div className="font-semibold" style={{ color: 'var(--orange)' }}>
-                    ⚠ La fecha ya pasó: actualízala en «Reservar pista» para poder apostar.
+                    ⚠ La fecha ya pasó: actualízala en «Reservar pista» para reabrir las apuestas.
+                  </div>
+                )}
+                {!j.played && !j.isPastDate && j.reservaStatus === 'pendiente' && (
+                  <div className="font-semibold" style={{ color: 'var(--orange)' }}>
+                    🔒 Apuestas cerradas: faltan día, hora o club.
                   </div>
                 )}
 
                 {j.played && (
                   <>
-                    <div>🎾 Resultado: <strong>{j.scoreLabel}</strong> ({j.winnerLabel})</div>
+                    <div>🎾 Ganan <strong>{j.winnerLabel}</strong> · {j.scoreLabel}</div>
                     {j.betWinner && (
                       <div>💰 Mejor apostador: <strong>{j.betWinner}</strong> (+1){j.betSecond && ` · ${j.betSecond} (+0.5)`}</div>
                     )}
@@ -129,7 +134,7 @@ export default function JornadasAccordion({ items }: { items: JornadaViewModel[]
 
                 {!j.played && (
                   <>
-                    {j.isNext && (
+                    {j.isNext && !j.isPastDate && j.reservaStatus !== 'pendiente' && (
                       <div>
                         💰 Mercado de apuestas abierto —{' '}
                         <Link href={`/liga?tab=apuestas&round=${j.id}`} className="font-bold" style={{ color: 'var(--accent)' }}>apostar en esta jornada</Link>.

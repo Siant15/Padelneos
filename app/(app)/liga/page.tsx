@@ -66,8 +66,11 @@ export default async function LigaPage() {
 
     let scoreLabel = ''
     if (match && match.set1_t1 !== null) {
-      const sets = [`${match.set1_t1}-${match.set1_t2}`, `${match.set2_t1}-${match.set2_t2}`]
-      if (match.set3_t1 !== null) sets.push(`${match.set3_t1}-${match.set3_t2}`)
+      // El marcador se lee siempre desde la pareja ganadora (6-2, 6-1 = ganadores primero).
+      const flip = match.winner === 'team2'
+      const fmt = (a: number | null, b: number | null) => flip ? `${b}-${a}` : `${a}-${b}`
+      const sets = [fmt(match.set1_t1, match.set1_t2), fmt(match.set2_t1, match.set2_t2)]
+      if (match.set3_t1 !== null) sets.push(fmt(match.set3_t1, match.set3_t2))
       scoreLabel = sets.join(', ')
     }
 
