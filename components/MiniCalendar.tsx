@@ -5,9 +5,9 @@ import { useState } from 'react'
 const DAY_LABELS = ['L', 'M', 'X', 'J', 'V', 'S', 'D']
 
 type Kind = 'played' | 'upcoming' | null
-type Cell = { key: number; label: number; muted: boolean; kind: Kind }
+type Cell = { key: number; label: number; muted: boolean; kind: Kind; today: boolean }
 
-function buildMonthGrid(year: number, month: number, kindByDay: Map<number, Kind>): Cell[] {
+function buildMonthGrid(year: number, month: number, kindByDay: Map<number, Kind>, todayDay: number | null): Cell[] {
   const first = new Date(year, month, 1)
   const startOffset = (first.getDay() + 6) % 7 // lunes = 0
   const daysInMonth = new Date(year, month + 1, 0).getDate()
@@ -15,14 +15,14 @@ function buildMonthGrid(year: number, month: number, kindByDay: Map<number, Kind
 
   const cells: Omit<Cell, 'key'>[] = []
   for (let i = 0; i < startOffset; i++) {
-    cells.push({ label: daysInPrev - startOffset + 1 + i, muted: true, kind: null })
+    cells.push({ label: daysInPrev - startOffset + 1 + i, muted: true, kind: null, today: false })
   }
   for (let d = 1; d <= daysInMonth; d++) {
-    cells.push({ label: d, muted: false, kind: kindByDay.get(d) ?? null })
+    cells.push({ label: d, muted: false, kind: kindByDay.get(d) ?? null, today: d === todayDay })
   }
   let nextDay = 1
   while (cells.length % 7 !== 0 || cells.length < 42) {
-    cells.push({ label: nextDay++, muted: true, kind: null })
+    cells.push({ label: nextDay++, muted: true, kind: null, today: false })
   }
   return cells.map((c, i) => ({ ...c, key: i }))
 }
@@ -31,7 +31,17 @@ function buildMonthGrid(year: number, month: number, kindByDay: Map<number, Kind
 // por jugar.
 export default function MiniCalendar({ matches }: { matches: { date: string; played: boolean }[] }) {
   const today = new Date()
-  const [monthOffset, setMonthOffset] = useState(0)
+  const monthIndex = (d: Date) => d.getFullYear() * 12 + d.getMonth()
+  const matchMonths = matches.map(m => monthIndex(new Date(m.date + 'T12:00:00')))
+  // Abre en el mes de la próxima jornada por jugar (o el actual si no hay ninguna).
+  const nextPending = matches
+    .filter(m => !m.played)
+    .map(m => monthIndex(new Date(m.date + 'T12:00:00')))
+    .sort((a, b) => a - b)[0]
+  const [monthOffset, setMonthOffset] = useState(nextPending !== undefined ? Math.max(nextPending - monthIndex(today), 0) : 0)
+  const shownMonth = monthIndex(today) + monthOffset
+  const hasEarlier = matchMonths.some(m => m < shownMonth)
+  const hasLater = matchMonths.some(m => m > shownMonth)
 
   const base = new Date(today.getFullYear(), today.getMonth() + monthOffset, 1)
   const year = base.getFullYear()
@@ -46,15 +56,20 @@ export default function MiniCalendar({ matches }: { matches: { date: string; pla
     if (m.played || !kindByDay.has(day)) kindByDay.set(day, m.played ? 'played' : 'upcoming')
   }
 
-  const cells = buildMonthGrid(year, month, kindByDay)
+  const todayDay = year === today.getFullYear() && month === today.getMonth() ? today.getDate() : null
+  const cells = buildMonthGrid(year, month, kindByDay, todayDay)
   const monthLabel = base.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })
 
   return (
     <div className="rounded-2xl px-4 py-3.5" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
       <div className="flex items-center justify-between mb-2.5">
-        <button onClick={() => setMonthOffset(o => o - 1)} className="text-base px-1" style={{ color: 'var(--text-muted)' }} aria-label="Mes anterior">‹</button>
+        <button onClick={() => setMonthOffset(o => o - 1)} className="relative w-10 h-10 -ml-2 text-lg rounded-full" style={{ color: 'var(--text-muted)' }} aria-label="Mes anterior">
+          ‹{hasEarlier && <span aria-hidden className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full" style={{ background: 'var(--green)' }} />}
+        </button>
         <span className="font-heading font-bold text-sm capitalize">{monthLabel}</span>
-        <button onClick={() => setMonthOffset(o => o + 1)} className="text-base px-1" style={{ color: 'var(--text-muted)' }} aria-label="Mes siguiente">›</button>
+        <button onClick={() => setMonthOffset(o => o + 1)} className="relative w-10 h-10 -mr-2 text-lg rounded-full" style={{ color: 'var(--text-muted)' }} aria-label="Mes siguiente">
+          ›{hasLater && <span aria-hidden className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full" style={{ background: 'var(--red)' }} />}
+        </button>
       </div>
       <div className="grid grid-cols-7 gap-1 text-center">
         {DAY_LABELS.map(l => (
@@ -64,7 +79,7 @@ export default function MiniCalendar({ matches }: { matches: { date: string; pla
           <span
             key={c.key}
             className="text-[12.5px] py-1.5 rounded-lg"
-            style={
+            style={{ ...(c.today ? { boxShadow: 'inset 0 0 0 2px var(--accent)' } : null), ...(
               c.kind === 'played'
                 ? { background: 'var(--green)', color: '#fff', fontWeight: 800 }
                 : c.kind === 'upcoming'
@@ -72,7 +87,8 @@ export default function MiniCalendar({ matches }: { matches: { date: string; pla
                   : c.muted
                   ? { color: 'var(--text-muted2)', opacity: 0.5 }
                   : { color: 'var(--text)', fontWeight: 600 }
-            }
+            ) }}
+            aria-current={c.today ? 'date' : undefined}
           >
             {c.label}
           </span>

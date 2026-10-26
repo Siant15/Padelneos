@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import type { RoundActa } from '@/lib/betting-queries'
 import type { BettingMarket, BettingQuestionTemplate } from '@/lib/types'
 import { DAYS_ES, formatTime } from '@/lib/types'
@@ -39,7 +40,8 @@ export default function ApuestasTab({ userId, rounds, initialRoundId }: { userId
   const firstOpen = open[0] ?? null
 
   const requestedExists = initialRoundId && sorted.some(r => r.roundId === initialRoundId)
-  const defaultId = (requestedExists ? initialRoundId : null) ?? lastSettled?.roundId ?? firstOpen?.roundId ?? sorted[0]?.roundId ?? ''
+  // Se entra a apostar: por defecto la jornada activa; si no hay, la última terminada.
+  const defaultId = (requestedExists ? initialRoundId : null) ?? firstOpen?.roundId ?? lastSettled?.roundId ?? sorted[0]?.roundId ?? ''
   const [selectedId, setSelectedId] = useState(defaultId)
   const [historyOpen, setHistoryOpen] = useState(false)
 
@@ -87,7 +89,7 @@ export default function ApuestasTab({ userId, rounds, initialRoundId }: { userId
             type="button"
             onClick={() => index > 0 && setSelectedId(sorted[index - 1].roundId)}
             disabled={index <= 0}
-            className="w-7 h-7 rounded-lg font-bold disabled:opacity-30"
+            className="w-10 h-10 rounded-lg text-lg font-bold disabled:opacity-30"
             style={{ background: 'var(--tint)' }}
             aria-label="Jornada anterior"
           >
@@ -103,7 +105,7 @@ export default function ApuestasTab({ userId, rounds, initialRoundId }: { userId
             type="button"
             onClick={() => index < sorted.length - 1 && setSelectedId(sorted[index + 1].roundId)}
             disabled={index === -1 || index >= sorted.length - 1}
-            className="w-7 h-7 rounded-lg font-bold disabled:opacity-30"
+            className="w-10 h-10 rounded-lg text-lg font-bold disabled:opacity-30"
             style={{ background: 'var(--tint)' }}
             aria-label="Jornada siguiente"
           >
@@ -201,9 +203,9 @@ export default function ApuestasTab({ userId, rounds, initialRoundId }: { userId
             </div>
           )}
           {current.reason === 'awaiting_settlement' && (
-            <a href={`/admin/jornadas/${current.roundId}/resultado`} className="block text-center text-sm font-bold py-3 rounded-xl" style={{ background: 'var(--orange-bg)', color: 'var(--orange)' }}>
+            <Link href={`/admin/jornadas/${current.roundId}/resultado`} className="block text-center text-sm font-bold py-3 rounded-xl" style={{ background: 'var(--orange-bg)', color: 'var(--orange)' }}>
               📝 Resolver apuestas de esta jornada
-            </a>
+            </Link>
           )}
         </>
       )}
@@ -230,7 +232,7 @@ export default function ApuestasTab({ userId, rounds, initialRoundId }: { userId
                   color: r.roundId === selectedId ? 'var(--green)' : 'var(--text-muted2)',
                 }}
               >
-                J{r.roundNumber}
+                J{r.roundNumber}{r.kind === 'settled' ? ' ✓' : r.kind === 'open' ? ' ●' : ''}
               </button>
             ))}
           </div>
@@ -249,7 +251,9 @@ export function JornadaHeader({ roundNumber, pair1Label, pair2Label, scoreLabel,
   scheduledTime: string | null
   club: string | null
 }) {
-  const dayLabel = scheduledDate ? DAYS_ES[new Date(scheduledDate + 'T12:00:00').getDay()] : null
+  const dayLabel = scheduledDate
+    ? `${DAYS_ES[new Date(scheduledDate + 'T12:00:00').getDay()]} ${new Date(scheduledDate + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}`
+    : null
   const matchLabel = pair1Label && pair2Label ? `${pair1Label} ${scoreLabel ?? 'vs.'} ${pair2Label}` : null
   return (
     <div className="px-1">

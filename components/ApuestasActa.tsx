@@ -125,9 +125,10 @@ export default function ApuestasActa({ markets, closure, pair1Label, pair2Label,
               <>
                 <PersonalResultLine row={myRow} />
 
-                <p className="text-[10px] font-bold uppercase tracking-wide mt-3 mb-1.5" style={{ color: 'var(--text-muted2)' }}>
-                  Apuestas del grupo
-                </p>
+                <details className="mt-3 group">
+                <summary className="text-[10px] font-bold uppercase tracking-wide mb-1.5 cursor-pointer select-none list-none flex items-center gap-1" style={{ color: 'var(--text-muted2)' }}>
+                  Apuestas del grupo <span aria-hidden className="group-open:rotate-180 transition-transform">⌄</span>
+                </summary>
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs" style={{ borderCollapse: 'collapse' }}>
                     <thead>
@@ -161,6 +162,7 @@ export default function ApuestasActa({ markets, closure, pair1Label, pair2Label,
                     </tbody>
                   </table>
                 </div>
+                </details>
 
                 {market.hasNoWinners && (
                   <p

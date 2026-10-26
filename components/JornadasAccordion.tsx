@@ -42,10 +42,31 @@ export default function JornadasAccordion({ items }: { items: JornadaViewModel[]
     })
   }
 
+  // Con jornadas jugadas y pendientes a la vez, las jugadas se pliegan en
+  // una sola fila para que la próxima aparezca justo debajo del calendario.
+  const [showPlayed, setShowPlayed] = useState(false)
+  const playedCount = items.filter(i => i.played).length
+  const canFold = playedCount > 0 && playedCount < items.length
+  const visible = canFold && !showPlayed ? items.filter(i => !i.played) : items
+
   return (
     <div className="flex flex-col gap-2.5">
-      {items.map(j => {
+      {canFold && (
+        <button
+          type="button"
+          onClick={() => setShowPlayed(v => !v)}
+          aria-expanded={showPlayed}
+          className="text-xs font-bold py-2 rounded-xl"
+          style={{ background: 'var(--green-bg)', color: 'var(--green)' }}
+        >
+          ✓ {playedCount} {playedCount === 1 ? 'jornada jugada' : 'jornadas jugadas'} · {showPlayed ? 'ocultar' : 'ver'}
+        </button>
+      )}
+      {visible.map(j => {
         const isOpen = expanded.has(j.id)
+        // Las pendientes lejanas no necesitan llamar la atención: solo la próxima
+        // o las que tienen la fecha vencida conservan el color de aviso.
+        const quietTag = j.reservaStatus === 'pendiente' && !j.isNext && !j.isPastDate
         return (
           <div
             key={j.id}
@@ -67,7 +88,7 @@ export default function JornadasAccordion({ items }: { items: JornadaViewModel[]
                 </span>
                 <span
                   className="text-[10px] font-extrabold px-2.5 py-1 rounded-full whitespace-nowrap"
-                  style={{ background: j.tagBg, color: j.tagColor }}
+                  style={{ background: quietTag ? 'var(--tint)' : j.tagBg, color: quietTag ? 'var(--text-muted2)' : j.tagColor }}
                 >
                   {j.statusLabel}
                 </span>

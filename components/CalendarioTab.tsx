@@ -1,12 +1,14 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import JornadasAccordion, { type JornadaViewModel } from '@/components/JornadasAccordion'
 import MiniCalendar from '@/components/MiniCalendar'
 import { revalidateLigaData } from '@/lib/actions'
+import { rescheduleFollowingRounds } from '@/lib/schedule-actions'
+import InfoToggle from '@/components/InfoToggle'
 import { friendlyError } from '@/lib/errors'
 
 type PlayerLite = { id: string; name: string }
@@ -40,13 +42,20 @@ export default function CalendarioTab({
     <div className="flex flex-col gap-3.5">
       {!!items.length && <MiniCalendar matches={items.filter(j => !!j.rawDate).map(j => ({ date: j.rawDate as string, played: j.played }))} />}
       {!!items.length && (
-        <p className="text-[11px] flex flex-wrap gap-x-3 gap-y-1" style={{ color: 'var(--text-muted)' }}>
-          <span><span style={{ color: 'var(--green)' }}>●</span> <strong>Verde</strong>: día en que hubo partido</span>
-          <span><span style={{ color: 'var(--red)' }}>●</span> <strong>Rojo</strong>: fecha prevista del próximo partido</span>
-          <span>⏳ <strong>Pendiente de reserva</strong>: falta día, hora o club</span>
-          <span>📅 <strong>Reservada</strong>: ya tiene día, hora y club</span>
-          <span>✔ <strong>Finalizada</strong>: ya se jugó</span>
-        </p>
+        <InfoToggle
+          label="Qué significan los colores y las etiquetas"
+          lead={
+            <span className="text-[11px] flex flex-wrap items-center gap-x-3" style={{ color: 'var(--text-muted)' }}>
+              <span><span style={{ color: 'var(--green)' }}>●</span> <strong>Verde</strong>: jugado</span>
+              <span><span style={{ color: 'var(--red)' }}>●</span> <strong>Rojo</strong>: previsto</span>
+            </span>
+          }
+        >
+          <p>Los días del calendario: <strong style={{ color: 'var(--text)' }}>verde</strong> = día en que hubo partido, <strong style={{ color: 'var(--text)' }}>rojo</strong> = fecha prevista del próximo.</p>
+          <p>⏳ <strong style={{ color: 'var(--text)' }}>Pendiente de reserva</strong>: falta día, hora o club.</p>
+          <p>📅 <strong style={{ color: 'var(--text)' }}>Reservada</strong>: ya tiene día, hora y club.</p>
+          <p>✔ <strong style={{ color: 'var(--text)' }}>Finalizada</strong>: ya se jugó.</p>
+        </InfoToggle>
       )}
       {!items.length
         ? <p className="text-sm" style={{ color: 'var(--text-muted)' }}>No hay jornadas creadas todavía.</p>
@@ -90,7 +99,7 @@ export default function CalendarioTab({
       )}
 
       {action === 'extend' && (
-        <ExtendForm currentMin={activeSeason.minMatches} onCancel={() => setAction(null)} />
+        <ExtendForm currentMin={activeSeason.minMatches} anchorRoundId={items[items.length - 1]?.id ?? null} onCancel={() => setAction(null)} />
       )}
 
       {action === 'new' && (
@@ -137,6 +146,15 @@ function SeasonForm({ mode, players, onCancel }: {
       setError(friendlyError(rpcError.message, 'No se pudo crear la liga. Inténtalo de nuevo.'))
       return
     }
+    // Las fechas que genera el SQL son semanales a secas: se reajustan con la
+    // cadena de la liga (+7 días, una semana de pausa tras cada 3 partidos).
+    if (firstMatchDate) {
+      const { data: season } = await supabase.from('seasons').select('id').eq('status', 'active').order('created_at', { ascending: false }).limit(1).maybeSingle()
+      const { data: first } = season
+        ? await supabase.from('rounds').select('id').eq('season_id', season.id).eq('round_number', 1).maybeSingle()
+        : { data: null }
+      if (first) await rescheduleFollowingRounds(first.id)
+    }
     await revalidateLigaData()
     router.refresh()
   }
@@ -171,7 +189,7 @@ function SeasonForm({ mode, players, onCancel }: {
           onChange={e => setFirstMatchDate(e.target.value)}
           style={inputStyle} />
         <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
-          Si la pones, el resto de jornadas se rellenan solas cada 7 días (J2, J3...). Se puede ajustar cualquiera después desde Editar jornada.
+          Si la pones, el resto de jornadas se rellenan solas cada 7 días, con una semana de pausa tras cada 3 partidos. Se puede ajustar cualquiera después desde Editar jornada.
         </p>
       </Field>
 
@@ -211,8 +229,11 @@ function SeasonForm({ mode, players, onCancel }: {
 }
 
 // ─── Ampliar la liga activa ───────────────────────────────────
-function ExtendForm({ currentMin, onCancel }: { currentMin: number; onCancel: () => void }) {
+function ExtendForm({ currentMin, anchorRoundId, onCancel }: { currentMin: number; anchorRoundId: string | null; onCancel: () => void }) {
   const supabase = createClient()
+  const formRef = useRef<HTMLFormElement>(null)
+  // El formulario se abre al final de la página, bajo la barra inferior: se trae a la vista.
+  useEffect(() => { formRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' }) }, [])
   const router = useRouter()
   const [newMin, setNewMin] = useState(currentMin + 3)
   const [loading, setLoading] = useState(false)
@@ -231,13 +252,14 @@ function ExtendForm({ currentMin, onCancel }: { currentMin: number; onCancel: ()
       setError(friendlyError(rpcError.message, 'No se pudo ampliar el calendario. Inténtalo de nuevo.'))
       return
     }
+    if (anchorRoundId) await rescheduleFollowingRounds(anchorRoundId)
     await revalidateLigaData()
     onCancel()
     router.refresh()
   }
 
   return (
-    <form onSubmit={handleSubmit} className="rounded-2xl p-4 flex flex-col gap-4" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
+    <form ref={formRef} onSubmit={handleSubmit} className="rounded-2xl p-4 flex flex-col gap-4 scroll-mb-24" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
       <Field label={`Nuevo total de partidos (ahora ${currentMin})`}>
         <input type="number" min={currentMin + 1} max={60} required value={newMin}
           onChange={e => setNewMin(+e.target.value)}

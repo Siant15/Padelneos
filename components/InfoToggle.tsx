@@ -5,12 +5,13 @@ import { Info } from 'lucide-react'
 
 // Punto de información: un icono "i" discreto que despliega la explicación
 // al tocarlo, para que el texto no ocupe sitio cuando no hace falta.
-export default function InfoToggle({ label, children }: { label: string; children: React.ReactNode }) {
+export default function InfoToggle({ label, lead, children }: { label: string; lead?: React.ReactNode; children: React.ReactNode }) {
   const [open, setOpen] = useState(false)
 
   return (
     <div className="px-0.5 pt-1.5">
-      <div className="flex justify-end">
+      <div className={`flex items-center ${lead ? 'justify-between' : 'justify-end'}`}>
+        {lead}
         <button
           type="button"
           onClick={() => setOpen(v => !v)}
