@@ -19,6 +19,8 @@ export type JornadaViewModel = {
   reservaStatus: 'pendiente' | 'reservada' | 'finalizada'
   played: boolean
   isNext: boolean
+  courtCost: number | null
+  isPastDate: boolean
   statusLabel: string
   tagBg: string
   tagColor: string
@@ -84,6 +86,14 @@ export default function JornadasAccordion({ items }: { items: JornadaViewModel[]
                 {j.clubLabel && (
                   <div>📍 Club: {j.clubLabel}</div>
                 )}
+                <div>
+                  💸 Pista: {j.courtCost !== null ? <strong>{j.courtCost.toLocaleString('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} €</strong> : <span style={{ color: 'var(--text-muted2)' }}>sin importe todavía</span>}
+                </div>
+                {!j.played && j.isPastDate && (
+                  <div className="font-semibold" style={{ color: 'var(--orange)' }}>
+                    ⚠ La fecha ya pasó: actualízala en «Reservar pista» para poder apostar.
+                  </div>
+                )}
 
                 {j.played && (
                   <>
@@ -92,6 +102,13 @@ export default function JornadasAccordion({ items }: { items: JornadaViewModel[]
                       <div>💰 Mejor apostador: <strong>{j.betWinner}</strong> (+1){j.betSecond && ` · ${j.betSecond} (+0.5)`}</div>
                     )}
                     <div className="flex gap-2 mt-1">
+                      <Link
+                        href={`/admin/jornadas/${j.id}/reserva`}
+                        className="flex-1 text-center text-xs font-bold py-2 rounded-xl"
+                        style={{ background: 'var(--tint)', color: '#555' }}
+                      >
+                        💸 Importe
+                      </Link>
                       <Link
                         href={`/admin/jornadas/${j.id}/resultado`}
                         className="flex-1 text-center text-xs font-bold py-2 rounded-xl"
@@ -118,7 +135,14 @@ export default function JornadasAccordion({ items }: { items: JornadaViewModel[]
                         <Link href={`/liga?tab=apuestas&round=${j.id}`} className="font-bold" style={{ color: 'var(--accent)' }}>apostar en esta jornada</Link>.
                       </div>
                     )}
-                    <div className="flex gap-2 mt-1">
+                    <Link
+                      href={`/admin/jornadas/${j.id}/reserva`}
+                      className="block text-center text-xs font-bold py-2.5 rounded-xl mt-1"
+                      style={{ background: 'var(--accent)', color: '#fff' }}
+                    >
+                      🏟️ {j.reservaStatus === 'pendiente' ? 'Reservar pista' : 'Reserva e importe'}
+                    </Link>
+                    <div className="flex gap-2">
                       <Link
                         href={`/admin/jornadas/${j.id}/editar`}
                         className="flex-1 text-center text-xs font-bold py-2 rounded-xl"

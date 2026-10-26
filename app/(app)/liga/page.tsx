@@ -86,6 +86,8 @@ export default async function LigaPage() {
       reservaStatus,
       played,
       isNext,
+      courtCost: round.court_cost ?? null,
+      isPastDate: !played && !!round.scheduled_date && round.scheduled_date < new Date().toISOString().slice(0, 10),
       statusLabel: statusView.label,
       tagBg: statusView.bg,
       tagColor: statusView.color,

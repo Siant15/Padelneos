@@ -109,7 +109,7 @@ export default async function DashboardPage() {
               <span className="flex items-center gap-1"><Clock size={13} /> {round.scheduled_date ? formatDate(round.scheduled_date).split(',')[0] : '-'} · {effectiveTime || '-'}</span>
             </div>
             <p className="text-xs flex items-center gap-1 -mt-1.5 opacity-90">
-              <MapPin size={13} /> {effectiveClub || '-'}
+              <MapPin size={13} /> {effectiveClub || 'Falta elegir club'}
               {clubMapsUrl && (
                 <StopPropagation>
                   <a href={clubMapsUrl} target="_blank" rel="noopener noreferrer" className="underline font-bold">
@@ -173,6 +173,16 @@ export default async function DashboardPage() {
                 <ConfirmCourtButton roundId={round.id} />
               </StopPropagation>
             )}
+
+            <StopPropagation>
+              <Link
+                href={`/admin/jornadas/${round.id}/reserva`}
+                className="block text-center text-sm font-bold py-2.5 rounded-xl transition hover:opacity-90"
+                style={{ background: 'rgba(255,255,255,0.16)', color: '#fff' }}
+              >
+                🏟️ {!effectiveClub || !round.scheduled_date || !effectiveTime ? 'Reservar pista' : 'Reserva e importe'}
+              </Link>
+            </StopPropagation>
 
             <StopPropagation>
               <div className="flex gap-2 mt-1">
