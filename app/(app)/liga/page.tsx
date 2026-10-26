@@ -177,9 +177,13 @@ export default async function LigaPage() {
   )
 
   const playerList = (players as { id: string; name: string }[] | null) ?? []
-  const [settledActas, openBetting] = await Promise.all([
+  // Las apuestas propias de jornadas jugadas-sin-liquidar van en la misma
+  // tanda en paralelo, no después (no suman latencia).
+  const awaitingIds = pendingRoundRefs.filter(r => r.status === 'played').map(r => r.id)
+  const [settledActas, openBetting, myBetsByRound] = await Promise.all([
     settledRoundRefs.length ? getCachedSettledActas(settledRoundRefs.map(r => r.id), playerList) : Promise.resolve([]),
     userId && openRoundRefs.length ? getCachedOpenRoundsBetting(seasonId ?? '', openRoundRefs.map(r => r.id), userId) : Promise.resolve(null),
+    awaitingIds.length ? getCachedMyBetsForRounds(awaitingIds, userId) : Promise.resolve({} as Awaited<ReturnType<typeof getCachedMyBetsForRounds>>),
   ])
   const settledEntries: ApuestasRoundEntry[] = settledRoundRefs.map((r, i) => ({
     kind: 'settled' as const, roundId: r.id, roundNumber: r.round_number, acta: settledActas[i],
@@ -204,9 +208,6 @@ export default async function LigaPage() {
       availableTemplates,
     }
   }) : []
-
-  const awaitingIds = pendingRoundRefs.filter(r => r.status === 'played').map(r => r.id)
-  const myBetsByRound = awaitingIds.length ? await getCachedMyBetsForRounds(awaitingIds, userId) : {}
 
   const pendingEntries: ApuestasRoundEntry[] = pendingRoundRefs.map(r => ({
     kind: 'pending' as const,

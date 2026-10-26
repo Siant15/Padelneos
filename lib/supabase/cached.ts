@@ -195,19 +195,23 @@ export const getCachedOpenRoundsBetting = unstable_cache(
     const sortedCatalog = [...(catalogTemplates ?? [])].sort((a, b) => (usageCount[b.id] ?? 0) - (usageCount[a.id] ?? 0))
 
     const allTemplateIds = [...new Set(contexts.flatMap(ctx => ctx.markets.map(m => m.template_id).filter((id): id is string => !!id)))]
-    const { data: jackpots } = allTemplateIds.length
-      ? await client.from('jackpots').select('template_id, chips').eq('season_id', seasonId).in('template_id', allTemplateIds)
-      : { data: [] as { template_id: string; chips: number }[] }
+    const marketIds = contexts.flatMap(ctx => ctx.markets.map(m => m.id))
+    // Botes acumulados y nº de apostantes por pregunta: no dependen uno
+    // del otro, se piden a la vez (no una consulta detrás de otra).
+    const [{ data: jackpots }, { data: betRows }] = await Promise.all([
+      allTemplateIds.length
+        ? client.from('jackpots').select('template_id, chips').eq('season_id', seasonId).in('template_id', allTemplateIds)
+        : Promise.resolve({ data: [] as { template_id: string; chips: number }[] }),
+      marketIds.length
+        ? client.from('bets').select('market_id, player_id').in('market_id', marketIds)
+        : Promise.resolve({ data: [] as { market_id: string; player_id: string }[] }),
+    ])
     const jackpotByTemplate: Record<string, number> = {}
     for (const j of jackpots ?? []) jackpotByTemplate[j.template_id] = j.chips
 
     // Cuántos jugadores han apostado en cada pregunta (solo el número,
     // nunca quién): la lectura va con service role porque RLS oculta las
     // apuestas ajenas hasta el cierre.
-    const marketIds = contexts.flatMap(ctx => ctx.markets.map(m => m.id))
-    const { data: betRows } = marketIds.length
-      ? await client.from('bets').select('market_id, player_id').in('market_id', marketIds)
-      : { data: [] as { market_id: string; player_id: string }[] }
     const bettorSets: Record<string, Set<string>> = {}
     for (const b of betRows ?? []) (bettorSets[b.market_id] ??= new Set()).add(b.player_id)
     const bettorsByMarket: Record<string, number> = {}

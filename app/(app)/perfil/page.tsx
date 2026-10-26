@@ -1,6 +1,6 @@
 import { createClient, getCachedUser } from '@/lib/supabase/server'
 import PerfilForm from '@/components/PerfilForm'
-import { getCachedSeasonCompetitiveDna, getCachedSeasonCourtExpenses } from '@/lib/supabase/cached'
+import { getCachedActiveSeason, getCachedSeasonCompetitiveDna, getCachedSeasonCourtExpenses } from '@/lib/supabase/cached'
 
 export default async function PerfilPage() {
   const supabase = await createClient()
@@ -14,7 +14,7 @@ export default async function PerfilPage() {
   // extra en serie cuando no hay temporada activa.
   const [{ data: profile }, { data: activeSeason }, { data: mostRecentSeason }] = await Promise.all([
     supabase.from('profiles').select('name, racket_brand, dominant_hand, preferred_side, avatar_url').eq('id', user.id).maybeSingle(),
-    supabase.from('seasons').select('id, name').eq('status', 'active').order('created_at', { ascending: false }).limit(1).maybeSingle(),
+    getCachedActiveSeason().then(s => ({ data: s ? { id: s.id, name: s.name } : null })),
     supabase.from('seasons').select('id, name').order('created_at', { ascending: false }).limit(1).maybeSingle(),
   ])
 
