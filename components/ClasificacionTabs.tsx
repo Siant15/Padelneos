@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import InfoToggle from '@/components/InfoToggle'
 
 type IndividualRow = { medal: string; playerId: string; name: string; pj: number; pg: number; pe: number; pp: number; apuestas: number; total: number }
 type PairRow = { name: string; pj: number; pg: number; pe: number; pp: number; pts: number }
@@ -46,13 +47,15 @@ export default function ClasificacionTabs({ individual, parejas, apuestasMatrix,
 
       {seg === 'individual' && (
         <div className="rounded-2xl px-3 py-1.5" style={{ background: 'var(--surface)', boxShadow: '0 3px 10px rgba(0,0,0,0.04)' }}>
-          <p className="text-[11px] pt-2 px-0.5" style={{ color: 'var(--text-muted)' }}>
-            🏅 Cada partido reparte <strong style={{ color: 'var(--text)' }}>victoria = 2 pts, empate = 1 pt, derrota = 0 pts</strong> por jugador.
-            <strong style={{ color: 'var(--text)' }}> PTS = puntos de partido + APU</strong> (puntos ganados en apuestas).
-          </p>
-          <p className="text-[11px] pt-1 px-0.5" style={{ color: 'var(--text-muted2)' }}>
-            PJ jugados · PG ganados · PE empatados · PP perdidos. Si hay empate a PTS, gana quien tenga más puntos de partido; si siguen igual, orden alfabético.
-          </p>
+          <InfoToggle label="Cómo se cuentan los puntos">
+            <p>
+              🏅 Cada partido reparte <strong style={{ color: 'var(--text)' }}>victoria = 2 pts, empate = 1 pt, derrota = 0 pts</strong> por jugador.
+              <strong style={{ color: 'var(--text)' }}> PTS = puntos de partido + APU</strong> (puntos ganados en apuestas).
+            </p>
+            <p style={{ color: 'var(--text-muted2)' }}>
+              PJ jugados · PG ganados · PE empatados · PP perdidos. Si hay empate a PTS, gana quien tenga más puntos de partido; si siguen igual, orden alfabético.
+            </p>
+          </InfoToggle>
           <div className="grid text-[11px] font-extrabold py-2 mt-1" style={{ gridTemplateColumns: '1.4fr 0.4fr 0.4fr 0.4fr 0.4fr 0.5fr 0.6fr', color: 'var(--text-muted2)', borderBottom: '1px solid var(--hairline)' }}>
             <span>JUGADOR</span><span>PJ</span><span>PG</span><span>PE</span><span>PP</span><span>APU</span><span>PTS</span>
           </div>
@@ -88,9 +91,9 @@ export default function ClasificacionTabs({ individual, parejas, apuestasMatrix,
 
       {seg === 'parejas' && (
         <div className="rounded-2xl px-3 py-1.5" style={{ background: 'var(--surface)', boxShadow: '0 3px 10px rgba(0,0,0,0.04)' }}>
-          <p className="text-[11px] pt-2 px-0.5" style={{ color: 'var(--text-muted)' }}>
-            🎾 Todas las parejas posibles entre los jugadores registrados. PJ jugados · PG ganados · PE empatados · PP perdidos.
-          </p>
+          <InfoToggle label="Qué muestra la clasificación de parejas">
+            <p>🎾 Todas las parejas posibles entre los jugadores registrados. PJ jugados · PG ganados · PE empatados · PP perdidos.</p>
+          </InfoToggle>
           <div className="grid text-[11px] font-extrabold py-2 mt-1" style={{ gridTemplateColumns: '1.5fr 0.45fr 0.45fr 0.45fr 0.45fr 0.6fr', color: 'var(--text-muted2)', borderBottom: '1px solid var(--hairline)' }}>
             <span>PAREJA</span><span>PJ</span><span>PG</span><span>PE</span><span>PP</span><span>PTS</span>
           </div>
@@ -120,9 +123,13 @@ export default function ClasificacionTabs({ individual, parejas, apuestasMatrix,
             <div className="py-8 text-center text-sm" style={{ color: 'var(--text-muted)' }}>Aún no hay jornadas liquidadas</div>
           ) : (
             <>
-              <p className="text-[11px] pt-2 px-3.5" style={{ color: 'var(--text-muted)' }}>
-                🎯 Puntos que cada jugador ganó con sus apuestas en cada jornada: el mejor apostador suma <strong style={{ color: 'var(--text)' }}>+1</strong> y el segundo <strong style={{ color: 'var(--text)' }}>+0,5</strong>. «·» = sin puntos o jornada aún sin liquidar. Desliza para ver más jornadas; el total (PTS) queda siempre a la derecha.
-              </p>
+              <div className="px-3">
+                <InfoToggle label="Cómo se ganan los puntos de apuestas">
+                  <p>
+                    🎯 Puntos que cada jugador ganó con sus apuestas en cada jornada: el mejor apostador suma <strong style={{ color: 'var(--text)' }}>+1</strong> y el segundo <strong style={{ color: 'var(--text)' }}>+0,5</strong>. «·» = sin puntos o jornada aún sin liquidar. Desliza para ver más jornadas; el total (PTS) queda siempre a la derecha.
+                  </p>
+                </InfoToggle>
+              </div>
               <div className="overflow-x-auto mt-1" style={{ scrollbarWidth: 'thin' }}>
                 <table className="text-[13px] w-full" style={{ borderCollapse: 'collapse' }}>
                   <thead>
