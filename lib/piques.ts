@@ -29,7 +29,7 @@ function rankOrder(players: PlayerLite[], totals: Totals): string[] {
     .sort((a, b) => {
       const ta = totals[a.id] ?? { sport: 0, bet: 0 }
       const tb = totals[b.id] ?? { sport: 0, bet: 0 }
-      return (tb.sport + tb.bet) - (ta.sport + ta.bet) || tb.sport - ta.sport || a.id.localeCompare(b.id)
+      return (tb.sport + tb.bet) - (ta.sport + ta.bet) || tb.sport - ta.sport || a.name.localeCompare(b.name, 'es')
     })
     .map(p => p.id)
 }

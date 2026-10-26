@@ -101,7 +101,12 @@ export default async function LigaPage() {
   })
 
   // ─── Clasificación ────────────────────────────────────────
-  const individualRows = ((individual as IndividualStanding[] | null) ?? []).map((s, i) => ({
+  // Mismo criterio de desempate que Inicio (lib/piques.ts): puntos
+  // totales, luego puntos deportivos, luego nombre.
+  const individualSorted = [...((individual as IndividualStanding[] | null) ?? [])].sort((a, b) =>
+    b.total_points - a.total_points || b.sport_points - a.sport_points || a.name.localeCompare(b.name, 'es')
+  )
+  const individualRows = individualSorted.map((s, i) => ({
     medal: MEDALS[i] ?? `${i + 1}º`,
     playerId: s.player_id,
     name: s.name,
