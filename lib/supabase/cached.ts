@@ -194,7 +194,12 @@ export const getCachedOpenRoundsBetting = unstable_cache(
     }
     const sortedCatalog = [...(catalogTemplates ?? [])].sort((a, b) => (usageCount[b.id] ?? 0) - (usageCount[a.id] ?? 0))
 
-    const allTemplateIds = [...new Set(contexts.flatMap(ctx => ctx.markets.map(m => m.template_id).filter((id): id is string => !!id)))]
+    // Botes de las preguntas ya puestas en las jornadas y también de las del catálogo
+    // ("Añadir más preguntas"), para poder avisar de que una pregunta tiene jackpot.
+    const allTemplateIds = [...new Set([
+      ...contexts.flatMap(ctx => ctx.markets.map(m => m.template_id).filter((id): id is string => !!id)),
+      ...sortedCatalog.map(t => t.id),
+    ])]
     const marketIds = contexts.flatMap(ctx => ctx.markets.map(m => m.id))
     // Botes acumulados y nº de apostantes por pregunta: no dependen uno
     // del otro, se piden a la vez (no una consulta detrás de otra).

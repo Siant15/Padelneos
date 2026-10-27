@@ -31,7 +31,7 @@ const MAX_EXTRA_QUESTIONS = 6
 // pregunta totalmente nueva: se guarda en el catálogo (para poder
 // reutilizarla en futuras jornadas) y se aplica a esta a la vez.
 // Entre 6 y 10 preguntas de pago por jornada (el marcador exacto no cuenta).
-export default function AddQuestionPicker({ roundId, templates, paidCount }: { roundId: string; templates: BettingQuestionTemplate[]; paidCount: number }) {
+export default function AddQuestionPicker({ roundId, templates, paidCount, jackpotByTemplate = {} }: { roundId: string; templates: BettingQuestionTemplate[]; paidCount: number; jackpotByTemplate?: Record<string, number> }) {
   const supabase = createClient()
   const router = useRouter()
   const [open, setOpen] = useState(false)
@@ -55,6 +55,12 @@ export default function AddQuestionPicker({ roundId, templates, paidCount }: { r
   const [loadingPlayers, setLoadingPlayers] = useState(false)
 
   const atLimit = paidCount >= MAX_PAID_QUESTIONS
+
+  // Las preguntas con jackpot acumulado (nadie acertó la última vez) van primero:
+  // es lo que más interesa al elegir, y así no quedan fuera del recorte de 6.
+  const visibleTemplates = [...templates]
+    .sort((a, b) => Number((jackpotByTemplate[b.id] ?? 0) > 0) - Number((jackpotByTemplate[a.id] ?? 0) > 0))
+    .slice(0, MAX_EXTRA_QUESTIONS)
 
   function startEdit(t: BettingQuestionTemplate) {
     setEditingId(t.id)
@@ -220,7 +226,7 @@ export default function AddQuestionPicker({ roundId, templates, paidCount }: { r
               Esta jornada ya tiene las {MAX_PAID_QUESTIONS} preguntas de pago (máximo).
             </p>
           )}
-          {templates.slice(0, MAX_EXTRA_QUESTIONS).map(t => (
+          {visibleTemplates.map(t => (
             editingId === t.id ? (
               <div key={t.id} className="flex gap-1.5">
                 <input value={editText} onChange={e => setEditText(e.target.value)} style={inputStyle} />
@@ -231,7 +237,14 @@ export default function AddQuestionPicker({ roundId, templates, paidCount }: { r
               </div>
             ) : (
               <div key={t.id} className="rounded-xl pl-3 pr-1.5 py-1.5 flex items-center gap-1.5" style={{ background: 'var(--surface2)' }}>
-                <span className="flex-1 text-xs font-semibold" style={{ color: 'var(--text)' }}>{t.text}</span>
+                <span className="flex-1 min-w-0">
+                  <span className="block text-xs font-semibold" style={{ color: 'var(--text)' }}>{t.text}</span>
+                  {(jackpotByTemplate[t.id] ?? 0) > 0 && (
+                    <span className="inline-block mt-1 text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'var(--orange-bg)', color: 'var(--orange)' }}>
+                      🎰 Jackpot: {jackpotByTemplate[t.id]} fichas
+                    </span>
+                  )}
+                </span>
                 <button
                   onClick={() => startEdit(t)}
                   aria-label="Modificar pregunta"
@@ -330,6 +343,11 @@ export default function AddQuestionPicker({ roundId, templates, paidCount }: { r
               <h2 className="font-bold text-base">{answerFor.text}</h2>
               <button type="button" onClick={() => setAnswerFor(null)} aria-label="Cerrar" className="shrink-0 text-lg font-bold px-1" style={{ color: 'var(--text-muted2)' }}>✕</button>
             </div>
+            {(jackpotByTemplate[answerFor.id] ?? 0) > 0 && (
+              <p className="text-xs font-bold mb-2" style={{ color: 'var(--orange)' }}>
+                🎰 Jackpot acumulado: {jackpotByTemplate[answerFor.id]} fichas (nadie acertó la última vez)
+              </p>
+            )}
             <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>
               Elige las respuestas entre las que se podrá apostar en esta jornada.
             </p>

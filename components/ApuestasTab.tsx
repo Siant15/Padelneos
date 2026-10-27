@@ -164,6 +164,7 @@ export default function ApuestasTab({ userId, rounds, initialRoundId }: { userId
             <AddQuestionPicker
               roundId={current.roundId}
               templates={current.availableTemplates}
+              jackpotByTemplate={current.jackpotByTemplate}
               paidCount={current.markets.filter(m => m.type !== 'exact_score').length}
             />
           )}
