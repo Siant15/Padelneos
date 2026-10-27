@@ -90,9 +90,24 @@ export default function BettingMarketsBoard({ roundId, markets, userId, roundSta
   // (cada pregunta 10-50 fichas, total hasta 100).
   const canSubmit = editableMarkets.length > 0 && allInRange && totalChosen <= ROUND_TOTAL
 
+  // Fichas que ya cuentan en preguntas cerradas (no se pueden tocar) y las que
+  // quedan libres: nunca se puede pasar de 100 entre todo. Quitar siempre se puede.
+  const lockedChips = paidMarkets
+    .filter(m => !editableMarkets.includes(m))
+    .reduce((sum, m) => sum + (m.bets?.find(b => b.player_id === userId)?.chips ?? 0), 0)
+  const chipsLeft = Math.max(0, ROUND_TOTAL - lockedChips - totalChosen)
+  // Tope de una pregunta: sus fichas actuales + las libres (y como mucho MAX_BET).
+  const roomFor = (marketId: string) => Math.min(MAX_BET, (selections[marketId]?.chips ?? 0) + chipsLeft)
+  const FULL_MESSAGE = 'Ya has apostado las 100 fichas. Para apostar aquí, quita fichas de otra pregunta.'
+
   const hasInteracted = useRef(false)
 
   function selectOption(marketId: string, optionId: string) {
+    // Elegir una opción en una pregunta sin apuesta necesita al menos 10 fichas libres.
+    if (!selections[marketId] && roomFor(marketId) < MIN_BET) {
+      setError(FULL_MESSAGE)
+      return
+    }
     hasInteracted.current = true
     setError('')
     setSelections(prev => ({ ...prev, [marketId]: { optionId, chips: prev[marketId]?.chips ?? MIN_BET } }))
@@ -102,12 +117,17 @@ export default function BettingMarketsBoard({ roundId, markets, userId, roundSta
   // empezando en 10 fichas; si ya lo era, suma o resta de 10 en 10
   // (tope en 50, y bajar de 10 la deselecciona del todo).
   function bumpChips(marketId: string, optionId: string, delta: number) {
+    const room = roomFor(marketId)
+    if (delta > 0 && room < MIN_BET) {
+      setError(FULL_MESSAGE)
+      return
+    }
     hasInteracted.current = true
     setError('')
     setSelections(prev => {
       const current = prev[marketId]
       const base = current?.optionId === optionId ? current.chips : 0
-      const next = Math.max(0, Math.min(MAX_BET, base + delta))
+      const next = Math.max(0, Math.min(room, base + delta))
       if (next <= 0) {
         const rest = { ...prev }
         delete rest[marketId]
@@ -123,8 +143,9 @@ export default function BettingMarketsBoard({ roundId, markets, userId, roundSta
   // mínimo real ya lo exige el guardado.
   function setChipsDirectly(marketId: string, optionId: string, value: number) {
     hasInteracted.current = true
-    setError('')
-    const clamped = Math.max(0, Math.min(MAX_BET, value))
+    const room = roomFor(marketId)
+    setError(value > room && room < MAX_BET ? FULL_MESSAGE : '')
+    const clamped = Math.max(0, Math.min(room, value))
     if (clamped <= 0) {
       setSelections(prev => {
         const rest = { ...prev }
@@ -257,9 +278,13 @@ export default function BettingMarketsBoard({ roundId, markets, userId, roundSta
             {saving && <span style={{ color: 'var(--text-muted)' }}>Guardando...</span>}
             {!saving && saved && <span style={{ color: 'var(--green)' }}>✓ Guardado</span>}
           </div>
-          {totalChosen !== ROUND_TOTAL && (
+          {totalChosen !== ROUND_TOTAL ? (
             <p className="text-[11px]" style={{ color: '#7A5A1E' }}>
               Reparte las 100 fichas entre las {editableMarkets.length} preguntas ({MIN_BET}-{MAX_BET} cada una). Lo que apuestes se guarda solo, aunque lo dejes a medias.
+            </p>
+          ) : (
+            <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+              Has repartido las 100 fichas. Para cambiar el reparto, quita fichas (−) de una pregunta y súmalas en otra, hasta que cierren las apuestas.
             </p>
           )}
         </div>
@@ -390,7 +415,7 @@ export default function BettingMarketsBoard({ roundId, markets, userId, roundSta
                         <button
                           type="button"
                           onClick={() => bumpChips(market.id, option.id, 10)}
-                          disabled={isChosen && optionChips >= MAX_BET}
+                          disabled={isChosen ? optionChips >= roomFor(market.id) : roomFor(market.id) < MIN_BET}
                           aria-label={`Añadir 10 fichas a ${option.label}`}
                           title="+10 fichas"
                           className="w-11 h-11 rounded-lg text-base font-bold shrink-0 flex items-center justify-center transition hover:opacity-90 disabled:opacity-40"
