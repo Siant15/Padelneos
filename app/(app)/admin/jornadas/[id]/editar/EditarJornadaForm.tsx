@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { revalidateLigaData } from '@/lib/actions'
 import { rescheduleFollowingRounds } from '@/lib/schedule-actions'
 import ClubPicker from '@/components/ClubPicker'
@@ -269,6 +270,20 @@ export default function EditarJornadaForm({ roundId, players, initialForm, initi
           {loading ? 'Guardando...' : saved ? '✓ Guardado' : 'Guardar cambios'}
         </button>
       </form>
+
+      {/* Desde aquí mismo se cierra el partido: marcador + resolver las apuestas. */}
+      <div className="rounded-xl p-3.5 space-y-2" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
+        <Link
+          href={`/admin/jornadas/${roundId}/resultado`}
+          className="block w-full py-3 rounded-xl font-semibold text-center transition hover:opacity-90"
+          style={{ background: 'var(--green)', color: '#fff' }}
+        >
+          📝 Resolver partido
+        </Link>
+        <p className="text-xs text-center" style={{ color: 'var(--text-muted)' }}>
+          Registra el resultado y resuelve las apuestas de la jornada. Guarda antes los cambios de arriba.
+        </p>
+      </div>
     </div>
   )
 }

@@ -337,7 +337,7 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
     <div className="space-y-5 pb-4">
       <div className="flex items-center gap-3">
         <button onClick={() => router.back()} className="text-sm" style={{ color: 'var(--text-muted)' }}>← Volver</button>
-        <h1 className="text-xl font-bold">Resultado · J{roundNumber}</h1>
+        <h1 className="text-xl font-bold">Resolver partido · J{roundNumber}</h1>
       </div>
 
       {loadState === 'no-match' && (

@@ -179,25 +179,29 @@ export default async function DashboardPage() {
               </StopPropagation>
             )}
 
-            <StopPropagation>
-              <Link
-                href={`/admin/jornadas/${round.id}/reserva`}
-                className="block text-center text-sm font-bold py-2.5 rounded-xl transition hover:opacity-90"
-                style={{ background: 'rgba(255,255,255,0.16)', color: '#fff' }}
-              >
-                🏟️ {!effectiveClub || !round.scheduled_date || !effectiveTime ? 'Reservar pista' : 'Reserva e importe'}
-              </Link>
-            </StopPropagation>
+            {/* Con la reserva ya confirmada no hace falta volver a ella desde Inicio:
+                aquí quedan solo Apostar y Resolver partido. */}
+            {!round.court_confirmed && (
+              <StopPropagation>
+                <Link
+                  href={`/admin/jornadas/${round.id}/reserva`}
+                  className="block text-center text-sm font-bold py-2.5 rounded-xl transition hover:opacity-90"
+                  style={{ background: 'rgba(255,255,255,0.16)', color: '#fff' }}
+                >
+                  🏟️ {!effectiveClub || !round.scheduled_date || !effectiveTime ? 'Reservar pista' : 'Reserva e importe'}
+                </Link>
+              </StopPropagation>
+            )}
 
             <StopPropagation>
               <div className="flex gap-2 mt-1">
-                {matchMayHaveHappened && (
+                {(matchMayHaveHappened || round.court_confirmed) && (
                   <Link
                     href={`/admin/jornadas/${round.id}/resultado`}
                     className="flex-1 text-center text-sm font-bold py-2.5 rounded-xl transition hover:opacity-90"
                     style={{ background: '#fff', color: 'oklch(0.4 0.09 155)' }}
                   >
-                    Resultado
+                    Resolver partido
                   </Link>
                 )}
                 {betsOpen ? (
