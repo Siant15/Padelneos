@@ -7,7 +7,9 @@ import type { JornadaViewModel } from '@/components/JornadasAccordion'
 import { getCachedActiveSeason, getCachedPlayers, getCachedSeasonRounds, getCachedSeasonAggregates, getCachedSettledActas, getCachedOpenRoundsBetting, getCachedMyBetsForRounds } from '@/lib/supabase/cached'
 import type { ApuestasRoundEntry } from '@/components/ApuestasTab'
 
-const MEDALS = ['🥇', '🥈', '🥉', '4º']
+const MEDALS = ['🥇', '🥈', '🥉']
+// El último de la clasificación (con 4 o más jugadores) es el farolillo rojo, como en el ciclismo.
+const RED_LANTERN = '🏮'
 
 type BetRow = { round_id: string; player_id: string; rank: number; chips_net: number; point_bonus: number; player: { id: string; name: string } | { id: string; name: string }[] | null }
 
@@ -112,7 +114,7 @@ export default async function LigaPage() {
     b.total_points - a.total_points || b.sport_points - a.sport_points || a.name.localeCompare(b.name, 'es')
   )
   const individualRows = individualSorted.map((s, i) => ({
-    medal: MEDALS[i] ?? `${i + 1}º`,
+    medal: i === individualSorted.length - 1 && individualSorted.length >= 4 ? RED_LANTERN : (MEDALS[i] ?? `${i + 1}º`),
     playerId: s.player_id,
     name: s.name,
     pj: s.matches_played,

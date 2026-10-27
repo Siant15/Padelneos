@@ -15,6 +15,7 @@ import { getInicioData } from '@/lib/inicio-data'
 import { estimateDinnerRisk, formatPoints } from '@/lib/types'
 
 const MEDALS = ['🥇', '🥈', '🥉']
+const RED_LANTERN = '🏮'
 
 // 4 tonos (no 6): oscuro→claro→ámbar→coral, calculados sobre la misma
 // probabilidad de estimateDinnerRisk — solo cambia cómo se pinta aquí.
@@ -213,7 +214,7 @@ export default async function DashboardPage() {
                       ? { background: 'rgba(255,255,255,0.16)', color: '#fff' }
                       : { background: '#fff', color: 'oklch(0.4 0.09 155)' }}
                   >
-                    Apostar · {bettingContext?.chipsLeft ?? 100} fichas
+                    {(bettingContext?.chipsLeft ?? 100) > 0 ? `Apostar · ${bettingContext?.chipsLeft ?? 100} fichas` : 'Modificar apuestas'}
                   </Link>
                 ) : (
                   <Link
@@ -261,6 +262,7 @@ export default async function DashboardPage() {
           )}
           {rows.map((row, i) => {
             const r = risk[row.id]
+            const isLast = rows.length >= 4 && i === rows.length - 1
             return (
               <div
                 key={row.id}
@@ -275,9 +277,10 @@ export default async function DashboardPage() {
                 <span className="text-[13px] font-bold flex items-center gap-1.5">
                   <span
                     className="flex items-center justify-center rounded-full text-[10px] font-extrabold shrink-0"
-                    style={{ width: 18, height: 18, background: row.rank <= 3 ? 'var(--tint)' : undefined }}
+                    style={{ width: 18, height: 18, background: row.rank <= 3 || isLast ? 'var(--tint)' : undefined }}
+                    title={isLast ? 'Farolillo rojo (último puesto)' : undefined}
                   >
-                    {MEDALS[row.rank - 1] ?? row.rank}
+                    {isLast ? RED_LANTERN : (MEDALS[row.rank - 1] ?? row.rank)}
                   </span>
                   <Link href={`/jugador/${row.id}`} className="hover:underline">{row.name}</Link>
                   <RankDelta delta={row.rankDelta} />

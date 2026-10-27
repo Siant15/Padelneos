@@ -50,6 +50,9 @@ export default function ClasificacionTabs({ individual, parejas, apuestasMatrix,
         <div className="rounded-2xl px-3 py-1.5" style={{ background: 'var(--surface)', boxShadow: '0 3px 10px rgba(0,0,0,0.04)' }}>
           <InfoToggle label="Cómo se cuentan los puntos">
             <p>
+              🥇🥈🥉 los tres primeros · 🏮 <strong style={{ color: 'var(--text)' }}>farolillo rojo</strong>: el último puesto.
+            </p>
+            <p>
               🏅 Cada partido reparte <strong style={{ color: 'var(--text)' }}>victoria = 2 pts, empate = 1 pt, derrota = 0 pts</strong> por jugador.
               <strong style={{ color: 'var(--text)' }}> PTS = puntos de partido + APU</strong> (puntos ganados en apuestas).
             </p>
@@ -72,7 +75,7 @@ export default function ClasificacionTabs({ individual, parejas, apuestasMatrix,
                   background: isMe ? 'var(--tint)' : undefined,
                 }}
               >
-                <Link href={`/jugador/${row.playerId}`} className="font-bold truncate" style={{ color: 'var(--text)' }}>
+                <Link href={`/jugador/${row.playerId}`} className="font-bold truncate" style={{ color: 'var(--text)' }} title={row.medal === '🏮' ? 'Farolillo rojo (último puesto)' : undefined}>
                   {row.medal} {row.name}{isMe && <span className="font-normal" style={{ color: 'var(--text-muted2)' }}> (tú)</span>}
                 </Link>
                 <span>{row.pj}</span>

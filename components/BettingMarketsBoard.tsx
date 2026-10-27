@@ -412,17 +412,23 @@ export default function BettingMarketsBoard({ roundId, markets, userId, roundSta
                           value={optionChips}
                           onCommit={v => setChipsDirectly(market.id, option.id, v)}
                         />
-                        <button
-                          type="button"
-                          onClick={() => bumpChips(market.id, option.id, 10)}
-                          disabled={isChosen ? optionChips >= roomFor(market.id) : roomFor(market.id) < MIN_BET}
-                          aria-label={`Añadir 10 fichas a ${option.label}`}
-                          title="+10 fichas"
-                          className="w-11 h-11 rounded-lg text-base font-bold shrink-0 flex items-center justify-center transition hover:opacity-90 disabled:opacity-40"
-                          style={{ background: 'var(--green)', color: '#fff' }}
-                        >
-                          +
-                        </button>
+                        {chipsLeft > 0 ? (
+                          <button
+                            type="button"
+                            onClick={() => bumpChips(market.id, option.id, 10)}
+                            disabled={isChosen ? optionChips >= roomFor(market.id) : roomFor(market.id) < MIN_BET}
+                            aria-label={`Añadir 10 fichas a ${option.label}`}
+                            title="+10 fichas"
+                            className="w-11 h-11 rounded-lg text-base font-bold shrink-0 flex items-center justify-center transition hover:opacity-90 disabled:opacity-40"
+                            style={{ background: 'var(--green)', color: '#fff' }}
+                          >
+                            +
+                          </button>
+                        ) : (
+                          // Con las 100 repartidas el + desaparece (el hueco se mantiene para que
+                          // la fila no se mueva): solo se puede quitar fichas con el −.
+                          <span className="w-11 h-11 shrink-0" aria-hidden />
+                        )}
                       </>
                     )}
                     {!canBet && isChosen && (
