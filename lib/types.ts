@@ -275,3 +275,8 @@ export function getJornadaReservaStatus(round: { scheduled_date: string | null; 
   if (round.scheduled_date && round.scheduled_time && round.club) return 'reservada'
   return 'pendiente'
 }
+
+// Puntos en formato español (4,5 en vez de 4.5), sin ceros de relleno: 2 → "2", 0.5 → "0,5".
+export function formatPoints(n: number): string {
+  return n.toLocaleString('es-ES', { maximumFractionDigits: 2 })
+}

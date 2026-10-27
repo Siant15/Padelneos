@@ -132,6 +132,9 @@ export function computeHeadToHead(rounds: RoundWithMatch[]): Record<string, Reco
   return h2h
 }
 
+// Desde cuántos partidos seguidos ganados o perdidos se habla de "racha" (Inicio y piques).
+export const STREAK_MIN = 2
+
 export type Pique = {
   type: 'en_llamas' | 'remontada' | 'cuentas_pendientes' | 'tapado' | 'rey_pronosticos' | 'bajo_presion'
   category: string
@@ -150,7 +153,7 @@ export function computePiques(
 
   // En llamas: jugador con mejor racha (de victorias) activa.
   const onFire = byRank
-    .filter(r => r.activeStreak?.type === 'V')
+    .filter(r => r.activeStreak?.type === 'V' && r.activeStreak.length >= STREAK_MIN)
     .sort((a, b) => (b.activeStreak?.length ?? 0) - (a.activeStreak?.length ?? 0))[0]
   if (onFire) {
     const length = onFire.activeStreak!.length

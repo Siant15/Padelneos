@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { getCachedSeasonCompetitiveDna } from '@/lib/supabase/cached'
 import CompetitiveDnaRadar from '@/components/CompetitiveDnaRadar'
+import { formatPoints } from '@/lib/types'
 
 const HAND_LABEL: Record<string, string> = { diestra: 'Diestra', zurda: 'Zurda' }
 const SIDE_LABEL: Record<string, string> = { drive: 'Drive (derecha)', reves: 'Revés (izquierda)' }
@@ -66,7 +67,7 @@ export default async function JugadorPage({ params }: { params: Promise<{ id: st
       <div className="grid grid-cols-3 gap-2.5 mb-5">
         <StatCard value={stats.matches_played} label="Partidos" />
         <StatCard value={stats.wins} label="Victorias" />
-        <StatCard value={stats.total_points} label="Puntos" accent />
+        <StatCard value={formatPoints(stats.total_points)} label="Puntos" accent />
       </div>
 
       {dnaPlayers.length > 0 && (
@@ -76,7 +77,7 @@ export default async function JugadorPage({ params }: { params: Promise<{ id: st
   )
 }
 
-function StatCard({ value, label, accent }: { value: number; label: string; accent?: boolean }) {
+function StatCard({ value, label, accent }: { value: number | string; label: string; accent?: boolean }) {
   return (
     <div
       className="rounded-2xl p-3.5 text-center"

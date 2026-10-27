@@ -1,10 +1,13 @@
 import AjustesForm from '@/components/AjustesForm'
 import ResponsablesReserva, { type ResponsableRound } from '@/components/ResponsablesReserva'
-import { createClient } from '@/lib/supabase/server'
+import Link from 'next/link'
+import { createClient, getCachedUser } from '@/lib/supabase/server'
+import { isAdminUser } from '@/lib/admin'
 import { formatDate } from '@/lib/types'
 
 export default async function AjustesPage() {
   const supabase = await createClient()
+  const user = await getCachedUser()
 
   // Lecturas sin caché: aquí se editan los responsables, así que siempre hay que ver el valor real.
   const [{ data: players }, { data: season }] = await Promise.all([
@@ -25,7 +28,19 @@ export default async function AjustesPage() {
 
   return (
     <AjustesForm>
-      <ResponsablesReserva rounds={items} players={players ?? []} />
+      <div className="flex flex-col gap-4">
+        {isAdminUser(user) && (
+          <Link
+            href="/admin"
+            className="block rounded-2xl p-4 transition hover:opacity-90"
+            style={{ background: 'var(--surface)', boxShadow: '0 3px 10px rgba(0,0,0,0.04)' }}
+          >
+            <span className="font-heading text-sm font-bold">🛠️ Administración →</span>
+            <span className="block text-xs mt-1" style={{ color: 'var(--text-muted)' }}>Miembros, ligas y clubs.</span>
+          </Link>
+        )}
+        <ResponsablesReserva rounds={items} players={players ?? []} />
+      </div>
     </AjustesForm>
   )
 }

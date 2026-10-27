@@ -8,6 +8,7 @@ import CompetitiveDnaRadar from '@/components/CompetitiveDnaRadar'
 import type { PlayerDna } from '@/lib/dna-data'
 import type { SeasonCourtExpenses } from '@/lib/supabase/cached'
 import { friendlyError } from '@/lib/errors'
+import { formatPoints } from '@/lib/types'
 
 type Stats = { matches_played: number; wins: number; total_points: number }
 
@@ -201,7 +202,7 @@ export default function PerfilForm({
       <div className="grid grid-cols-3 gap-2.5 mb-5">
         <StatCard value={stats.matches_played} label="Partidos" />
         <StatCard value={stats.wins} label="Victorias" />
-        <StatCard value={stats.total_points} label="Puntos" accent />
+        <StatCard value={formatPoints(stats.total_points)} label="Puntos" accent />
       </div>
 
       {/* Lo accionable primero: cuánto debes o te deben, antes que el radar. */}
@@ -347,7 +348,7 @@ function CourtExpensesCard({ userId, expenses }: { userId: string; expenses: Sea
   )
 }
 
-function StatCard({ value, label, accent }: { value: number; label: string; accent?: boolean }) {
+function StatCard({ value, label, accent }: { value: number | string; label: string; accent?: boolean }) {
   return (
     <div
       className="rounded-2xl p-3.5 text-center"

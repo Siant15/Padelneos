@@ -10,9 +10,9 @@ const NAV = [
   { href: '/perfil', label: 'Perfil', Icon: User },
 ]
 
-export default function NavBar({ isAdmin }: { isAdmin: boolean }) {
+export default function NavBar() {
   const pathname = usePathname()
-  const settingsHref = isAdmin ? '/admin' : '/ajustes'
+  const settingsHref = '/ajustes'
 
   return (
     <>
@@ -31,7 +31,7 @@ export default function NavBar({ isAdmin }: { isAdmin: boolean }) {
             <img src="/icon-192.png" alt="" width={26} height={26} className="rounded-lg" />
             PadelNeos
           </span>
-          <Link href={settingsHref} aria-label={isAdmin ? 'Administración' : 'Ajustes'} style={{ color: 'var(--text-muted2)' }}>
+          <Link href={settingsHref} aria-label="Ajustes" style={{ color: 'var(--text-muted2)' }}>
             <Settings size={20} strokeWidth={2} />
           </Link>
         </header>

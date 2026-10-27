@@ -23,7 +23,7 @@ export default async function AdminPage() {
           </p>
         </div>
         <Link href="/ajustes" className="text-xs font-bold shrink-0 mt-1" style={{ color: 'var(--accent)' }}>
-          ⚙️ Tu cuenta →
+          ← Ajustes
         </Link>
       </div>
 

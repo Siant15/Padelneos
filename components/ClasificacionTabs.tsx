@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import InfoToggle from '@/components/InfoToggle'
+import { formatPoints } from '@/lib/types'
 
 type IndividualRow = { medal: string; playerId: string; name: string; pj: number; pg: number; pe: number; pp: number; apuestas: number; total: number }
 type PairRow = { name: string; pj: number; pg: number; pe: number; pp: number; pts: number }
@@ -78,8 +79,8 @@ export default function ClasificacionTabs({ individual, parejas, apuestasMatrix,
                 <span>{row.pg}</span>
                 <span>{row.pe}</span>
                 <span>{row.pp}</span>
-                <span>{row.apuestas}</span>
-                <span className="font-extrabold" style={{ color: 'var(--accent)' }}>{row.total}</span>
+                <span>{formatPoints(row.apuestas)}</span>
+                <span className="font-extrabold" style={{ color: 'var(--accent)' }}>{formatPoints(row.total)}</span>
               </div>
             )
           })}
@@ -108,7 +109,7 @@ export default function ClasificacionTabs({ individual, parejas, apuestasMatrix,
               <span>{row.pg}</span>
               <span>{row.pe}</span>
               <span>{row.pp}</span>
-              <span className="font-extrabold" style={{ color: 'var(--accent)' }}>{row.pts}</span>
+              <span className="font-extrabold" style={{ color: 'var(--accent)' }}>{formatPoints(row.pts)}</span>
             </div>
           ))}
           {!parejas.length && (
@@ -147,10 +148,10 @@ export default function ClasificacionTabs({ individual, parejas, apuestasMatrix,
                         <td className="font-bold py-2.5 pl-3.5 pr-3 whitespace-nowrap sticky left-0" style={{ background: 'var(--surface)' }}>{row.name}</td>
                         {row.cells.map((cell, j) => (
                           <td key={j} className="py-2.5 px-2 text-center" style={{ color: cell ? 'var(--accent)' : 'var(--text-muted2)' }}>
-                            {cell === null ? '·' : cell}
+                            {cell === null ? '·' : formatPoints(cell)}
                           </td>
                         ))}
-                        <td className="font-extrabold py-2.5 pl-3 pr-3.5 text-right sticky right-0" style={{ color: 'var(--accent)', background: 'var(--surface)', boxShadow: '-6px 0 6px -6px rgba(0,0,0,0.15)' }}>{row.total}</td>
+                        <td className="font-extrabold py-2.5 pl-3 pr-3.5 text-right sticky right-0" style={{ color: 'var(--accent)', background: 'var(--surface)', boxShadow: '-6px 0 6px -6px rgba(0,0,0,0.15)' }}>{formatPoints(row.total)}</td>
                       </tr>
                     ))}
                   </tbody>

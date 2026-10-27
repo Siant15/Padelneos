@@ -19,6 +19,17 @@ export type MarketWithAll = BettingMarket & {
   template?: BettingQuestionTemplate
 }
 
+// Nombre legible del tipo de pregunta (antes se veía el identificador interno: "pair", "sets_score"...).
+const MARKET_TYPE_LABEL: Record<string, string> = {
+  pair: 'Pareja',
+  player: 'Jugador',
+  player_choice: 'Jugador',
+  yes_no: 'Sí / No',
+  sets_score: 'Resultado por sets',
+  exact_score: 'Marcador exacto',
+  custom_options: 'Opciones',
+}
+
 export default function MercadosClient({ roundId, initialMarkets, initialCatalog, initialRoundStatus, initialIsSettled, initialLoadError }: {
   roundId: string
   initialMarkets: MarketWithAll[]
@@ -197,7 +208,7 @@ export default function MercadosClient({ roundId, initialMarkets, initialCatalog
 
   return (
     <div className="space-y-5 pb-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-3">
           <button onClick={() => router.back()} className="text-sm" style={{ color: 'var(--text-muted)' }}>← Volver</button>
           <h1 className="text-xl font-bold">Acta y apuestas 🎰</h1>
@@ -206,7 +217,7 @@ export default function MercadosClient({ roundId, initialMarkets, initialCatalog
           onClick={() => setShowNewForm(v => !v)}
           className="text-xs px-3 py-1.5 rounded-lg font-semibold"
           style={{ background: 'var(--accent)', color: '#fff' }}>
-          {showNewForm ? '✕ Cancelar' : '+ Plantilla nueva'}
+          {showNewForm ? '✕ Cancelar' : '+ Pregunta nueva'}
         </button>
       </div>
 
@@ -330,7 +341,7 @@ function MarketCard({ market, resolving, voiding, deleting, readOnly, canDelete 
     <div className="rounded-xl p-4" style={{ background: 'var(--surface)', border: `1px solid ${market.voided ? 'var(--text-muted2)' : market.resolved ? 'var(--green)' : 'var(--border)'}` }}>
       <div className="flex items-start justify-between mb-2">
         <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'var(--surface2)', color: 'var(--text-muted)' }}>
-          {market.type}
+          {MARKET_TYPE_LABEL[market.type] ?? market.type}
         </span>
         <div className="flex items-center gap-2">
           {market.voided

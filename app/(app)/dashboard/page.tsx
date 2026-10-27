@@ -9,9 +9,10 @@ import DinnerRiskInfo from '@/components/DinnerRiskInfo'
 import PiquesCarousel from '@/components/PiquesCarousel'
 import { getRoundBettingContext } from '@/lib/betting-queries'
 import { isRoundBettable } from '@/lib/betting'
+import { STREAK_MIN } from '@/lib/piques'
 import { getCachedActiveSeason, getCachedSeasonRounds } from '@/lib/supabase/cached'
 import { getInicioData } from '@/lib/inicio-data'
-import { estimateDinnerRisk } from '@/lib/types'
+import { estimateDinnerRisk, formatPoints } from '@/lib/types'
 
 const MEDALS = ['🥇', '🥈', '🥉']
 
@@ -281,7 +282,7 @@ export default async function DashboardPage() {
                   <Link href={`/jugador/${row.id}`} className="hover:underline">{row.name}</Link>
                   <RankDelta delta={row.rankDelta} />
                 </span>
-                <span className="text-[13px] font-extrabold text-right" style={{ color: 'var(--accent)' }}>{row.points}</span>
+                <span className="text-[13px] font-extrabold text-right" style={{ color: 'var(--accent)' }}>{formatPoints(row.points)}</span>
                 <span className="flex items-center justify-center">
                   <StreakBadge row={row} />
                 </span>
@@ -359,7 +360,7 @@ function RankDelta({ delta }: { delta: number }) {
 }
 
 function StreakBadge({ row }: { row: { activeStreak: { type: 'V' | 'D'; length: number } | null; results: ('V' | 'D')[] } }) {
-  if (row.activeStreak && row.activeStreak.length >= 3) {
+  if (row.activeStreak && row.activeStreak.length >= STREAK_MIN) {
     const isWin = row.activeStreak.type === 'V'
     return (
       <span
