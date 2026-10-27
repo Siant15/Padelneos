@@ -7,7 +7,7 @@ import Link from 'next/link'
 import PwaSetup from '@/components/PwaSetup'
 import { friendlyError } from '@/lib/errors'
 
-export default function AjustesForm() {
+export default function AjustesForm({ children }: { children?: React.ReactNode }) {
   const supabase = createClient()
   const router = useRouter()
 
@@ -44,6 +44,8 @@ export default function AjustesForm() {
     <div className="px-5 pt-5 pb-6">
       <Link href="/perfil" className="text-sm inline-block mb-2" style={{ color: 'var(--text-muted)' }}>← Perfil</Link>
       <h1 className="font-heading text-[22px] font-extrabold mb-4">⚙️ Ajustes</h1>
+
+      {children && <div className="mb-4">{children}</div>}
 
       <form
         onSubmit={handlePasswordSubmit}

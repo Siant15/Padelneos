@@ -289,7 +289,7 @@ export default function PerfilForm({
       </form>
 
       <Link href="/ajustes" className="block text-center text-sm font-bold mt-4" style={{ color: 'var(--text-muted)' }}>
-        ⚙️ Contraseña, notificaciones y salir →
+        ⚙️ Ajustes: reservas, contraseña, notificaciones y salir →
       </Link>
     </div>
   )
