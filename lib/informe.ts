@@ -4,6 +4,11 @@
 // negativo de cada pregunta ya lo marca la propia app con `allow_self_bet`
 // (se puede apostar por uno mismo = positiva; si no, negativa).
 
+// El informe se abre cuando se ha jugado al menos la mitad de las jornadas (5 de 9).
+export function halfSeasonReached(roundsPlayed: number, roundsTotal: number): boolean {
+  return roundsTotal > 0 && roundsPlayed * 2 >= roundsTotal
+}
+
 export type InformeEvent = { playerId: string; templateText: string; positive: boolean }
 
 export type InformePlayer = { id: string; name: string; wins: number; losses: number }

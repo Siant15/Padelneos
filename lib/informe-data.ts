@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { getCachedPlayers, getCachedSeasonRounds } from '@/lib/supabase/cached'
-import { computeInforme, type InformeEvent, type InformePlayer, type InformeTitle } from '@/lib/informe'
+import { computeInforme, halfSeasonReached, type InformeEvent, type InformePlayer, type InformeTitle } from '@/lib/informe'
 
 export type InformeData = {
   titles: InformeTitle[]
@@ -59,6 +59,6 @@ export async function getInformeData(seasonId: string): Promise<InformeData> {
     titles: computeInforme(informePlayers, events),
     roundsPlayed,
     roundsTotal,
-    halfReached: roundsTotal > 0 && roundsPlayed * 2 >= roundsTotal,
+    halfReached: halfSeasonReached(roundsPlayed, roundsTotal),
   }
 }

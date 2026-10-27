@@ -10,6 +10,7 @@ import PiquesCarousel from '@/components/PiquesCarousel'
 import { getRoundBettingContext } from '@/lib/betting-queries'
 import { isRoundBettable } from '@/lib/betting'
 import { STREAK_MIN } from '@/lib/piques'
+import { halfSeasonReached } from '@/lib/informe'
 import { getCachedActiveSeason, getCachedSeasonRounds } from '@/lib/supabase/cached'
 import { getInicioData } from '@/lib/inicio-data'
 import { estimateDinnerRisk, formatPoints } from '@/lib/types'
@@ -63,6 +64,8 @@ export default async function DashboardPage() {
   const seasonRoundDates = rounds.filter(r => r.status !== 'played').map(r => r.scheduled_date)
   const today = new Date().toISOString().slice(0, 10)
   const remainingJornadas = seasonRoundDates.length
+  // El informe de mitad de temporada solo aparece cuando se ha jugado la mitad de las jornadas.
+  const informeOpen = halfSeasonReached(rounds.filter(r => r.status === 'played').length, rounds.filter(r => r.status !== 'cancelled').length)
   const lastDate = seasonRoundDates.filter((d): d is string => !!d).sort().at(-1)
   const lastDateLabel = lastDate ? new Date(`${lastDate}T12:00:00`).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }) : null
   // Con la reserva incompleta, o con la fecha ya pasada, el mercado de apuestas está cerrado.
@@ -327,7 +330,7 @@ export default async function DashboardPage() {
       )}
 
       {/* Informe de mitad de temporada: MVP, rey del error, mejor sacador... */}
-      {seasonId && (
+      {seasonId && informeOpen && (
         <Link
           href="/informe"
           className="flex items-center justify-between rounded-2xl px-3.5 py-3 transition hover:opacity-90"
