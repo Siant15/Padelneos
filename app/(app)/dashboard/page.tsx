@@ -326,6 +326,21 @@ export default async function DashboardPage() {
         </div>
       )}
 
+      {/* Informe de mitad de temporada: MVP, rey del error, mejor sacador... */}
+      {seasonId && (
+        <Link
+          href="/informe"
+          className="flex items-center justify-between rounded-2xl px-3.5 py-3 transition hover:opacity-90"
+          style={{ background: 'var(--surface)', boxShadow: '0 4px 14px rgba(0,0,0,0.04)' }}
+        >
+          <span>
+            <span className="font-heading text-sm font-bold block">📊 Informe de mitad de temporada</span>
+            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>MVP, rey del error, mejor sacador…</span>
+          </span>
+          <span className="text-xs font-bold" style={{ color: 'var(--accent)' }}>Ver →</span>
+        </Link>
+      )}
+
       {/* Footer nota */}
       <div
         className="rounded-2xl px-3.5 py-3 text-xs flex items-center gap-2"
