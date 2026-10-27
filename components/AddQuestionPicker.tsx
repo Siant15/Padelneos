@@ -31,7 +31,7 @@ const MAX_EXTRA_QUESTIONS = 6
 // pregunta totalmente nueva: se guarda en el catálogo (para poder
 // reutilizarla en futuras jornadas) y se aplica a esta a la vez.
 // Entre 6 y 10 preguntas de pago por jornada (el marcador exacto no cuenta).
-export default function AddQuestionPicker({ roundId, templates, paidCount, jackpotByTemplate = {} }: { roundId: string; templates: BettingQuestionTemplate[]; paidCount: number; jackpotByTemplate?: Record<string, number> }) {
+export default function AddQuestionPicker({ roundId, templates, paidCount, jackpotByTemplate = {}, jackpotList = [] }: { roundId: string; templates: BettingQuestionTemplate[]; paidCount: number; jackpotByTemplate?: Record<string, number>; jackpotList?: { text: string; chips: number; inRound: boolean }[] }) {
   const supabase = createClient()
   const router = useRouter()
   const [open, setOpen] = useState(false)
@@ -226,6 +226,18 @@ export default function AddQuestionPicker({ roundId, templates, paidCount, jackp
               Esta jornada ya tiene las {MAX_PAID_QUESTIONS} preguntas de pago (máximo).
             </p>
           )}
+          <div className="rounded-xl px-3 py-2 text-xs" style={{ background: 'var(--tint)', color: 'var(--text)' }}>
+            <p className="font-bold">🎰 Botes de jornadas anteriores</p>
+            {jackpotList.length === 0 ? (
+              <p style={{ color: 'var(--text-muted)' }}>Ahora mismo no hay ningún bote acumulado.</p>
+            ) : (
+              <ul className="mt-1 flex flex-col gap-0.5">
+                {jackpotList.map(j => (
+                  <li key={j.text}>{j.text}: <strong>{j.chips} fichas</strong>{j.inRound ? ' · ya está en esta jornada' : ''}</li>
+                ))}
+              </ul>
+            )}
+          </div>
           {visibleTemplates.map(t => (
             editingId === t.id ? (
               <div key={t.id} className="flex gap-1.5">

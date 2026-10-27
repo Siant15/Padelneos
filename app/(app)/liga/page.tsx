@@ -211,6 +211,9 @@ export default async function LigaPage() {
       jackpotByTemplate: openBetting.jackpotByTemplate,
       bettorsByMarket: openBetting.bettorsByMarket,
       availableTemplates,
+      jackpotList: openBetting.catalogTemplates
+        .filter(t => (openBetting.jackpotByTemplate[t.id] ?? 0) > 0)
+        .map(t => ({ text: t.text, chips: openBetting.jackpotByTemplate[t.id], inRound: templateIds.has(t.id) })),
     }
   }) : []
 
