@@ -13,7 +13,7 @@ import AddQuestionPicker from '@/components/AddQuestionPicker'
 type BaseRound = { roundId: string; roundNumber: number; pair1Label: string | null; pair2Label: string | null; scheduledDate: string | null; scheduledTime: string | null; club: string | null }
 
 export type SettledRoundEntry = { kind: 'settled'; roundId: string; roundNumber: number; acta: RoundActa }
-export type OpenRoundEntry = BaseRound & { kind: 'open'; markets: BettingMarket[]; chipsLeft: number; jackpotByTemplate: Record<string, number>; bettorsByMarket: Record<string, number>; availableTemplates: BettingQuestionTemplate[]; jackpotList: { text: string; chips: number; inRound: boolean }[] }
+export type OpenRoundEntry = BaseRound & { kind: 'open'; markets: BettingMarket[]; chipsLeft: number; jackpotByTemplate: Record<string, number>; bettorsByMarket: Record<string, number>; availableTemplates: BettingQuestionTemplate[] }
 export type PendingRoundEntry = BaseRound & { kind: 'pending'; reason: 'awaiting_settlement' | 'no_questions'; myBets: { question: string; answer: string; chips: number; resolved: boolean; voided: boolean; won: boolean }[] }
 export type ApuestasRoundEntry = SettledRoundEntry | OpenRoundEntry | PendingRoundEntry
 
@@ -165,7 +165,6 @@ export default function ApuestasTab({ userId, rounds, initialRoundId }: { userId
               roundId={current.roundId}
               templates={current.availableTemplates}
               jackpotByTemplate={current.jackpotByTemplate}
-              jackpotList={current.jackpotList}
               paidCount={current.markets.filter(m => m.type !== 'exact_score').length}
             />
           )}
