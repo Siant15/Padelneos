@@ -570,7 +570,7 @@ function ExactScoreCard({ market, canBet, bettors, userId, draft, onDraftChange,
       )}
 
       {canBet && (
-        <div className="flex items-center gap-2 mt-2.5">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-2 mt-2.5">
           {draft.map((s, i) => (
             <div key={i} className="flex items-center gap-1">
               <input ref={el => { inputRefs.current[i * 2] = el }} type="number" inputMode="numeric" min={0} max={7} value={s[0]} onFocus={e => e.target.select()} onChange={e => setSet(i, 0, e.target.value)}
@@ -580,11 +580,11 @@ function ExactScoreCard({ market, canBet, bettors, userId, draft, onDraftChange,
                 className="w-9 text-center text-xs rounded-lg py-1.5 outline-none" style={{ border: '1px solid var(--hairline)' }} />
             </div>
           ))}
-          <button type="button" onClick={toggleThirdSet} className="text-[11px] px-2 rounded-lg" style={{ border: '1px solid var(--hairline)', color: 'var(--text-muted)' }}>
+          <button type="button" onClick={toggleThirdSet} className="text-[11px] px-2 py-1.5 rounded-lg whitespace-nowrap" style={{ border: '1px solid var(--hairline)', color: 'var(--text-muted)' }}>
             {draft.length === 3 ? '−3.º set' : '+3.º set'}
           </button>
           <button type="button" onClick={onSubmit} disabled={saving}
-            className="ml-auto text-xs font-bold px-3 py-1.5 rounded-lg transition hover:opacity-90 disabled:opacity-40"
+            className="basis-full text-sm font-bold px-3 py-2 rounded-lg transition hover:opacity-90 disabled:opacity-40"
             style={{ background: 'var(--accent)', color: '#fff' }}>
             {saving ? '...' : myBetOptions.length ? 'Cambiar' : 'Pronosticar'}
           </button>
