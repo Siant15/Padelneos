@@ -1,4 +1,5 @@
 {
+  "regions": ["dub1"],
   "crons": [
     { "path": "/api/cron/notify?type=dayBefore", "schedule": "30 20 * * *" }
   ]
