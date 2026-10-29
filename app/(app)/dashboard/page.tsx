@@ -1,3 +1,4 @@
+import EnableNotificationsCard from '@/components/EnableNotificationsCard'
 import { createClient, getCachedUser } from '@/lib/supabase/server'
 import type { Round } from '@/lib/types'
 import Link from 'next/link'
@@ -99,6 +100,8 @@ export default async function DashboardPage() {
           </span>
         )}
       </div>
+
+      <EnableNotificationsCard />
 
       {/* Próximo partido */}
       {round ? (

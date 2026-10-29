@@ -3,30 +3,12 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { friendlyError } from '@/lib/errors'
+import { VAPID_KEY, isIos, isStandalone, errorMessage, subscribeToPush } from '@/lib/push-client'
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>
 }
-
-function urlBase64ToUint8Array(base64String: string): BufferSource {
-  const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
-  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
-  const rawData = window.atob(base64)
-  const bytes = new Uint8Array(rawData.length)
-  for (let i = 0; i < rawData.length; i++) bytes[i] = rawData.charCodeAt(i)
-  return bytes.buffer
-}
-
-function isIos(): boolean {
-  return /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase())
-}
-
-function isStandalone(): boolean {
-  return window.matchMedia('(display-mode: standalone)').matches || (window.navigator as { standalone?: boolean }).standalone === true
-}
-
-const VAPID_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
 
 export default function PwaSetup() {
   const supabase = createClient()
@@ -79,40 +61,15 @@ export default function PwaSetup() {
     setSubscribing(true)
 
     try {
-      const perm = await Notification.requestPermission()
-      setPermission(perm)
-      if (perm !== 'granted') {
+      const ok = await subscribeToPush()
+      setPermission(Notification.permission)
+      if (!ok) {
         setPushError('No has dado permiso, así que no podemos avisarte.')
-        setSubscribing(false)
         return
       }
-
-      const registration = await navigator.serviceWorker.ready
-      const subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(VAPID_KEY!),
-      })
-
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('No hay sesión')
-
-      const json = subscription.toJSON()
-      const { error } = await supabase.from('push_subscriptions').upsert({
-        player_id: user.id,
-        endpoint: json.endpoint!,
-        p256dh: json.keys!.p256dh,
-        auth: json.keys!.auth,
-      }, { onConflict: 'endpoint' })
-
-      if (error) throw error
       setPushOk(true)
     } catch (err) {
-      // Los errores de Supabase (PostgrestError) son objetos planos con
-      // `.message`, no instancias de Error — String(err) sobre ellos da
-      // "[object Object]" en vez del texto real.
-      const message = err instanceof Error
-        ? err.message
-        : (err && typeof err === 'object' && 'message' in err) ? String((err as { message: unknown }).message) : String(err)
+      const message = errorMessage(err)
       setPushOk(false)
       setPushError(friendlyError(message, 'No se pudo activar las notificaciones. Inténtalo de nuevo.'))
     } finally {
