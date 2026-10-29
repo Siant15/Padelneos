@@ -8,7 +8,14 @@ import type { BettingQuestionTemplate } from '@/lib/types'
 import { revalidateLigaData } from '@/lib/actions'
 import { friendlyError } from '@/lib/errors'
 
-type CustomAnswerType = 'yes_no' | 'player' | 'custom_options'
+type CustomAnswerType = 'pair' | 'player' | 'yes_no' | 'custom_options'
+
+const ANSWER_TYPES: { value: CustomAnswerType; label: string; hint: string }[] = [
+  { value: 'pair', label: '👥 Una pareja', hint: 'Se apuesta por una de las dos parejas del partido' },
+  { value: 'player', label: '🎾 Un jugador', hint: 'Se apuesta por uno de los 4 jugadores' },
+  { value: 'yes_no', label: '✅ Sí o no', hint: 'Pasa o no pasa' },
+  { value: 'custom_options', label: '✏️ Otras opciones', hint: 'Escribes tú las respuestas posibles' },
+]
 
 const inputStyle: React.CSSProperties = {
   width: '100%',
@@ -42,6 +49,7 @@ export default function AddQuestionPicker({ roundId, templates, paidCount, jackp
   const [savingEdit, setSavingEdit] = useState(false)
 
   const [creating, setCreating] = useState(false)
+  const [createStep, setCreateStep] = useState<1 | 2>(1)
   const [text, setText] = useState('')
   const [answerType, setAnswerType] = useState<CustomAnswerType>('yes_no')
   const [options, setOptions] = useState<string[]>(['', ''])
@@ -167,6 +175,7 @@ export default function AddQuestionPicker({ roundId, templates, paidCount, jackp
   async function handleCreateCustom(e: React.FormEvent) {
     e.preventDefault()
     if (!text.trim() || atLimit) return
+    if (createStep === 1) { setCreateStep(2); return }
     if (answerType === 'custom_options' && options.filter(o => o.trim()).length < 2) {
       setError('Añade al menos 2 opciones.')
       return
@@ -184,7 +193,7 @@ export default function AddQuestionPicker({ roundId, templates, paidCount, jackp
         options: answerType === 'custom_options'
           ? options.filter(o => o.trim()).map(o => ({ label: o.trim(), value: o.trim() }))
           : null,
-        allow_none: allowNone,
+        allow_none: (answerType === 'player' || answerType === 'custom_options') && allowNone,
         auto_apply: false,
         active: true,
       })
@@ -207,7 +216,7 @@ export default function AddQuestionPicker({ roundId, templates, paidCount, jackp
       return
     }
 
-    setText(''); setOptions(['', '']); setAllowNone(false); setAnswerType('yes_no'); setCreating(false)
+    setText(''); setOptions(['', '']); setAllowNone(false); setAnswerType('yes_no'); setCreating(false); setCreateStep(1)
     await revalidateLigaData()
     router.refresh()
   }
@@ -269,7 +278,7 @@ export default function AddQuestionPicker({ roundId, templates, paidCount, jackp
           ))}
 
           {!creating ? (
-            !atLimit && templates.length < MAX_EXTRA_QUESTIONS && (
+            !atLimit && (
               <button
                 onClick={() => setCreating(true)}
                 className="text-left text-xs font-bold px-3 py-2 rounded-xl transition hover:opacity-90"
@@ -280,20 +289,40 @@ export default function AddQuestionPicker({ roundId, templates, paidCount, jackp
             )
           ) : (
             <form onSubmit={handleCreateCustom} className="rounded-xl p-3 flex flex-col gap-2.5" style={{ background: 'var(--surface2)' }}>
-              <input
-                value={text}
-                onChange={e => setText(e.target.value)}
-                placeholder="Ej: ¿Se caerá alguien en pista?"
-                required
-                style={inputStyle}
-              />
-              <select value={answerType} onChange={e => setAnswerType(e.target.value as CustomAnswerType)} style={inputStyle}>
-                <option value="yes_no">Sí / No</option>
-                <option value="player">Elegir un jugador del partido</option>
-                <option value="custom_options">Opciones personalizadas</option>
-              </select>
+              {createStep === 1 ? (
+                <input
+                  value={text}
+                  onChange={e => setText(e.target.value)}
+                  placeholder="Ej: ¿Se caerá alguien en pista?"
+                  required
+                  autoFocus
+                  style={inputStyle}
+                />
+              ) : (
+                <>
+                  <p className="text-xs font-bold" style={{ color: 'var(--text)' }}>«{text.trim()}»</p>
+                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>¿Cómo se responde?</p>
+                  <div className="flex flex-col gap-1.5">
+                    {ANSWER_TYPES.map(t => (
+                      <button
+                        key={t.value}
+                        type="button"
+                        onClick={() => setAnswerType(t.value)}
+                        className="text-left rounded-xl px-3 py-2"
+                        style={{
+                          background: answerType === t.value ? 'var(--tint)' : 'var(--surface)',
+                          border: `1.5px solid ${answerType === t.value ? 'var(--accent)' : 'var(--border)'}`,
+                        }}
+                      >
+                        <span className="block text-xs font-bold" style={{ color: 'var(--text)' }}>{t.label}</span>
+                        <span className="block text-[11px]" style={{ color: 'var(--text-muted)' }}>{t.hint}</span>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
 
-              {answerType === 'custom_options' && (
+              {createStep === 2 && answerType === 'custom_options' && (
                 <div className="flex flex-col gap-1.5">
                   {options.map((o, i) => (
                     <div key={i} className="flex gap-1.5">
@@ -316,7 +345,7 @@ export default function AddQuestionPicker({ roundId, templates, paidCount, jackp
                 </div>
               )}
 
-              {(answerType === 'player' || answerType === 'custom_options') && (
+              {createStep === 2 && (answerType === 'player' || answerType === 'custom_options') && (
                 <label className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-muted)' }}>
                   <input type="checkbox" checked={allowNone} onChange={e => setAllowNone(e.target.checked)} />
                   Permitir la opción &quot;Ninguno&quot;
@@ -324,11 +353,11 @@ export default function AddQuestionPicker({ roundId, templates, paidCount, jackp
               )}
 
               <div className="flex gap-2">
-                <button type="button" onClick={() => setCreating(false)} className="flex-1 py-2 rounded-xl text-xs font-bold" style={{ background: 'var(--tint)', color: '#555' }}>
-                  Cancelar
+                <button type="button" onClick={() => (createStep === 2 ? setCreateStep(1) : setCreating(false))} className="flex-1 py-2 rounded-xl text-xs font-bold" style={{ background: 'var(--tint)', color: '#555' }}>
+                  {createStep === 2 ? 'Atrás' : 'Cancelar'}
                 </button>
                 <button type="submit" disabled={savingCustom} className="flex-1 py-2 rounded-xl text-xs font-bold disabled:opacity-50" style={{ background: 'var(--accent)', color: '#fff' }}>
-                  {savingCustom ? 'Guardando...' : 'Crear y añadir'}
+                  {createStep === 1 ? 'Siguiente' : savingCustom ? 'Guardando...' : 'Crear y añadir'}
                 </button>
               </div>
             </form>
