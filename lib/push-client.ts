@@ -53,3 +53,16 @@ export async function subscribeToPush(): Promise<boolean> {
   if (error) throw error
   return true
 }
+
+// Quita la suscripción de este dispositivo: la borra del navegador y de la base de datos.
+export async function unsubscribeFromPush(): Promise<void> {
+  const registration = await navigator.serviceWorker.ready
+  const subscription = await registration.pushManager.getSubscription()
+  if (!subscription) return
+  const endpoint = subscription.endpoint
+
+  const supabase = createClient()
+  const { error } = await supabase.from('push_subscriptions').delete().eq('endpoint', endpoint)
+  if (error) throw error
+  await subscription.unsubscribe()
+}

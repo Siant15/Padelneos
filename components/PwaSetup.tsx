@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { friendlyError } from '@/lib/errors'
-import { VAPID_KEY, isIos, isStandalone, errorMessage, subscribeToPush } from '@/lib/push-client'
+import { VAPID_KEY, isIos, isStandalone, errorMessage, subscribeToPush, unsubscribeFromPush } from '@/lib/push-client'
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>
@@ -54,6 +54,20 @@ export default function PwaSetup() {
     }
     await installEvent.prompt()
     setInstallEvent(null)
+  }
+
+  async function handleDisableNotifications() {
+    if (!window.confirm('¿Dejar de recibir avisos en este dispositivo?')) return
+    setPushError('')
+    setSubscribing(true)
+    try {
+      await unsubscribeFromPush()
+      setPushOk(false)
+    } catch (err) {
+      setPushError(friendlyError(errorMessage(err), 'No se pudo desactivar las notificaciones. Inténtalo de nuevo.'))
+    } finally {
+      setSubscribing(false)
+    }
   }
 
   async function handleEnableNotifications() {
@@ -134,6 +148,16 @@ export default function PwaSetup() {
           >
             {subscribing ? 'Activando...' : pushOk ? '✓ Notificaciones activadas' : '🔔 Activar notificaciones'}
           </button>
+          {pushOk && (
+            <button
+              onClick={handleDisableNotifications}
+              disabled={subscribing}
+              className="w-full mt-2 text-xs font-bold disabled:opacity-50"
+              style={{ color: 'var(--text-muted)' }}
+            >
+              {subscribing ? 'Desactivando...' : 'Desactivar notificaciones en este dispositivo'}
+            </button>
+          )}
         </div>
       )}
       {permission === 'denied' && (
