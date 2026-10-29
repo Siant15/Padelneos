@@ -226,7 +226,7 @@ export function computePiques(
   if (bettingTop && bettingTop.correctPicks > 0) {
     candidates.push({
       type: 'rey_pronosticos', category: 'Rey de los pronósticos',
-      title: `${bettingTop.name}, rey de los pronósticos`,
+      title: bettingTop.name,
       text: `${bettingTop.correctPicks} apuesta${bettingTop.correctPicks === 1 ? '' : 's'} acertada${bettingTop.correctPicks === 1 ? '' : 's'} esta temporada`,
       score: Math.min(1, bettingTop.correctPicks / 6),
     })
