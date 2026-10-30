@@ -201,7 +201,7 @@ async function handleBetAgainstYou(admin: SupabaseClient) {
 
     const { data: markets } = await admin
       .from('betting_markets')
-      .select('id, options:betting_options(id, player_id)')
+      .select('id, options:betting_options!market_id(id, player_id)')
       .eq('round_id', round.id)
       .eq('type', 'player')
 

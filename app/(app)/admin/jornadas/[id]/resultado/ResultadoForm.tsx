@@ -93,7 +93,7 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
   const loadBetsStatus = useCallback(async () => {
     const [{ data: pending }, { data: settlement }] = await Promise.all([
       supabase.from('betting_markets')
-        .select('id, description, options:betting_options(id, label, is_none)')
+        .select('id, description, options:betting_options!market_id(id, label, is_none)')
         .eq('round_id', roundId).eq('resolved', false),
       supabase.from('round_settlements').select('id').eq('round_id', roundId).is('voided_at', null).maybeSingle(),
     ])
@@ -267,7 +267,7 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
     loadBetsStatus()
     const { data } = await supabase
       .from('betting_markets')
-      .select('id, description, options:betting_options(id, label, is_none)')
+      .select('id, description, options:betting_options!market_id(id, label, is_none)')
       .eq('round_id', roundId)
       .eq('resolved', false)
 

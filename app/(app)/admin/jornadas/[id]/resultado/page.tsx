@@ -71,7 +71,7 @@ export default async function ResultadoPage({ params }: { params: Promise<{ id: 
 
   const [{ data: pendingRows }, { data: settlement }] = await Promise.all([
     supabase.from('betting_markets')
-      .select('id, description, options:betting_options(id, label, is_none)')
+      .select('id, description, options:betting_options!market_id(id, label, is_none)')
       .eq('round_id', roundId).eq('resolved', false),
     supabase.from('round_settlements').select('id').eq('round_id', roundId).is('voided_at', null).maybeSingle(),
   ])
