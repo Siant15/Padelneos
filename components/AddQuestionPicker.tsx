@@ -38,7 +38,7 @@ const MAX_EXTRA_QUESTIONS = 6
 // pregunta totalmente nueva: se guarda en el catálogo (para poder
 // reutilizarla en futuras jornadas) y se aplica a esta a la vez.
 // Entre 6 y 10 preguntas de pago por jornada (el marcador exacto no cuenta).
-export default function AddQuestionPicker({ roundId, templates, paidCount, jackpotByTemplate = {} }: { roundId: string; templates: BettingQuestionTemplate[]; paidCount: number; jackpotByTemplate?: Record<string, number> }) {
+export default function AddQuestionPicker({ roundId, templates, paidCount, jackpotByTemplate = {}, usageByTemplate = {} }: { roundId: string; templates: BettingQuestionTemplate[]; paidCount: number; jackpotByTemplate?: Record<string, number>; usageByTemplate?: Record<string, number> }) {
   const supabase = createClient()
   const router = useRouter()
   const [open, setOpen] = useState(false)
@@ -56,6 +56,7 @@ export default function AddQuestionPicker({ roundId, templates, paidCount, jackp
   const [allowNone, setAllowNone] = useState(false)
   const [savingCustom, setSavingCustom] = useState(false)
 
+  const [chosenType, setChosenType] = useState<CustomAnswerType>('player')
   const [answerFor, setAnswerFor] = useState<BettingQuestionTemplate | null>(null)
   const [answerTexts, setAnswerTexts] = useState<string[]>([])
   const [playerChoices, setPlayerChoices] = useState<{ id: string; name: string; checked: boolean }[]>([])
@@ -108,55 +109,95 @@ export default function AddQuestionPicker({ roundId, templates, paidCount, jackp
     router.refresh()
   }
 
-  // Popup de respuestas: solo para preguntas cuyas respuestas tiene
-  // sentido elegir (jugadores, sí/no, opciones propias). Las demás
-  // (ganador, resultado por sets...) se resuelven solas a partir del
-  // marcador y se añaden directamente.
+  // Al añadir una pregunta del catálogo se pregunta siempre cómo se responde
+  // (pareja, jugador, sí/no u otras opciones), salvo que ya se haya usado 2 o
+  // más veces: entonces su tipo ya está asentado y se añade directamente. Las
+  // preguntas que se resuelven solas con el marcador (ganador, resultado por
+  // sets...) tampoco preguntan.
+  const ASKABLE: string[] = ['pair', 'player', 'yes_no', 'custom_options']
+
   async function startAdd(t: BettingQuestionTemplate) {
     if (atLimit) return
-    if (t.answer_type !== 'player' && t.answer_type !== 'yes_no' && t.answer_type !== 'custom_options') {
+    if (!ASKABLE.includes(t.answer_type) || (usageByTemplate[t.id] ?? 0) >= 2) {
       await addTemplate(t.id)
       return
     }
     setError('')
     setAnswerFor(t)
-    if (t.answer_type === 'player') {
-      setLoadingPlayers(true)
-      const { data } = await supabase
-        .from('matches')
-        .select('team1_p1:profiles!team1_p1_id(id, name), team1_p2:profiles!team1_p2_id(id, name), team2_p1:profiles!team2_p1_id(id, name), team2_p2:profiles!team2_p2_id(id, name)')
-        .eq('round_id', roundId)
-        .maybeSingle()
-      setLoadingPlayers(false)
-      const m = data as unknown as Record<string, { id: string; name: string } | null> | null
-      const players = m ? [m.team1_p1, m.team1_p2, m.team2_p1, m.team2_p2].filter((p): p is { id: string; name: string } => !!p) : []
-      setPlayerChoices(players.map(p => ({ ...p, checked: true })))
-      setIncludeNone(t.allow_none)
-    } else if (t.answer_type === 'yes_no') {
-      setAnswerTexts(['Sí', 'No'])
-    } else {
-      const labels = (t.options ?? []).map(o => o.label)
+    setIncludeNone(t.allow_none)
+    setLoadingPlayers(true)
+    const { data } = await supabase
+      .from('matches')
+      .select('team1_p1:profiles!team1_p1_id(id, name), team1_p2:profiles!team1_p2_id(id, name), team2_p1:profiles!team2_p1_id(id, name), team2_p2:profiles!team2_p2_id(id, name)')
+      .eq('round_id', roundId)
+      .maybeSingle()
+    setLoadingPlayers(false)
+    const m = data as unknown as Record<string, { id: string; name: string } | null> | null
+    const players = m ? [m.team1_p1, m.team1_p2, m.team2_p1, m.team2_p2].filter((p): p is { id: string; name: string } => !!p) : []
+    setPlayerChoices(players.map(p => ({ ...p, checked: true })))
+    const labels = (t.options ?? []).map(o => o.label)
+    setAnswerTexts(labels.length >= 2 ? labels : [...labels, ...Array(2 - labels.length).fill('')])
+    setChosenType(t.answer_type as CustomAnswerType)
+  }
+
+  function chooseType(type: CustomAnswerType) {
+    setChosenType(type)
+    if (type === 'yes_no') setAnswerTexts(['Sí', 'No'])
+    else if (type === 'custom_options' && answerFor) {
+      const labels = (answerFor.options ?? []).map(o => o.label)
       setAnswerTexts(labels.length >= 2 ? labels : [...labels, ...Array(2 - labels.length).fill('')])
     }
   }
 
   async function confirmAnswers() {
     if (!answerFor) return
-    let payload: { label: string; value?: string; player_id?: string; is_none?: boolean }[]
-    if (answerFor.answer_type === 'player') {
+    let payload: { label: string; value?: string; player_id?: string; is_none?: boolean }[] = []
+    if (chosenType === 'player') {
       payload = playerChoices.filter(p => p.checked).map(p => ({ label: p.name, player_id: p.id }))
       if (includeNone) payload.push({ label: 'Ninguno', value: 'none', is_none: true })
-    } else if (answerFor.answer_type === 'yes_no') {
+    } else if (chosenType === 'yes_no') {
       payload = [{ label: answerTexts[0].trim() || 'Sí', value: 'yes' }, { label: answerTexts[1].trim() || 'No', value: 'no' }]
-    } else {
+    } else if (chosenType === 'custom_options') {
       payload = answerTexts.map(a => a.trim()).filter(Boolean).map(a => ({ label: a, value: a }))
     }
-    if (payload.length < 2) {
+    if (chosenType !== 'pair' && payload.length < 2) {
       setError('Hacen falta al menos 2 respuestas.')
       return
     }
     setAdding(answerFor.id)
     setError('')
+
+    // Si el tipo elegido es distinto al guardado, se corrige en el catálogo: la
+    // pregunta se crea con ese tipo y las próximas veces ya sale bien.
+    if (chosenType !== answerFor.answer_type || chosenType === 'custom_options') {
+      const { error: tplError } = await supabase
+        .from('betting_question_templates')
+        .update({
+          answer_type: chosenType,
+          allow_none: chosenType === 'player' ? includeNone : false,
+          options: chosenType === 'custom_options' ? payload.map(o => ({ label: o.label, value: o.value ?? o.label })) : null,
+        })
+        .eq('id', answerFor.id)
+      if (tplError) {
+        setAdding(null)
+        setError(friendlyError(tplError.message, 'No se pudo guardar el tipo de respuesta. Inténtalo de nuevo.'))
+        return
+      }
+    }
+
+    if (chosenType === 'pair') {
+      const { error: pairError } = await supabase.rpc('instantiate_round_questions', { p_round_id: roundId, p_template_ids: [answerFor.id] })
+      setAdding(null)
+      if (pairError) {
+        setError(friendlyError(pairError.message, 'No se pudo añadir la pregunta. Inténtalo de nuevo.'))
+        return
+      }
+      setAnswerFor(null)
+      await revalidateLigaData()
+      router.refresh()
+      return
+    }
+
     const { error: rpcError } = await supabase.rpc('add_round_question_with_options', {
       p_round_id: roundId,
       p_template_id: answerFor.id,
@@ -377,11 +418,32 @@ export default function AddQuestionPicker({ roundId, templates, paidCount, jackp
                 🎰 Jackpot acumulado: {jackpotByTemplate[answerFor.id]} fichas (nadie acertó la última vez)
               </p>
             )}
-            <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>
-              Elige las respuestas entre las que se podrá apostar en esta jornada.
-            </p>
+            <p className="text-xs mb-2" style={{ color: 'var(--text-muted)' }}>¿Cómo se responde esta pregunta?</p>
+            <div className="flex flex-col gap-1.5 mb-3">
+              {ANSWER_TYPES.map(t => (
+                <button
+                  key={t.value}
+                  type="button"
+                  onClick={() => chooseType(t.value)}
+                  className="text-left rounded-xl px-3 py-2"
+                  style={{
+                    background: chosenType === t.value ? 'var(--tint)' : 'var(--surface)',
+                    border: `1.5px solid ${chosenType === t.value ? 'var(--accent)' : 'var(--border)'}`,
+                  }}
+                >
+                  <span className="block text-xs font-bold" style={{ color: 'var(--text)' }}>{t.label}</span>
+                  <span className="block text-[11px]" style={{ color: 'var(--text-muted)' }}>{t.hint}</span>
+                </button>
+              ))}
+            </div>
+            {chosenType === 'pair' && (
+              <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>Las respuestas serán las dos parejas del partido.</p>
+            )}
+            {chosenType === 'player' && (
+              <p className="text-xs mb-2" style={{ color: 'var(--text-muted)' }}>Marca entre qué jugadores se podrá apostar.</p>
+            )}
 
-            {answerFor.answer_type === 'player' && (
+            {chosenType === 'player' && (
               <div className="flex flex-col gap-2 mb-3">
                 {loadingPlayers && <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Cargando jugadores...</p>}
                 {playerChoices.map((p, i) => (
@@ -397,7 +459,7 @@ export default function AddQuestionPicker({ roundId, templates, paidCount, jackp
               </div>
             )}
 
-            {answerFor.answer_type === 'yes_no' && (
+            {chosenType === 'yes_no' && (
               <div className="flex flex-col gap-2 mb-3">
                 {answerTexts.map((a, i) => (
                   <input key={i} value={a} onChange={e => setAnswerTexts(list => list.map((x, j) => j === i ? e.target.value : x))} style={inputStyle} />
@@ -405,7 +467,7 @@ export default function AddQuestionPicker({ roundId, templates, paidCount, jackp
               </div>
             )}
 
-            {answerFor.answer_type === 'custom_options' && (
+            {chosenType === 'custom_options' && (
               <div className="flex flex-col gap-2 mb-3">
                 {answerTexts.map((a, i) => (
                   <div key={i} className="flex gap-1.5">

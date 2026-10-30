@@ -222,7 +222,7 @@ export const getCachedOpenRoundsBetting = unstable_cache(
     const bettorsByMarket: Record<string, number> = {}
     for (const [id, set] of Object.entries(bettorSets)) bettorsByMarket[id] = set.size
 
-    return { contexts, catalogTemplates: sortedCatalog, jackpotByTemplate, bettorsByMarket }
+    return { contexts, catalogTemplates: sortedCatalog, jackpotByTemplate, bettorsByMarket, usageByTemplate: usageCount }
   },
   ['open-rounds-betting'],
   { revalidate: REVALIDATE_SECONDS, tags: ['liga-data'] }
