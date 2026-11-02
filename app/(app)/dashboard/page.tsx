@@ -12,6 +12,7 @@ import { getRoundBettingContext } from '@/lib/betting-queries'
 import { isRoundBettable } from '@/lib/betting'
 import { todayMadrid, leagueFinished, isReservationRegistered } from '@/lib/rounds'
 import FinishSeasonCard from '@/components/FinishSeasonCard'
+import EventBanner from '@/components/EventBanner'
 import { STREAK_MIN } from '@/lib/piques'
 import { halfSeasonReached } from '@/lib/informe'
 import { getCachedActiveSeason, getCachedSeasonRounds } from '@/lib/supabase/cached'
@@ -103,6 +104,8 @@ export default async function DashboardPage() {
           </span>
         )}
       </div>
+
+      <EventBanner />
 
       {seasonId && leagueFinished(rounds) && <FinishSeasonCard seasonId={seasonId} seasonName={activeSeasonRow?.name} />}
 
