@@ -2,6 +2,8 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { formatDate } from '@/lib/types'
+import type { IndividualStanding, PairStanding } from '@/lib/types'
+import { sortIndividualStandings, sortPairStandings } from '@/lib/standings'
 import { getCachedSeasonBettingRanking, getCachedSeasonCourtExpenses } from '@/lib/supabase/cached'
 import ShareSummaryButton from '@/components/ShareSummaryButton'
 
@@ -11,7 +13,7 @@ export default async function HistoricoSeasonPage({ params }: { params: Promise<
   const { seasonId } = await params
   const supabase = await createClient()
 
-  const [{ data: season }, { data: rounds }, { data: individual }, { data: pairs }, bettingRanking, courtExpenses] = await Promise.all([
+  const [{ data: season }, { data: rounds }, { data: individualRaw }, { data: pairsRaw }, bettingRanking, courtExpenses] = await Promise.all([
     supabase.from('seasons').select('id, name, start_date, min_matches, status').eq('id', seasonId).maybeSingle(),
     supabase.from('rounds').select(`
       id, round_number, scheduled_date, scheduled_time, club, status,
@@ -28,6 +30,10 @@ export default async function HistoricoSeasonPage({ params }: { params: Promise<
   ])
 
   if (!season) notFound()
+
+  // Mismo criterio de desempate que el resto de pantallas (lib/standings.ts).
+  const individual = sortIndividualStandings((individualRaw ?? []) as IndividualStanding[])
+  const pairs = sortPairStandings((pairsRaw ?? []) as PairStanding[])
 
   const topBettor = bettingRanking[0]
   const topPair = pairs?.[0]

@@ -1,4 +1,6 @@
 import { createClient as createRawClient } from '@supabase/supabase-js'
+import { sortIndividualStandings, sortPairStandings } from '@/lib/standings'
+import type { IndividualStanding, PairStanding } from '@/lib/types'
 import { unstable_cache } from 'next/cache'
 import { getRoundActa, getRoundBettingContext, getSeasonBettingRanking } from '@/lib/betting-queries'
 import { getSeasonCompetitiveDna } from '@/lib/dna-data'
@@ -80,8 +82,8 @@ export const getCachedSeasonAggregates = unstable_cache(
         : Promise.resolve({ data: [] as { round_id: string; player_id: string; rank: number; chips_net: number; point_bonus: number }[] }),
     ])
     return {
-      individual: individual ?? [],
-      pairs: pairs ?? [],
+      individual: sortIndividualStandings((individual ?? []) as IndividualStanding[]),
+      pairs: sortPairStandings((pairs ?? []) as PairStanding[]),
       marketsByRound: marketsByRound ?? [],
       settlements: settlements ?? [],
       allBetResults: allBetResults ?? [],

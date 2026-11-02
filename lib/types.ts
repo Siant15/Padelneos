@@ -1,3 +1,5 @@
+import { compareIndividual } from '@/lib/standings'
+
 export type Profile = {
   id: string
   name: string
@@ -206,7 +208,7 @@ function dinnerRiskTierFor(probability: number): DinnerRiskTier {
 }
 
 export function estimateDinnerRisk(
-  players: { id: string; sportPoints: number; bettingBonus: number }[],
+  players: { id: string; name: string; sportPoints: number; bettingBonus: number; wins: number }[],
   remainingPairings: { pair1: [string, string]; pair2: [string, string] }[]
 ): Record<string, DinnerRiskTier> {
   // Tope defensivo: 2^n combinaciones se vuelve inviable con muchas
@@ -219,17 +221,18 @@ export function estimateDinnerRisk(
 
   for (let mask = 0; mask < totalCombos; mask++) {
     const sport: Record<string, number> = {}
-    for (const p of players) sport[p.id] = p.sportPoints
+    const wins: Record<string, number> = {}
+    for (const p of players) { sport[p.id] = p.sportPoints; wins[p.id] = p.wins }
 
     for (let i = 0; i < n; i++) {
       const { pair1, pair2 } = remainingPairings[i]
       const pair1Wins = ((mask >> i) & 1) === 0
-      for (const id of pair1Wins ? pair1 : pair2) sport[id] = (sport[id] ?? 0) + 2
+      for (const id of pair1Wins ? pair1 : pair2) { sport[id] = (sport[id] ?? 0) + 2; wins[id] = (wins[id] ?? 0) + 1 }
     }
 
     const ranked = players
-      .map(p => ({ id: p.id, total: sport[p.id] + p.bettingBonus, sport: sport[p.id] }))
-      .sort((a, b) => b.total - a.total || b.sport - a.sport || a.id.localeCompare(b.id))
+      .map(p => ({ id: p.id, name: p.name, total: sport[p.id] + p.bettingBonus, sport: sport[p.id], wins: wins[p.id] }))
+      .sort(compareIndividual)
 
     for (const bottom of ranked.slice(2)) bottomCount[bottom.id]++
   }

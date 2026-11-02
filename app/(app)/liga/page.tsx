@@ -3,6 +3,7 @@ import { getCachedUser } from '@/lib/supabase/server'
 import type { IndividualStanding, PairStanding } from '@/lib/types'
 import { formatDate, getJornadaReservaStatus } from '@/lib/types'
 import { todayMadrid } from '@/lib/rounds'
+import { sortIndividualStandings, sortPairStandings } from '@/lib/standings'
 import { marketCloseTime } from '@/lib/betting'
 import LigaTabs from '@/components/LigaTabs'
 import type { JornadaViewModel } from '@/components/JornadasAccordion'
@@ -113,11 +114,8 @@ export default async function LigaPage() {
   })
 
   // ─── Clasificación ────────────────────────────────────────
-  // Mismo criterio de desempate que Inicio (lib/piques.ts): puntos
-  // totales, luego puntos deportivos, luego nombre.
-  const individualSorted = [...((individual as IndividualStanding[] | null) ?? [])].sort((a, b) =>
-    b.total_points - a.total_points || b.sport_points - a.sport_points || a.name.localeCompare(b.name, 'es')
-  )
+  // Mismo criterio de desempate en todas las pantallas (lib/standings.ts).
+  const individualSorted = sortIndividualStandings((individual as IndividualStanding[] | null) ?? [])
   const individualRows = individualSorted.map((s, i) => ({
     medal: i === individualSorted.length - 1 && individualSorted.length >= 4 ? RED_LANTERN : (MEDALS[i] ?? `${i + 1}º`),
     playerId: s.player_id,
@@ -130,7 +128,7 @@ export default async function LigaPage() {
     total: s.total_points,
   }))
 
-  const pairRows = ((pairs as PairStanding[] | null) ?? []).map(p => ({
+  const pairRows = sortPairStandings((pairs as PairStanding[] | null) ?? []).map(p => ({
     name: `${p.p1_name} / ${p.p2_name}`,
     pj: p.matches_played,
     pg: p.wins,

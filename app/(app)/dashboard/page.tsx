@@ -89,7 +89,7 @@ export default async function DashboardPage() {
       return { pair1: [m.team1_p1.id, m.team1_p2.id] as [string, string], pair2: [m.team2_p1.id, m.team2_p2.id] as [string, string] }
     })
     .filter((x): x is { pair1: [string, string]; pair2: [string, string] } => !!x)
-  const risk = estimateDinnerRisk(rows.map(r => ({ id: r.id, sportPoints: r.points, bettingBonus: 0 })), remainingPairings)
+  const risk = estimateDinnerRisk(rows.map(r => ({ id: r.id, name: r.name, sportPoints: r.sport, bettingBonus: r.bet, wins: r.wins })), remainingPairings)
 
   return (
     <div className="flex flex-col px-5 pt-4 pb-6 gap-4">

@@ -1,3 +1,5 @@
+import { sortIndividualStandings } from '@/lib/standings'
+import type { IndividualStanding } from '@/lib/types'
 import { NextResponse } from 'next/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createPushAdminClient, sendPushToAll, sendPushToPlayers } from '@/lib/push'
@@ -143,11 +145,9 @@ export async function GET(request: Request) {
 
   const { data: standings } = await admin
     .from('individual_standings')
-    .select('player_id')
+    .select('*')
     .eq('season_id', season.id)
-    .order('total_points', { ascending: false })
-    .order('sport_points', { ascending: false })
-  const ranked = standings ?? []
+  const ranked = sortIndividualStandings((standings ?? []) as IndividualStanding[])
 
   let sent = 0
   const toDelete: string[] = []

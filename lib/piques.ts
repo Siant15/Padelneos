@@ -1,3 +1,4 @@
+import { compareIndividual } from '@/lib/standings'
 // "El pique de la jornada": narrativas calculadas a partir de los
 // resultados reales de la temporada (nunca datos inventados). Se
 // recalculan cada vez que se pide la página (que a su vez está detrás
@@ -22,21 +23,19 @@ export type BetResultRow = { round_id: string; player_id: string; point_bonus: n
 
 export type PlayerLite = { id: string; name: string }
 
-type Totals = Record<string, { sport: number; bet: number }>
+type Totals = Record<string, { sport: number; bet: number; wins: number }>
 
 function rankOrder(players: PlayerLite[], totals: Totals): string[] {
-  return [...players]
-    .sort((a, b) => {
-      const ta = totals[a.id] ?? { sport: 0, bet: 0 }
-      const tb = totals[b.id] ?? { sport: 0, bet: 0 }
-      return (tb.sport + tb.bet) - (ta.sport + ta.bet) || tb.sport - ta.sport || a.name.localeCompare(b.name, 'es')
-    })
-    .map(p => p.id)
+  const of = (p: PlayerLite) => {
+    const t = totals[p.id] ?? { sport: 0, bet: 0, wins: 0 }
+    return { name: p.name, total: t.sport + t.bet, sport: t.sport, wins: t.wins }
+  }
+  return [...players].sort((a, b) => compareIndividual(of(a), of(b))).map(p => p.id)
 }
 
 function totalsUpTo(players: PlayerLite[], playedRounds: RoundWithMatch[], betResults: BetResultRow[], uptoIndex: number): Totals {
   const totals: Totals = {}
-  for (const p of players) totals[p.id] = { sport: 0, bet: 0 }
+  for (const p of players) totals[p.id] = { sport: 0, bet: 0, wins: 0 }
   for (let i = 0; i <= uptoIndex; i++) {
     const m = playedRounds[i].match
     if (!m?.winner) continue
@@ -46,7 +45,7 @@ function totalsUpTo(players: PlayerLite[], playedRounds: RoundWithMatch[], betRe
       for (const id of [...team1, ...team2]) if (totals[id]) totals[id].sport += 1
     } else {
       const winners = m.winner === 'team1' ? team1 : team2
-      for (const id of winners) if (totals[id]) totals[id].sport += 2
+      for (const id of winners) if (totals[id]) { totals[id].sport += 2; totals[id].wins += 1 }
     }
     const roundId = playedRounds[i].id
     for (const b of betResults) if (b.round_id === roundId && totals[b.player_id]) totals[b.player_id].bet += b.point_bonus
@@ -59,6 +58,10 @@ export type PlayerRow = {
   name: string
   rank: number
   points: number
+  // Desglose de `points` (deporte + apuestas) y victorias, para desempatar igual que la clasificación.
+  sport: number
+  bet: number
+  wins: number
   rankDelta: number // positivo = ha subido puestos
   results: ('V' | 'D')[] // últimos partidos, más reciente al final
   activeStreak: { type: 'V' | 'D'; length: number } | null
@@ -90,7 +93,7 @@ export function computeStandingsRows(
   }
 
   return players.map(p => {
-    const totals = currentTotals[p.id] ?? { sport: 0, bet: 0 }
+    const totals = currentTotals[p.id] ?? { sport: 0, bet: 0, wins: 0 }
     const results = resultsByPlayer[p.id] ?? []
     const last3 = results.slice(-3)
     let activeStreak: PlayerRow['activeStreak'] = null
@@ -105,6 +108,9 @@ export function computeStandingsRows(
       name: p.name,
       rank: currentOrder.indexOf(p.id) + 1,
       points: totals.sport + totals.bet,
+      sport: totals.sport,
+      bet: totals.bet,
+      wins: totals.wins,
       rankDelta: previousOrder.indexOf(p.id) - currentOrder.indexOf(p.id),
       results: last3,
       activeStreak,
