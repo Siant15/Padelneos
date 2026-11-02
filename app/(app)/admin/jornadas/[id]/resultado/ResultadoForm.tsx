@@ -105,7 +105,10 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
   }, [roundId, supabase])
 
   async function handleSettle() {
-    if (!window.confirm('¿Liquidar la jornada? Se repartirán las fichas, se asignarán los puntos de apuestas y se avisará a los jugadores. No se puede deshacer desde aquí.')) return
+    const resettle = !!betsStatus?.settled
+    if (!window.confirm(resettle
+      ? '¿Volver a liquidar? Se deshace el reparto anterior (incluidos los jackpots que tocara) y se recalcula con el resultado y las respuestas actuales.'
+      : '¿Liquidar la jornada? Se repartirán las fichas, se asignarán los puntos de apuestas y se avisará a los jugadores.')) return
     setSettling(true)
     setSettleError('')
     const { error } = await supabase.rpc('settle_round', { p_round_id: roundId })
@@ -115,12 +118,9 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
       return
     }
     await supabase.rpc('prune_stale_question_templates')
-    try { await notifySettlementResults(roundId) } catch { /* el aviso es secundario: la liquidación ya está hecha */ }
-    const { error: statusError } = await supabase.from('rounds').update({ status: 'played' }).eq('id', roundId)
-    if (statusError) {
-      setSettleError(friendlyError(statusError.message, 'Jornada liquidada, pero no se pudo marcar como jugada. Vuelve a guardar el resultado.'))
+    if (!resettle) {
+      try { await notifySettlementResults(roundId) } catch { /* el aviso es secundario: la liquidación ya está hecha */ }
     }
-    await rescheduleFollowingRounds(roundId)
     await revalidateLigaData()
     await loadBetsStatus()
     setSettling(false)
@@ -265,6 +265,35 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
     }
     setSavedKey(key)
 
+    // Si se corrige un marcador ya guardado, las preguntas automáticas
+    // (ganador, sets, marcador exacto...) se reabren para volver a
+    // resolverlas con el marcador nuevo; si no, se pagarían con el viejo.
+    const { data: resolvedRows } = await supabase.from('betting_markets')
+      .select('id, type, template:betting_question_templates(category)')
+      .eq('round_id', roundId).eq('resolved', true)
+    const autoIds = ((resolvedRows ?? []) as unknown as { id: string; type: string; template: { category: string } | null }[])
+      .filter(m => m.type === 'exact_score' || m.template?.category === 'automatic')
+      .map(m => m.id)
+    if (autoIds.length) {
+      const { error: reopenError } = await supabase.from('betting_markets')
+        .update({ resolved: false, voided: false, winning_option_id: null }).in('id', autoIds)
+      if (reopenError) {
+        setSaveError(friendlyError(reopenError.message, 'Resultado guardado, pero no se pudieron recalcular las apuestas automáticas.'))
+        setLoading(false)
+        return
+      }
+    }
+
+    // Con el resultado guardado la jornada cuenta ya como jugada (así todas
+    // las pantallas coinciden); liquidar las apuestas es un paso aparte.
+    const { data: flipped, error: statusError } = await supabase.from('rounds')
+      .update({ status: 'played' }).eq('id', roundId).eq('status', 'scheduled').select('id')
+    if (statusError) {
+      setSaveError(friendlyError(statusError.message, 'Resultado guardado, pero no se pudo marcar la jornada como jugada.'))
+    } else if (flipped?.length) {
+      await rescheduleFollowingRounds(roundId)
+    }
+
     // Con el resultado guardado, las preguntas automaticas (ganador,
     // resultado por sets, marcador exacto...) se resuelven solas; las
     // anecdoticas se resuelven a mano en el bloque de apuestas.
@@ -274,11 +303,11 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
     }
 
     await loadBetsStatus()
+    await revalidateLigaData()
     setLoading(false)
-    if (alreadySettled) {
-      await revalidateLigaData()
-      router.refresh()
-    }
+    // El autoguardado no recarga la pantalla (se perdería lo que se esté
+    // tecleando); solo en el guardado manual de una jornada liquidada.
+    if (alreadySettled) router.refresh()
   }
 
   async function resolvePendingMarket(marketId: string, winningOptionId: string | null, voided: boolean) {
@@ -577,7 +606,19 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
           <div className="rounded-xl p-4 space-y-3" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
             <p className="text-sm font-semibold">🏆 Liquidar jornada</p>
             {betsStatus?.settled ? (
-              <p className="text-sm font-semibold" style={{ color: 'var(--green)' }}>✓ Jornada liquidada — fichas repartidas y puntos asignados.</p>
+              <>
+                <p className="text-sm font-semibold" style={{ color: 'var(--green)' }}>✓ Jornada liquidada — fichas repartidas y puntos asignados.</p>
+                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                  Si has corregido el marcador o una respuesta, vuelve a liquidar para que el reparto use los datos nuevos.
+                </p>
+                {settleError && <p className="text-xs" style={{ color: 'var(--red)' }}>⚠ {settleError}</p>}
+                <button type="button" onClick={handleSettle}
+                  disabled={!resultSaved || pendingList.length > 0 || settling}
+                  className="w-full py-3 rounded-xl font-semibold transition hover:opacity-90 disabled:opacity-40"
+                  style={{ background: 'var(--surface2)', color: 'var(--text)', border: '1px solid var(--border)' }}>
+                  {settling ? 'Liquidando...' : pendingList.length > 0 ? `Faltan ${pendingList.length} preguntas por resolver` : '↻ Volver a liquidar'}
+                </button>
+              </>
             ) : (
               <>
                 <p className="text-xs" style={{ color: 'var(--text-muted)' }}>

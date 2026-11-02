@@ -8,6 +8,7 @@ import { revalidateLigaData } from '@/lib/actions'
 import { rescheduleFollowingRounds } from '@/lib/schedule-actions'
 import ClubPicker from '@/components/ClubPicker'
 import { friendlyError } from '@/lib/errors'
+import { RESET_NOTIFICATION_FLAGS } from '@/lib/rounds'
 
 type PlayerLite = { id: string; name: string }
 
@@ -66,7 +67,9 @@ export default function EditarJornadaForm({ roundId, players, initialForm, initi
     setLoading(true)
     setSaveError('')
 
+    const dateOrTimeChanged = form.scheduled_date !== initialForm.scheduled_date || form.scheduled_time !== initialForm.scheduled_time
     const { error: roundError } = await supabase.from('rounds').update({
+      ...(dateOrTimeChanged ? RESET_NOTIFICATION_FLAGS : {}),
       scheduled_date: form.scheduled_date || null,
       scheduled_time: form.scheduled_time || null,
       club: form.club || null,
@@ -81,7 +84,9 @@ export default function EditarJornadaForm({ roundId, players, initialForm, initi
       return
     }
 
-    await rescheduleFollowingRounds(roundId)
+    if (form.scheduled_date !== initialForm.scheduled_date || form.status !== initialForm.status) {
+      await rescheduleFollowingRounds(roundId)
+    }
 
     if (form.matchId) {
       const { error: matchError } = await supabase.from('matches').update({

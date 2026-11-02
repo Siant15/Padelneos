@@ -16,11 +16,13 @@ export type JornadaViewModel = {
   pairBLabel: string
   responsableName: string
   responsableAvatarUrl: string | null
-  reservaStatus: 'pendiente' | 'reservada' | 'finalizada'
+  reservaStatus: 'pendiente' | 'reservada' | 'finalizada' | 'cancelada'
   played: boolean
   isNext: boolean
   courtCost: number | null
   isPastDate: boolean
+  // Hora de cierre de las apuestas ya superada (1 h antes del partido).
+  betsClosed: boolean
   statusLabel: string
   tagBg: string
   tagColor: string
@@ -155,7 +157,7 @@ export default function JornadasAccordion({ items }: { items: JornadaViewModel[]
 
                 {!j.played && (
                   <>
-                    {j.isNext && !j.isPastDate && j.reservaStatus !== 'pendiente' && (
+                    {j.isNext && !j.isPastDate && !j.betsClosed && j.reservaStatus !== 'pendiente' && (
                       <div>
                         💰 Mercado de apuestas abierto —{' '}
                         <Link href={`/liga?tab=apuestas&round=${j.id}`} className="font-bold" style={{ color: 'var(--accent)' }}>apostar en esta jornada</Link>.

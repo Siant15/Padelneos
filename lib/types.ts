@@ -268,10 +268,11 @@ export function getPairName(match: Match, team: 'team1' | 'team2'): string {
 
 // Estado de una jornada, calculado a partir de si tiene día+hora+club
 // y de si ya se ha jugado — nunca se elige a mano.
-export type JornadaReservaStatus = 'pendiente' | 'reservada' | 'finalizada'
+export type JornadaReservaStatus = 'pendiente' | 'reservada' | 'finalizada' | 'cancelada'
 
 export function getJornadaReservaStatus(round: { scheduled_date: string | null; scheduled_time: string | null; club: string | null; status: string }): JornadaReservaStatus {
   if (round.status === 'played') return 'finalizada'
+  if (round.status === 'cancelled') return 'cancelada'
   if (round.scheduled_date && round.scheduled_time && round.club) return 'reservada'
   return 'pendiente'
 }

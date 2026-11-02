@@ -2,6 +2,8 @@ import { Suspense } from 'react'
 import { getCachedUser } from '@/lib/supabase/server'
 import type { IndividualStanding, PairStanding } from '@/lib/types'
 import { formatDate, getJornadaReservaStatus } from '@/lib/types'
+import { todayMadrid } from '@/lib/rounds'
+import { marketCloseTime } from '@/lib/betting'
 import LigaTabs from '@/components/LigaTabs'
 import type { JornadaViewModel } from '@/components/JornadasAccordion'
 import { getCachedActiveSeason, getCachedPlayers, getCachedSeasonRounds, getCachedSeasonAggregates, getCachedSettledActas, getCachedOpenRoundsBetting, getCachedMyBetsForRounds } from '@/lib/supabase/cached'
@@ -40,7 +42,8 @@ export default async function LigaPage() {
     : { individual: [], pairs: [], marketsByRound: [], settlements: [], allBetResults: [] }
 
   // ─── Calendario ───────────────────────────────────────────
-  const nextRound = (rounds ?? []).find(r => r.status !== 'played')
+  const nextRound = (rounds ?? []).find(r => r.status === 'scheduled')
+  const todayStr = todayMadrid()
 
   const calendarioItems: JornadaViewModel[] = (rounds ?? []).map(round => {
     const match = round.match as {
@@ -64,6 +67,7 @@ export default async function LigaPage() {
       pendiente: { label: '⏳ Pendiente de reserva', bg: 'var(--orange-bg)', color: 'var(--orange)' },
       reservada: { label: '📅 Reservada', bg: 'var(--tint)', color: 'var(--text-muted2)' },
       finalizada: { label: '✔ Finalizada', bg: 'var(--green-bg)', color: 'var(--green)' },
+      cancelada: { label: '✕ Cancelada', bg: 'var(--tint)', color: 'var(--text-muted2)' },
     }[reservaStatus]
 
     let scoreLabel = ''
@@ -92,7 +96,8 @@ export default async function LigaPage() {
       played,
       isNext,
       courtCost: round.court_cost ?? null,
-      isPastDate: !played && !!round.scheduled_date && round.scheduled_date < new Date().toISOString().slice(0, 10),
+      isPastDate: !played && !!round.scheduled_date && round.scheduled_date < todayStr,
+      betsClosed: (() => { const close = marketCloseTime({ closes_at: null }, round); return close !== null && new Date(close) <= new Date() })(),
       statusLabel: statusView.label,
       tagBg: statusView.bg,
       tagColor: statusView.color,

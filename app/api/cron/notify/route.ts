@@ -92,6 +92,7 @@ export async function GET(request: Request) {
     .select('id, round_number, scheduled_date, scheduled_time, club, court_cost, reminder_120_sent_at, day_before_sent_at, court_booker:profiles!court_booker_id(name), match:matches(team1_p1:profiles!team1_p1_id(name), team1_p2:profiles!team1_p2_id(name), team2_p1:profiles!team2_p1_id(name), team2_p2:profiles!team2_p2_id(name))')
     .eq('season_id', season.id)
     .eq('scheduled_date', targetDate)
+    .eq('status', 'scheduled')
     .maybeSingle()
 
   if (!round) return NextResponse.json({ sent: 0, reason: type === 'dayBefore' ? 'no hay jornada mañana' : 'no hay jornada hoy' })

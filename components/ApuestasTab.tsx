@@ -5,6 +5,7 @@ import Link from 'next/link'
 import type { RoundActa } from '@/lib/betting-queries'
 import type { BettingMarket, BettingQuestionTemplate } from '@/lib/types'
 import { DAYS_ES, formatTime } from '@/lib/types'
+import { isMarketOpenForBetting } from '@/lib/betting'
 import ApuestasActa from '@/components/ApuestasActa'
 import BettingMarketsBoard from '@/components/BettingMarketsBoard'
 import ApuestasInfo from '@/components/ApuestasInfo'
@@ -37,7 +38,8 @@ export default function ApuestasTab({ userId, rounds, initialRoundId }: { userId
   const settled = sorted.filter((r): r is SettledRoundEntry => r.kind === 'settled')
   const open = sorted.filter((r): r is OpenRoundEntry => r.kind === 'open')
   const lastSettled = settled[settled.length - 1] ?? null
-  const firstOpen = open[0] ?? null
+  // La activa es la primera con alguna pregunta realmente abierta; si ninguna lo está, la primera programada.
+  const firstOpen = open.find(r => r.markets.some(m => isMarketOpenForBetting(m, { scheduled_date: r.scheduledDate, scheduled_time: r.scheduledTime, club: r.club }, 'scheduled'))) ?? open[0] ?? null
 
   const requestedExists = initialRoundId && sorted.some(r => r.roundId === initialRoundId)
   // Se entra a apostar: por defecto la jornada activa; si no hay, la última terminada.

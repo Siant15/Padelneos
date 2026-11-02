@@ -7,6 +7,7 @@ import { revalidateLigaData } from '@/lib/actions'
 import { rescheduleFollowingRounds } from '@/lib/schedule-actions'
 import ClubPicker from '@/components/ClubPicker'
 import { friendlyError } from '@/lib/errors'
+import { RESET_NOTIFICATION_FLAGS, todayMadrid } from '@/lib/rounds'
 
 type Form = { scheduled_date: string; scheduled_time: string; club: string; court_cost: string }
 
@@ -31,7 +32,7 @@ export default function ReservaForm({ roundId, roundNumber, bookerName, isRespon
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
 
-  const today = new Date().toISOString().slice(0, 10)
+  const today = todayMadrid()
   const isPast = !!form.scheduled_date && form.scheduled_date < today
   const missing = [!form.scheduled_date && 'día', !form.scheduled_time && 'hora', !form.club && 'club'].filter(Boolean) as string[]
   const cost = form.court_cost ? parseFloat(form.court_cost) : null
@@ -42,7 +43,9 @@ export default function ReservaForm({ roundId, roundNumber, bookerName, isRespon
     if (badCost) return
     setLoading(true)
     setError('')
+    const dateOrTimeChanged = form.scheduled_date !== initial.scheduled_date || form.scheduled_time !== initial.scheduled_time
     const { error: updateError } = await supabase.from('rounds').update({
+      ...(dateOrTimeChanged ? RESET_NOTIFICATION_FLAGS : {}),
       scheduled_date: form.scheduled_date || null,
       scheduled_time: form.scheduled_time || null,
       club: form.club || null,
@@ -53,7 +56,7 @@ export default function ReservaForm({ roundId, roundNumber, bookerName, isRespon
       setLoading(false)
       return
     }
-    await rescheduleFollowingRounds(roundId)
+    if (form.scheduled_date !== initial.scheduled_date) await rescheduleFollowingRounds(roundId)
     await revalidateLigaData()
     setSaved(true)
     setLoading(false)

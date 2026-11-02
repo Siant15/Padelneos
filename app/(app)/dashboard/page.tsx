@@ -10,6 +10,7 @@ import DinnerRiskInfo from '@/components/DinnerRiskInfo'
 import PiquesCarousel from '@/components/PiquesCarousel'
 import { getRoundBettingContext } from '@/lib/betting-queries'
 import { isRoundBettable } from '@/lib/betting'
+import { todayMadrid } from '@/lib/rounds'
 import { STREAK_MIN } from '@/lib/piques'
 import { halfSeasonReached } from '@/lib/informe'
 import { getCachedActiveSeason, getCachedSeasonRounds } from '@/lib/supabase/cached'
@@ -49,7 +50,7 @@ export default async function DashboardPage() {
   const effectiveTime = round?.scheduled_time?.slice(0, 5)
   // La jornada sigue abierta todo el día del partido: "Resultado" está
   // disponible desde ese día (no solo tras la hora de inicio).
-  const matchMayHaveHappened = !!(round?.scheduled_date && round.scheduled_date <= new Date().toISOString().slice(0, 10))
+  const matchMayHaveHappened = !!(round?.scheduled_date && round.scheduled_date <= todayMadrid())
   const effectiveClub = round?.club
 
   // Ninguna de estas tres depende del resultado de las otras dos —
@@ -62,16 +63,17 @@ export default async function DashboardPage() {
   ])
   const clubMapsUrl = clubMapsRow?.data?.maps_url ?? null
 
-  const seasonRoundDates = rounds.filter(r => r.status !== 'played').map(r => r.scheduled_date)
-  const today = new Date().toISOString().slice(0, 10)
+  // Pendientes = programadas (ni jugadas ni canceladas).
+  const seasonRoundDates = rounds.filter(r => r.status === 'scheduled').map(r => r.scheduled_date)
   const remainingJornadas = seasonRoundDates.length
   // El informe de mitad de temporada solo aparece cuando se ha jugado la mitad de las jornadas.
   const informeOpen = halfSeasonReached(rounds.filter(r => r.status === 'played').length, rounds.filter(r => r.status !== 'cancelled').length)
   const lastDate = seasonRoundDates.filter((d): d is string => !!d).sort().at(-1)
   const lastDateLabel = lastDate ? new Date(`${lastDate}T12:00:00`).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }) : null
-  // Con la reserva incompleta, o con la fecha ya pasada, el mercado de apuestas está cerrado.
-  const betsOpen = !!round && isRoundBettable(round) && !!round.scheduled_date && round.scheduled_date >= today
-  const betsClosedReason = !round ? '' : !isRoundBettable(round) ? 'faltan día, hora o club' : 'la fecha ya pasó'
+  // Con la reserva incompleta, o pasada la hora de cierre (1 h antes del
+  // partido), el mercado está cerrado: mismo criterio que Liga → Apuestas.
+  const betsOpen = !!round && isRoundBettable(round) && (bettingContext?.openMarketsCount ?? 0) > 0
+  const betsClosedReason = !round ? '' : !isRoundBettable(round) ? 'faltan día, hora o club' : 'ya pasó la hora de cierre'
   const nextDateLabel = round?.scheduled_date
     ? new Date(`${round.scheduled_date}T12:00:00`).toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' }).replace(',', '')
     : '-'
