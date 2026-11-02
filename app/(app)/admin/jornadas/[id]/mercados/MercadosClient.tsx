@@ -1,8 +1,8 @@
 'use client'
 
+import BackButton from '@/components/BackButton'
 import { useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
 import type { BettingMarket, BettingOption, BettingQuestionTemplate, Profile } from '@/lib/types'
 import AddQuestionPicker from '@/components/AddQuestionPicker'
 import { revalidateLigaData } from '@/lib/actions'
@@ -38,7 +38,6 @@ export default function MercadosClient({ roundId, initialMarkets, initialCatalog
   initialLoadError: string
 }) {
   const supabase = createClient()
-  const router = useRouter()
 
   const [markets, setMarkets] = useState<MarketWithAll[]>(initialMarkets)
   const [roundStatus, setRoundStatus] = useState(initialRoundStatus)
@@ -209,7 +208,7 @@ export default function MercadosClient({ roundId, initialMarkets, initialCatalog
     <div className="space-y-5 pb-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-3">
-          <button onClick={() => router.back()} className="text-sm" style={{ color: 'var(--text-muted)' }}>← Volver</button>
+          <BackButton />
           <h1 className="text-xl font-bold">Acta y apuestas 🎰</h1>
         </div>
         <button
@@ -371,7 +370,7 @@ function MarketCard({ market, resolving, voiding, deleting, readOnly, canDelete 
               style={{ background: isWinner ? 'rgba(34,197,94,0.1)' : 'var(--surface2)', border: `1px solid ${isWinner ? 'var(--green)' : 'var(--border)'}` }}>
               <span className="text-sm">
                 {isWinner && '🏆 '}{opt.label}
-                {opt.is_self_negative && <span className="ml-1 text-xs" style={{ color: 'var(--text-muted)' }}>🚫 auto-apuesta</span>}
+                {opt.is_self_negative && <span className="ml-1 text-xs" style={{ color: 'var(--text-muted)' }}>🚫 no puede apostar por sí mismo</span>}
               </span>
               <span className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>
                 {chips} fichas ({totalPot > 0 ? Math.round(chips / totalPot * 100) : 0}%)

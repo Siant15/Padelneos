@@ -361,7 +361,7 @@ export default function GestionarJornada({ data }: { data: AdminRoundData }) {
           </>
         ) : (
           <>
-            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{pending > 0 ? `Faltan ${pending} preguntas por resolver o anular.` : 'Todas las preguntas están resueltas.'}</p>
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{pending === 1 ? 'Falta 1 pregunta por resolver o anular.' : pending > 0 ? `Faltan ${pending} preguntas por resolver o anular.` : 'Todas las preguntas están resueltas.'}</p>
             <Btn onClick={settle} busy={busy || pending > 0 || markets.length === 0} style={btnPrimary}>Liquidar jornada</Btn>
           </>
         )}

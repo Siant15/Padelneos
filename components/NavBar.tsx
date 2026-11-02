@@ -31,7 +31,7 @@ export default function NavBar() {
             <img src="/icon-192.png" alt="" width={26} height={26} className="rounded-lg" />
             PadelNeos
           </span>
-          <Link href={settingsHref} aria-label="Ajustes" style={{ color: 'var(--text-muted2)' }}>
+          <Link href={settingsHref} aria-label="Ajustes" className="flex items-center justify-center w-11 h-11 -mr-2.5" style={{ color: 'var(--text-muted2)' }}>
             <Settings size={20} strokeWidth={2} />
           </Link>
         </header>

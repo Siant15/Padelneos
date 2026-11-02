@@ -1,5 +1,6 @@
 'use client'
 
+import BackButton from '@/components/BackButton'
 import JornadaSteps from '@/components/JornadaSteps'
 import { useState, useCallback, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
@@ -318,7 +319,7 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
   return (
     <div className="space-y-5 pb-4">
       <div className="flex items-center gap-3">
-        <button onClick={() => router.back()} className="text-sm" style={{ color: 'var(--text-muted)' }}>← Volver</button>
+        <BackButton />
         <h1 className="text-xl font-bold">Anotar resultado · J{roundNumber}</h1>
       </div>
 
@@ -501,7 +502,7 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
               <>
                 <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
                   {pendingList.length > 0
-                    ? <>Quedan <strong>{pendingList.length}</strong> por resolver o anular. Cada respuesta se guarda al elegirla, así que puedes dejarlo a medias.</>
+                    ? <>{pendingList.length === 1 ? 'Queda' : 'Quedan'} <strong>{pendingList.length}</strong> por resolver o anular. Cada respuesta se guarda al elegirla, así que puedes dejarlo a medias.</>
                     : 'Todas las preguntas están resueltas.'}
                 </p>
                 {betsStatus.markets.map(m => {
@@ -556,10 +557,10 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
                           </button>
                         )}
                         <button type="button" disabled={busy}
-                          onClick={() => resolvePendingMarket(m.id, null, true)}
-                          className="flex-1 text-xs font-semibold py-2 rounded-lg disabled:opacity-40"
-                          style={{ background: 'var(--orange-bg)', color: '#7A5A1E' }}>
-                          Anular (devolver fichas)
+                          onClick={() => { if (window.confirm('¿Anular esta pregunta? Se devuelven las fichas a quien apostó y no genera bote.')) resolvePendingMarket(m.id, null, true) }}
+                          className="px-2 text-xs font-semibold underline disabled:opacity-40"
+                          style={{ color: '#7A5A1E' }}>
+                          Anular
                         </button>
                       </div>
                     </div>
@@ -591,7 +592,7 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
                   style={{ background: 'var(--green)', color: '#fff' }}>
                   {settling ? 'Liquidando...'
                     : !resultSaved ? 'Guarda primero el resultado'
-                    : pendingList.length > 0 ? `Faltan ${pendingList.length} preguntas por resolver`
+                    : pendingList.length > 0 ? (pendingList.length === 1 ? 'Falta 1 pregunta por resolver' : `Faltan ${pendingList.length} preguntas por resolver`)
                     : '🏆 Liquidar jornada'}
                 </button>
               </>

@@ -41,7 +41,7 @@ function Report({ titles, roundsPlayed, roundsTotal }: { titles: InformeTitle[];
     <>
       <div className="mt-2">
         <h1 className="font-heading text-[22px] font-extrabold leading-tight">📊 Informe de mitad de temporada</h1>
-        <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>Después de {roundsPlayed} de {roundsTotal} jornadas</p>
+        <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>Después de {roundsPlayed} de {roundsTotal} {roundsTotal === 1 ? 'jornada' : 'jornadas'}</p>
       </div>
 
       <InfoToggle label="Cómo se calculan los títulos">

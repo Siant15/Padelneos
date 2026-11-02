@@ -27,7 +27,7 @@ function buildMonthGrid(year: number, month: number, kindByDay: Map<number, Kind
   return cells.map((c, i) => ({ ...c, key: i }))
 }
 
-// Verde: día en que ya hubo partido. Rojo: fecha prevista de un partido
+// Verde: día en que ya hubo partido. Naranja: fecha prevista de un partido
 // por jugar.
 export default function MiniCalendar({ matches }: { matches: { date: string; played: boolean }[] }) {
   const today = new Date()
@@ -66,9 +66,9 @@ export default function MiniCalendar({ matches }: { matches: { date: string; pla
         <button onClick={() => setMonthOffset(o => o - 1)} className="relative w-10 h-10 -ml-2 text-lg rounded-full" style={{ color: 'var(--text-muted)' }} aria-label="Mes anterior">
           ‹{hasEarlier && <span aria-hidden className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full" style={{ background: 'var(--green)' }} />}
         </button>
-        <span className="font-heading font-bold text-sm capitalize">{monthLabel}</span>
+        <span className="font-heading font-bold text-sm inline-block first-letter:uppercase">{monthLabel}</span>
         <button onClick={() => setMonthOffset(o => o + 1)} className="relative w-10 h-10 -mr-2 text-lg rounded-full" style={{ color: 'var(--text-muted)' }} aria-label="Mes siguiente">
-          ›{hasLater && <span aria-hidden className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full" style={{ background: 'var(--red)' }} />}
+          ›{hasLater && <span aria-hidden className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full" style={{ background: 'var(--orange)' }} />}
         </button>
       </div>
       <div className="grid grid-cols-7 gap-1 text-center">
@@ -83,7 +83,7 @@ export default function MiniCalendar({ matches }: { matches: { date: string; pla
               c.kind === 'played'
                 ? { background: 'var(--green)', color: '#fff', fontWeight: 800 }
                 : c.kind === 'upcoming'
-                  ? { background: 'var(--red)', color: '#fff', fontWeight: 800 }
+                  ? { background: 'var(--orange)', color: '#fff', fontWeight: 800 }
                   : c.muted
                   ? { color: 'var(--text-muted2)', opacity: 0.5 }
                   : { color: 'var(--text)', fontWeight: 600 }

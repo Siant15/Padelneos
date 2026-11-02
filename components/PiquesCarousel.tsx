@@ -42,7 +42,7 @@ export default function PiquesCarousel({ piques }: { piques: Pique[] }) {
               className="rounded-2xl p-3.5 flex flex-col gap-2 transition hover:opacity-90"
               style={{ background: style.bg }}
             >
-              <span className="text-[10px] font-extrabold uppercase tracking-wide" style={{ color: style.accent }}>
+              <span className="text-[11px] font-extrabold uppercase tracking-wide" style={{ color: style.accent }}>
                 {p.category}
               </span>
               <Icon size={22} strokeWidth={1.75} style={{ color: style.accent }} />

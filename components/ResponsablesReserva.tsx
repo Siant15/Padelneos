@@ -48,8 +48,8 @@ export default function ResponsablesReserva({ rounds, players }: { rounds: Respo
         <p className="text-xs" style={{ color: 'var(--text-muted)' }}>No hay jornadas en la liga activa.</p>
       )}
 
-      <div className="flex flex-col">
-        {rounds.map((r, i) => {
+      {(() => {
+        const renderRow = (r: ResponsableRound, i: number) => {
           const st = status[r.id]
           return (
             <div
@@ -61,7 +61,7 @@ export default function ResponsablesReserva({ rounds, players }: { rounds: Respo
                 <p className="text-[13px] font-bold">
                   J{r.roundNumber}{r.played && <span className="font-normal" style={{ color: 'var(--green)' }}> · jugada</span>}
                 </p>
-                <p className="text-[11px] capitalize" style={{ color: 'var(--text-muted2)' }}>{r.dateLabel}</p>
+                <p className="text-[11px] first-letter:uppercase" style={{ color: 'var(--text-muted2)' }}>{r.dateLabel}</p>
               </div>
               <div className="flex flex-col items-end gap-0.5 shrink-0">
                 <select
@@ -83,8 +83,23 @@ export default function ResponsablesReserva({ rounds, players }: { rounds: Respo
               </div>
             </div>
           )
-        })}
-      </div>
+        }
+        const upcoming = rounds.filter(r => !r.played)
+        const played = rounds.filter(r => r.played)
+        return (
+          <>
+            <div className="flex flex-col">{upcoming.map(renderRow)}</div>
+            {played.length > 0 && (
+              <details>
+                <summary className="text-xs font-bold cursor-pointer min-h-11 flex items-center" style={{ color: 'var(--text-muted)' }}>
+                  Jornadas ya jugadas ({played.length})
+                </summary>
+                <div className="flex flex-col">{played.map(renderRow)}</div>
+              </details>
+            )}
+          </>
+        )
+      })()}
     </div>
   )
 }

@@ -48,11 +48,12 @@ export default function CalendarioTab({
           lead={
             <span className="text-[11px] flex flex-wrap items-center gap-x-3" style={{ color: 'var(--text-muted)' }}>
               <span><span style={{ color: 'var(--green)' }}>●</span> <strong>Verde</strong>: jugado</span>
-              <span><span style={{ color: 'var(--red)' }}>●</span> <strong>Rojo</strong>: previsto</span>
+              <span><span style={{ color: 'var(--orange)' }}>●</span> <strong>Naranja</strong>: previsto</span>
+              <span><span style={{ color: 'var(--accent)' }}>▢</span> <strong>Hoy</strong></span>
             </span>
           }
         >
-          <p>Los días del calendario: <strong style={{ color: 'var(--text)' }}>verde</strong> = día en que hubo partido, <strong style={{ color: 'var(--text)' }}>rojo</strong> = fecha prevista del próximo.</p>
+          <p>Los días del calendario: <strong style={{ color: 'var(--text)' }}>verde</strong> = día en que hubo partido, <strong style={{ color: 'var(--text)' }}>naranja</strong> = fecha prevista del próximo; el recuadro verde marca hoy.</p>
           <p>⏳ <strong style={{ color: 'var(--text)' }}>Pendiente de reserva</strong>: falta día, hora o club.</p>
           <p>📅 <strong style={{ color: 'var(--text)' }}>Reservada</strong>: ya tiene día, hora y club.</p>
           <p>✔ <strong style={{ color: 'var(--text)' }}>Finalizada</strong>: ya se jugó.</p>

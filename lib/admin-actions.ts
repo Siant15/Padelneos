@@ -4,6 +4,7 @@ import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { getCachedUser } from '@/lib/supabase/server'
 import { isAdminUser, ADMIN_EMAIL } from '@/lib/admin'
 import { updateTag } from 'next/cache'
+import { friendlyError } from '@/lib/errors'
 
 // Cada acción vuelve a comprobar quién la llama con service_role — la
 // pantalla de administración ya está protegida (app/(app)/admin/page.tsx
@@ -61,7 +62,7 @@ export async function addMember(name: string, email: string, password: string): 
   if (error) {
     const message = error.message.toLowerCase().includes('already been registered')
       ? 'Ese email ya está registrado.'
-      : error.message
+      : friendlyError(error.message, 'No se pudo completar la acción. Inténtalo de nuevo.')
     return { error: message }
   }
 
@@ -75,7 +76,7 @@ export async function changeMemberPassword(playerId: string, newPassword: string
 
   const admin = adminClient()
   const { error } = await admin.auth.admin.updateUserById(playerId, { password: newPassword })
-  if (error) return { error: error.message }
+  if (error) return { error: friendlyError(error.message, 'No se pudo completar la acción. Inténtalo de nuevo.') }
   return { error: null }
 }
 
@@ -89,7 +90,7 @@ export async function changeMemberEmail(playerId: string, newEmail: string): Pro
   if (error) {
     const message = error.message.toLowerCase().includes('already been registered')
       ? 'Ese email ya está registrado por otro miembro.'
-      : error.message
+      : friendlyError(error.message, 'No se pudo completar la acción. Inténtalo de nuevo.')
     return { error: message }
   }
   return { error: null }
@@ -105,7 +106,7 @@ export async function removeMember(playerId: string): Promise<{ error: string | 
   if (error) {
     const message = error.message.toLowerCase().includes('foreign key') || error.message.toLowerCase().includes('violates')
       ? 'No se puede eliminar: tiene partidos, apuestas u otros datos asociados en la liga.'
-      : error.message
+      : friendlyError(error.message, 'No se pudo completar la acción. Inténtalo de nuevo.')
     return { error: message }
   }
 
@@ -147,7 +148,7 @@ export async function deleteRound(roundId: string): Promise<{ error: string | nu
   await assertIsAdmin()
   const admin = adminClient()
   const { error } = await admin.from('rounds').delete().eq('id', roundId)
-  if (error) return { error: error.message }
+  if (error) return { error: friendlyError(error.message, 'No se pudo completar la acción. Inténtalo de nuevo.') }
   updateTag('liga-data')
   return { error: null }
 }
@@ -156,7 +157,7 @@ export async function deleteSeason(seasonId: string): Promise<{ error: string | 
   await assertIsAdmin()
   const admin = adminClient()
   const { error } = await admin.from('seasons').delete().eq('id', seasonId)
-  if (error) return { error: error.message }
+  if (error) return { error: friendlyError(error.message, 'No se pudo completar la acción. Inténtalo de nuevo.') }
   updateTag('liga-data')
   return { error: null }
 }
@@ -181,7 +182,7 @@ export async function addManualClub(name: string, address: string, mapsUrl: stri
   const { error } = await admin
     .from('clubs')
     .upsert({ name: name.trim(), address: address.trim() || null, maps_url: finalMapsUrl }, { onConflict: 'name' })
-  if (error) return { error: error.message }
+  if (error) return { error: friendlyError(error.message, 'No se pudo completar la acción. Inténtalo de nuevo.') }
   updateTag('liga-data')
   return { error: null }
 }
@@ -190,7 +191,7 @@ export async function deleteClub(clubId: string): Promise<{ error: string | null
   await assertIsAdmin()
   const admin = adminClient()
   const { error } = await admin.from('clubs').delete().eq('id', clubId)
-  if (error) return { error: error.message }
+  if (error) return { error: friendlyError(error.message, 'No se pudo completar la acción. Inténtalo de nuevo.') }
   updateTag('liga-data')
   return { error: null }
 }

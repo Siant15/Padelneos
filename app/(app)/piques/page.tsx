@@ -45,7 +45,7 @@ export default async function PiquesPage() {
                 <Icon size={19} strokeWidth={2} />
               </span>
               <div>
-                <p className="text-[10px] font-extrabold uppercase tracking-wide" style={{ color: 'var(--text-muted2)' }}>{p.category}</p>
+                <p className="text-[11px] font-extrabold uppercase tracking-wide" style={{ color: 'var(--text-muted2)' }}>{p.category}</p>
                 <p className="font-heading font-bold text-sm mt-0.5">{p.title}</p>
                 <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{p.text}</p>
               </div>

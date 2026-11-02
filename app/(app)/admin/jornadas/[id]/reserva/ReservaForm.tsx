@@ -1,5 +1,6 @@
 'use client'
 
+import BackButton from '@/components/BackButton'
 import JornadaSteps from '@/components/JornadaSteps'
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
@@ -72,7 +73,7 @@ export default function ReservaForm({ roundId, roundNumber, bookerName, isRespon
   return (
     <div className="space-y-5 pb-4">
       <div className="flex items-center gap-3">
-        <button onClick={() => router.back()} className="text-sm" style={{ color: 'var(--text-muted)' }}>← Volver</button>
+        <BackButton />
         <h1 className="text-xl font-bold">Reservar pista · J{roundNumber}</h1>
       </div>
 

@@ -1,4 +1,5 @@
 import { Suspense } from 'react'
+import { SkeletonBlock } from '@/components/Skeleton'
 import { getCachedUser } from '@/lib/supabase/server'
 import type { IndividualStanding, PairStanding } from '@/lib/types'
 import { formatDate, getJornadaReservaStatus } from '@/lib/types'
@@ -86,7 +87,7 @@ export default async function LigaPage() {
       roundNumber: round.round_number,
       numLabel: String(round.round_number),
       rawDate: round.scheduled_date,
-      dateLabel: round.scheduled_date ? formatDate(round.scheduled_date) : 'Por confirmar',
+      dateLabel: round.scheduled_date ? formatDate(round.scheduled_date) : 'por confirmar',
       timeLabel: effectiveTime,
       clubLabel: effectiveClub,
       pairALabel: match ? `${match.team1_p1?.name ?? '?'} / ${match.team1_p2?.name ?? '?'}` : 'Por confirmar',
@@ -250,7 +251,7 @@ export default async function LigaPage() {
       <div className="flex items-center justify-between mb-4">
         <h1 className="font-heading text-[22px] font-extrabold">🎾 Liga</h1>
       </div>
-      <Suspense fallback={null}>
+      <Suspense fallback={<div className="flex flex-col gap-4"><SkeletonBlock height={44} radius={14} /><SkeletonBlock height={260} /></div>}>
         <LigaTabs
           activeSeason={activeSeasonForTabs}
           players={(players as { id: string; name: string }[] | null) ?? []}

@@ -29,7 +29,7 @@ export default async function ResultadoPage({ params }: { params: Promise<{ id: 
       <div className="space-y-5 pb-4">
         <h1 className="text-xl font-bold">Resultado del partido</h1>
         <div className="rounded-xl p-4 text-sm" style={{ background: 'var(--orange-bg)', color: '#7A5A1E' }}>
-          ⚠ No se pudo cargar la jornada{error ? `: ${error.message}` : ''}
+          ⚠ No se pudo cargar la jornada. Recarga la página.
         </div>
       </div>
     )

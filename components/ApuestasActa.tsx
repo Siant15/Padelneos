@@ -21,7 +21,7 @@ export default function ApuestasActa({ markets, closure, pair1Label, pair2Label,
     <div className="rounded-2xl" style={{ background: 'var(--surface)', boxShadow: '0 3px 10px rgba(0,0,0,0.04)' }}>
       {(pair1Label || pair2Label) && (
         <div className="px-4 pt-4 pb-3.5" style={{ borderBottom: '1px solid var(--hairline)', background: 'var(--green-bg)', borderRadius: '16px 16px 0 0' }}>
-          <p className="text-[10.5px] font-extrabold uppercase tracking-wide" style={{ color: 'var(--green)' }}>Resultado final</p>
+          <p className="text-[11px] font-extrabold uppercase tracking-wide" style={{ color: 'var(--green)' }}>Resultado final</p>
           <div className="flex items-center justify-between gap-2 mt-2">
             <span className="text-sm font-bold flex-1 min-w-0 truncate">{pair1Label}</span>
             {scoreLabel && (
@@ -126,7 +126,7 @@ export default function ApuestasActa({ markets, closure, pair1Label, pair2Label,
                 <PersonalResultLine row={myRow} />
 
                 <details className="mt-3 group">
-                <summary className="text-[10px] font-bold uppercase tracking-wide mb-1.5 cursor-pointer select-none list-none flex items-center gap-1" style={{ color: 'var(--text-muted2)' }}>
+                <summary className="text-[11px] font-bold uppercase tracking-wide mb-1.5 cursor-pointer select-none list-none flex items-center gap-1" style={{ color: 'var(--text-muted2)' }}>
                   Apuestas del grupo <span aria-hidden className="group-open:rotate-180 transition-transform">⌄</span>
                 </summary>
                 <div className="overflow-x-auto">
@@ -180,7 +180,7 @@ export default function ApuestasActa({ markets, closure, pair1Label, pair2Label,
 
       {closure.length > 0 && (
         <div className="px-4 py-3.5" style={{ borderTop: '1px solid var(--hairline)' }}>
-          <p className="text-[10px] font-bold uppercase tracking-wide mb-2" style={{ color: 'var(--text-muted2)' }}>
+          <p className="text-[11px] font-bold uppercase tracking-wide mb-2" style={{ color: 'var(--text-muted2)' }}>
             Cierre de la jornada
           </p>
           <table className="w-full text-xs" style={{ borderCollapse: 'collapse' }}>

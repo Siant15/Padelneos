@@ -32,7 +32,7 @@ export default async function HistoricoPage() {
             <div>
               <p className="font-bold text-sm">{s.name}</p>
               <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                Empezó el {formatDate(s.start_date)} · {s.min_matches} jornadas
+                Empezó el {formatDate(s.start_date)} · {s.min_matches} {s.min_matches === 1 ? 'jornada' : 'jornadas'}
               </p>
             </div>
             <span style={{ color: 'var(--text-muted2)' }}>→</span>

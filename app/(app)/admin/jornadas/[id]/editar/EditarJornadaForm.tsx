@@ -1,5 +1,6 @@
 'use client'
 
+import BackButton from '@/components/BackButton'
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
@@ -156,7 +157,7 @@ export default function EditarJornadaForm({ roundId, players, initialForm, initi
   return (
     <div className="space-y-5 pb-4 overflow-x-hidden">
       <div className="flex items-center gap-3">
-        <button onClick={() => router.back()} className="text-sm" style={{ color: 'var(--text-muted)' }}>← Volver</button>
+        <BackButton />
         <h1 className="text-xl font-bold">Editar jornada</h1>
       </div>
 

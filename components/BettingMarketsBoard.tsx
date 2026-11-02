@@ -329,7 +329,7 @@ export default function BettingMarketsBoard({ roundId, markets, userId, roundSta
           {showDividerBefore && (
             <div className="flex items-center gap-2 my-1" aria-hidden>
               <div className="flex-1 h-px" style={{ background: 'var(--hairline)' }} />
-              <span className="text-[10px] font-bold" style={{ color: 'var(--text-muted2)' }}>PREGUNTAS DE LA JORNADA</span>
+              <span className="text-[11px] font-bold" style={{ color: 'var(--text-muted2)' }}>PREGUNTAS DE LA JORNADA</span>
               <div className="flex-1 h-px" style={{ background: 'var(--hairline)' }} />
             </div>
           )}
@@ -624,7 +624,7 @@ function GroupBets({ market, playerNames, userId }: { market: BettingMarket; pla
   if (!rows.length) return null
   return (
     <div className="mt-2.5 pt-2" style={{ borderTop: '1px solid var(--hairline)' }}>
-      <p className="text-[10px] font-bold uppercase tracking-wide mb-1" style={{ color: 'var(--text-muted2)' }}>Apuestas del grupo</p>
+      <p className="text-[11px] font-bold uppercase tracking-wide mb-1" style={{ color: 'var(--text-muted2)' }}>Apuestas del grupo</p>
       <ul className="flex flex-col gap-0.5">
         {rows.map(r => (
           <li key={r.id} className="flex items-center justify-between gap-2 text-xs" style={{ fontWeight: r.mine ? 800 : 500 }}>

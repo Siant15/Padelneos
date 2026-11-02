@@ -60,6 +60,9 @@ export default function ClasificacionTabs({ individual, parejas, apuestasMatrix,
               PJ jugados · PG ganados · PE empatados · PP perdidos. Si hay empate a PTS, gana quien tenga más puntos de partido; si siguen igual, orden alfabético.
             </p>
           </InfoToggle>
+          <p className="text-[11px] mt-1" style={{ color: 'var(--text-muted)' }}>
+            PJ jugados · PG ganados · PE empatados · PP perdidos · APU puntos de apuestas · PTS total.
+          </p>
           <div className="grid text-[11px] font-extrabold py-2 mt-1" style={{ gridTemplateColumns: '1.4fr 0.4fr 0.4fr 0.4fr 0.4fr 0.5fr 0.6fr', color: 'var(--text-muted2)', borderBottom: '1px solid var(--hairline)' }}>
             <span>JUGADOR</span><span>PJ</span><span>PG</span><span>PE</span><span>PP</span><span>APU</span><span>PTS</span>
           </div>
@@ -72,7 +75,7 @@ export default function ClasificacionTabs({ individual, parejas, apuestasMatrix,
                 style={{
                   gridTemplateColumns: '1.4fr 0.4fr 0.4fr 0.4fr 0.4fr 0.5fr 0.6fr',
                   borderBottom: i < individual.length - 1 ? '1px solid var(--hairline2)' : undefined,
-                  background: isMe ? 'var(--tint)' : undefined,
+                  background: isMe ? 'var(--green-bg)' : undefined,
                 }}
               >
                 <Link href={`/jugador/${row.playerId}`} className="font-bold truncate" style={{ color: 'var(--text)' }} title={row.medal === '🏮' ? 'Farolillo rojo (último puesto)' : undefined}>

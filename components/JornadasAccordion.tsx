@@ -77,7 +77,7 @@ export default function JornadasAccordion({ items }: { items: JornadaViewModel[]
           >
             <div className="flex justify-between items-center cursor-pointer" onClick={() => toggle(j.id)}>
               <div className="min-w-0 flex-1 pr-2">
-                <div className="text-[13px] font-extrabold capitalize">
+                <div className="text-[13px] font-extrabold first-letter:uppercase">
                   Jornada {j.numLabel} · {j.dateLabel}{j.timeLabel && ` · ${j.timeLabel}`}
                 </div>
                 <div className="text-xs mt-0.5 break-words" style={{ color: 'var(--text-muted2)' }}>
@@ -89,7 +89,7 @@ export default function JornadasAccordion({ items }: { items: JornadaViewModel[]
                   <Avatar name={j.responsableName} avatarUrl={j.responsableAvatarUrl} size={26} />
                 </span>
                 <span
-                  className="text-[10px] font-extrabold px-2.5 py-1 rounded-full whitespace-nowrap"
+                  className="text-[11px] font-extrabold px-2.5 py-1 rounded-full whitespace-nowrap"
                   style={{ background: quietTag ? 'var(--tint)' : j.tagBg, color: quietTag ? 'var(--text-muted2)' : j.tagColor }}
                 >
                   {j.statusLabel}

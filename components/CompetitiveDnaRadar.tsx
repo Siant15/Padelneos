@@ -112,7 +112,7 @@ export default function CompetitiveDnaRadar({ players, viewerId, seasonLabel }: 
         </div>
       </div>
 
-      <p className="text-[10.5px] font-bold mt-2 mb-2.5" style={{ color: 'var(--text-muted2)' }}>
+      <p className="text-[11px] font-bold mt-2 mb-2.5" style={{ color: 'var(--text-muted2)' }}>
         Temporada actual · {seasonLabel}
       </p>
 

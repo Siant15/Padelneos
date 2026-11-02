@@ -59,7 +59,7 @@ export default async function HistoricoSeasonPage({ params }: { params: Promise<
         <Link href="/liga/historico" className="text-sm" style={{ color: 'var(--text-muted)' }}>← Volver</Link>
         <h1 className="font-heading text-[22px] font-extrabold mt-2">{season.name}</h1>
         <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
-          Empezó el {formatDate(season.start_date)} · {season.min_matches} jornadas · Finalizada
+          Empezó el {formatDate(season.start_date)} · {season.min_matches} {season.min_matches === 1 ? 'jornada' : 'jornadas'} · Finalizada
         </p>
       </div>
 

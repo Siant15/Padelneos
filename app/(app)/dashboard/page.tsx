@@ -284,7 +284,7 @@ export default async function DashboardPage() {
               >
                 <span className="text-[13px] font-bold flex items-center gap-1.5">
                   <span
-                    className="flex items-center justify-center rounded-full text-[10px] font-extrabold shrink-0"
+                    className="flex items-center justify-center rounded-full text-[11px] font-extrabold shrink-0"
                     style={{ width: 18, height: 18, background: row.rank <= 3 || isLast ? 'var(--tint)' : undefined }}
                     title={isLast ? 'Farolillo rojo (último puesto)' : undefined}
                   >
@@ -316,7 +316,7 @@ export default async function DashboardPage() {
             </div>
           )}
           {!!rows.length && (
-            <p className="text-[10.5px] pb-2.5" style={{ color: 'var(--text-muted2)' }}>Racha: últimos 3 partidos · ↑↓ puestos que ha subido o bajado en la última jornada</p>
+            <p className="text-[11px] pb-2.5" style={{ color: 'var(--text-muted2)' }}>Racha: últimos 3 partidos · ↑↓ puestos que ha subido o bajado en la última jornada</p>
           )}
         </div>
       </div>
@@ -404,7 +404,7 @@ function StreakBadge({ row }: { row: { activeStreak: { type: 'V' | 'D'; length: 
       {row.results.map((r, i) => (
         <span
           key={i}
-          className="flex items-center justify-center rounded-full text-[9px] font-extrabold"
+          className="flex items-center justify-center rounded-full text-[11px] font-extrabold"
           style={{ width: 16, height: 16, background: r === 'V' ? 'var(--green-bg)' : 'oklch(0.95 0.04 55)', color: r === 'V' ? 'var(--green)' : 'oklch(0.55 0.15 40)' }}
         >
           {r}
