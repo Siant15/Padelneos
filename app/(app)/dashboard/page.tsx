@@ -10,7 +10,7 @@ import DinnerRiskInfo from '@/components/DinnerRiskInfo'
 import PiquesCarousel from '@/components/PiquesCarousel'
 import { getRoundBettingContext } from '@/lib/betting-queries'
 import { isRoundBettable } from '@/lib/betting'
-import { todayMadrid, leagueFinished } from '@/lib/rounds'
+import { todayMadrid, leagueFinished, isReservationRegistered } from '@/lib/rounds'
 import FinishSeasonCard from '@/components/FinishSeasonCard'
 import { STREAK_MIN } from '@/lib/piques'
 import { halfSeasonReached } from '@/lib/informe'
@@ -186,58 +186,55 @@ export default async function DashboardPage() {
             </div>
             )}
 
-            {!round.court_confirmed && round.court_booker_id === user?.id && (
-              <StopPropagation>
-                <ConfirmCourtButton roundId={round.id} />
-              </StopPropagation>
-            )}
+            {(() => {
+              // Una sola acción principal, según el estado de la jornada; el resto,
+              // como enlaces secundarios más discretos.
+              const registered = isReservationRegistered(round)
+              const isBooker = round.court_booker_id === user?.id
+              const primaryStyle = { background: '#fff', color: 'oklch(0.4 0.09 155)' }
+              const secondaryStyle = { background: 'rgba(255,255,255,0.16)', color: '#fff' }
+              const mutedStyle = { background: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.8)' }
+              const betsLabel = (bettingContext?.chipsLeft ?? 100) > 0 ? `Apostar · ${bettingContext?.chipsLeft ?? 100} fichas` : 'Modificar apuestas'
+              const betsHref = `/liga?tab=apuestas&round=${round.id}`
+              const cta = 'block text-center text-sm font-bold rounded-xl transition hover:opacity-90'
 
-            {/* Con la reserva ya confirmada no hace falta volver a ella desde Inicio:
-                aquí quedan solo Apostar y Resolver partido. */}
-            {!round.court_confirmed && (
-              <StopPropagation>
-                <Link
-                  href={`/admin/jornadas/${round.id}/reserva`}
-                  className="block text-center text-sm font-bold py-2.5 rounded-xl transition hover:opacity-90"
-                  style={{ background: 'rgba(255,255,255,0.16)', color: '#fff' }}
-                >
-                  🏟️ {!effectiveClub || !round.scheduled_date || !effectiveTime ? 'Reservar pista' : 'Reserva e importe'}
-                </Link>
-              </StopPropagation>
-            )}
+              let primary: React.ReactNode = null
+              let betsIsPrimary = false
+              if (!registered) {
+                primary = <Link href={`/admin/jornadas/${round.id}/reserva`} className={`${cta} py-3`} style={primaryStyle}>🏟️ Reservar pista</Link>
+              } else if (!round.court_confirmed && isBooker) {
+                primary = <ConfirmCourtButton roundId={round.id} />
+              } else if (matchMayHaveHappened) {
+                primary = <Link href={`/admin/jornadas/${round.id}/resultado`} className={`${cta} py-3`} style={primaryStyle}>📝 Anotar resultado</Link>
+              } else if (betsOpen) {
+                betsIsPrimary = true
+                primary = <Link href={betsHref} className={`${cta} py-3`} style={primaryStyle}>{betsLabel}</Link>
+              }
 
-            <StopPropagation>
-              <div className="flex gap-2 mt-1">
-                {(matchMayHaveHappened || round.court_confirmed) && (
-                  <Link
-                    href={`/admin/jornadas/${round.id}/resultado`}
-                    className="flex-1 text-center text-sm font-bold py-2.5 rounded-xl transition hover:opacity-90"
-                    style={{ background: '#fff', color: 'oklch(0.4 0.09 155)' }}
-                  >
-                    Resolver partido
-                  </Link>
-                )}
-                {betsOpen ? (
-                  <Link
-                    href={`/liga?tab=apuestas&round=${round.id}`}
-                    className="flex-1 text-center text-sm font-bold py-2.5 rounded-xl transition hover:opacity-90 flex items-center justify-center gap-1.5"
-                    style={matchMayHaveHappened
-                      ? { background: 'rgba(255,255,255,0.16)', color: '#fff' }
-                      : { background: '#fff', color: 'oklch(0.4 0.09 155)' }}
-                  >
-                    {(bettingContext?.chipsLeft ?? 100) > 0 ? `Apostar · ${bettingContext?.chipsLeft ?? 100} fichas` : 'Modificar apuestas'}
-                  </Link>
-                ) : (
-                  <Link
-                    href={`/liga?tab=apuestas&round=${round.id}`}
-                    className="flex-1 text-center text-xs font-bold py-2.5 rounded-xl transition hover:opacity-90 flex items-center justify-center gap-1.5"
-                    style={{ background: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.8)' }}
-                  >
-                    🔒 Apuestas cerradas: {betsClosedReason}
-                  </Link>
-                )}
-              </div>
-            </StopPropagation>
+              return (
+                <StopPropagation>
+                  <div className="flex flex-col gap-2 mt-1">
+                    {primary}
+                    <div className="flex gap-2">
+                      {registered && (
+                        <Link href={`/admin/jornadas/${round.id}/reserva`} className="flex-1 text-center text-xs font-bold py-2.5 rounded-xl transition hover:opacity-90" style={secondaryStyle}>
+                          🏟️ Reserva e importe
+                        </Link>
+                      )}
+                      {!betsIsPrimary && (betsOpen ? (
+                        <Link href={betsHref} className="flex-1 text-center text-xs font-bold py-2.5 rounded-xl transition hover:opacity-90" style={secondaryStyle}>
+                          🎰 {betsLabel}
+                        </Link>
+                      ) : (
+                        <Link href={betsHref} className="flex-1 text-center text-xs font-bold py-2.5 rounded-xl transition hover:opacity-90" style={mutedStyle}>
+                          🔒 Apuestas cerradas: {betsClosedReason}
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                </StopPropagation>
+              )
+            })()}
           </div>
         </ClickableCard>
       ) : !seasonId ? (

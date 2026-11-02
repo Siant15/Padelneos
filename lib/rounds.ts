@@ -25,3 +25,17 @@ export function isReservationRegistered(r: { scheduled_date: string | null; sche
 export function leagueFinished(rounds: { status: string }[]): boolean {
   return rounds.length > 0 && !rounds.some(r => r.status === 'scheduled') && rounds.some(r => r.status === 'played')
 }
+
+// Estado ÚNICO de una jornada, el mismo en todas las pantallas:
+//   cancelada → sin_reserva (falta día, hora o club) → reservada → jugada
+//   (resultado guardado) → liquidada (apuestas repartidas).
+export type RoundStage = 'cancelada' | 'sin_reserva' | 'reservada' | 'jugada' | 'liquidada'
+
+export function roundStage(
+  round: { status: string; scheduled_date: string | null; scheduled_time: string | null; club: string | null },
+  settled = false,
+): RoundStage {
+  if (round.status === 'cancelled') return 'cancelada'
+  if (round.status === 'played') return settled ? 'liquidada' : 'jugada'
+  return isReservationRegistered(round) ? 'reservada' : 'sin_reserva'
+}

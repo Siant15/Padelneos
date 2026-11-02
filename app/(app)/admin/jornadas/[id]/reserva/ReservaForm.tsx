@@ -1,5 +1,6 @@
 'use client'
 
+import JornadaSteps from '@/components/JornadaSteps'
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
@@ -74,6 +75,8 @@ export default function ReservaForm({ roundId, roundNumber, bookerName, isRespon
         <button onClick={() => router.back()} className="text-sm" style={{ color: 'var(--text-muted)' }}>← Volver</button>
         <h1 className="text-xl font-bold">Reservar pista · J{roundNumber}</h1>
       </div>
+
+      <JornadaSteps roundId={roundId} current={1} />
 
       <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
         Responsable de la reserva: <strong>{bookerName ?? 'sin asignar'}</strong>

@@ -131,6 +131,9 @@ function RoundRowItem({ round, onDeleted }: { round: RoundRow; onDeleted: () => 
         {round.club && <> · {round.club}</>}
       </div>
       <div className="flex flex-wrap gap-1.5 mt-1.5">
+        <Link href={`/admin/jornadas/${round.id}/gestionar`} className="text-[11px] font-bold px-2 py-1 rounded-lg" style={{ background: 'var(--accent)', color: '#fff' }}>
+          Gestionar
+        </Link>
         <Link href={`/admin/jornadas/${round.id}/editar`} className="text-[11px] font-bold px-2 py-1 rounded-lg" style={{ background: 'var(--tint)', color: 'var(--text-muted2)' }}>
           Editar
         </Link>

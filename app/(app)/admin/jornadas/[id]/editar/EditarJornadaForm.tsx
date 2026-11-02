@@ -312,10 +312,10 @@ export default function EditarJornadaForm({ roundId, players, initialForm, initi
           className="block w-full py-3 rounded-xl font-semibold text-center transition hover:opacity-90"
           style={{ background: 'var(--green)', color: '#fff' }}
         >
-          📝 Resolver partido
+          📝 Anotar resultado
         </Link>
         <p className="text-xs text-center" style={{ color: 'var(--text-muted)' }}>
-          Registra el resultado y resuelve las apuestas de la jornada. Guarda antes los cambios de arriba.
+          Anota el resultado y resuelve las apuestas de la jornada. Guarda antes los cambios de arriba.
         </p>
       </div>
     </div>

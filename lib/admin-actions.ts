@@ -194,3 +194,71 @@ export async function deleteClub(clubId: string): Promise<{ error: string | null
   updateTag('liga-data')
   return { error: null }
 }
+
+// ─── Gestión completa de una jornada ────────────────────────────────
+export type AdminOption = { id: string; label: string; isNone: boolean; playerId: string | null }
+export type AdminBet = { id: string; playerId: string; optionId: string; chips: number }
+export type AdminMarket = {
+  id: string; description: string; type: string; isAutomatic: boolean
+  resolved: boolean; voided: boolean; winningOptionId: string | null
+  options: AdminOption[]; bets: AdminBet[]
+}
+export type AdminRoundData = {
+  round: {
+    id: string; roundNumber: number; status: string
+    scheduledDate: string | null; scheduledTime: string | null; club: string | null
+    courtCost: number | null; courtConfirmed: boolean; courtBookerId: string | null
+  }
+  match: {
+    id: string; winner: string | null
+    sets: [number | null, number | null][]
+    team1p1: string | null; team1p2: string | null; team2p1: string | null; team2p2: string | null
+  } | null
+  players: { id: string; name: string }[]
+  markets: AdminMarket[]
+  settlement: { version: number; settledAt: string } | null
+}
+
+export async function getRoundAdminData(roundId: string): Promise<AdminRoundData | null> {
+  await assertIsAdmin()
+  const admin = adminClient()
+  const [round, match, players, markets, settlement] = await Promise.all([
+    admin.from('rounds').select('id, round_number, status, scheduled_date, scheduled_time, club, court_cost, court_confirmed, court_booker_id').eq('id', roundId).maybeSingle().throwOnError(),
+    admin.from('matches').select('id, winner, set1_t1, set1_t2, set2_t1, set2_t2, set3_t1, set3_t2, team1_p1_id, team1_p2_id, team2_p1_id, team2_p2_id').eq('round_id', roundId).maybeSingle().throwOnError(),
+    admin.from('profiles').select('id, name').order('name').throwOnError(),
+    admin.from('betting_markets')
+      .select('id, description, type, resolved, voided, winning_option_id, template:betting_question_templates(category), options:betting_options!market_id(id, label, is_none, player_id), bets(id, player_id, option_id, chips)')
+      .eq('round_id', roundId).order('created_at').throwOnError(),
+    admin.from('round_settlements').select('version, settled_at').eq('round_id', roundId).is('voided_at', null).maybeSingle().throwOnError(),
+  ])
+  const r = round.data
+  if (!r) return null
+  const m = match.data
+  return {
+    round: {
+      id: r.id, roundNumber: r.round_number, status: r.status,
+      scheduledDate: r.scheduled_date, scheduledTime: r.scheduled_time, club: r.club,
+      courtCost: r.court_cost === null ? null : Number(r.court_cost), courtConfirmed: r.court_confirmed, courtBookerId: r.court_booker_id,
+    },
+    match: m ? {
+      id: m.id, winner: m.winner,
+      sets: [[m.set1_t1, m.set1_t2], [m.set2_t1, m.set2_t2], [m.set3_t1, m.set3_t2]],
+      team1p1: m.team1_p1_id, team1p2: m.team1_p2_id, team2p1: m.team2_p1_id, team2p2: m.team2_p2_id,
+    } : null,
+    players: players.data ?? [],
+    markets: (markets.data ?? []).map(mk => {
+      const tpl = mk.template as unknown as { category: string } | { category: string }[] | null
+      const category = Array.isArray(tpl) ? tpl[0]?.category : tpl?.category
+      return {
+        id: mk.id, description: mk.description, type: mk.type,
+        isAutomatic: mk.type === 'exact_score' || category === 'automatic',
+        resolved: mk.resolved, voided: !!mk.voided, winningOptionId: mk.winning_option_id,
+        options: ((mk.options ?? []) as { id: string; label: string; is_none: boolean | null; player_id: string | null }[])
+          .map(o => ({ id: o.id, label: o.label, isNone: !!o.is_none, playerId: o.player_id })),
+        bets: ((mk.bets ?? []) as { id: string; player_id: string; option_id: string; chips: number }[])
+          .map(b => ({ id: b.id, playerId: b.player_id, optionId: b.option_id, chips: b.chips })),
+      }
+    }),
+    settlement: settlement.data ? { version: settlement.data.version, settledAt: settlement.data.settled_at } : null,
+  }
+}

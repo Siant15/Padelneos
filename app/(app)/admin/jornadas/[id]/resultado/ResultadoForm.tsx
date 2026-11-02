@@ -1,15 +1,15 @@
 'use client'
 
+import JornadaSteps from '@/components/JornadaSteps'
 import { useState, useCallback, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
-import { isValidSetScore } from '@/lib/types'
+import { evaluateSets, type SetScore } from '@/lib/evaluate-sets'
 import { revalidateLigaData } from '@/lib/actions'
 import { friendlyError } from '@/lib/errors'
 import { rescheduleFollowingRounds } from '@/lib/schedule-actions'
 
 type PairForm = { team1_p1_id: string; team1_p2_id: string; team2_p1_id: string; team2_p2_id: string }
-type SetScore = { t1: string; t2: string }
 type RoundPlayer = { id: string; name: string; team: 1 | 2 }
 type PlayerLite = { id: string; name: string }
 type PendingOption = { id: string; label: string; is_none: boolean | null }
@@ -20,47 +20,6 @@ type BetMarket = {
 }
 type BetsStatus = { markets: BetMarket[]; settled: boolean }
 const BETS_SELECT = 'id, description, resolved, voided, winning_option_id, template:betting_question_templates(category), options:betting_options!market_id(id, label, is_none)'
-
-type MatchStatus = {
-  winner: 'team1' | 'team2' | null
-  error: string | null
-  needsThirdSet: boolean
-  decidedInTwo: boolean
-  badSet: number | null
-}
-
-function evaluateSets(sets: SetScore[]): MatchStatus {
-  const parsed = sets.map(s => ({
-    t1: s.t1.trim() === '' ? null : parseInt(s.t1, 10),
-    t2: s.t2.trim() === '' ? null : parseInt(s.t2, 10),
-  }))
-  const [s1, s2, s3] = parsed
-  const notDecided = { winner: null, error: null, needsThirdSet: false, decidedInTwo: false, badSet: null } as const
-
-  if (s1.t1 === null || s1.t2 === null || s2.t1 === null || s2.t2 === null) {
-    return notDecided
-  }
-  if (!isValidSetScore(s1.t1, s1.t2)) {
-    return { ...notDecided, badSet: 0, error: `El set 1 (${s1.t1}-${s1.t2}) no es un resultado válido de pádel: 6-0 a 6-4, 7-5 o 7-6` }
-  }
-  if (!isValidSetScore(s2.t1, s2.t2)) {
-    return { ...notDecided, badSet: 1, error: `El set 2 (${s2.t1}-${s2.t2}) no es un resultado válido de pádel: 6-0 a 6-4, 7-5 o 7-6` }
-  }
-
-  const w1 = s1.t1 > s1.t2 ? 'team1' : 'team2'
-  const w2 = s2.t1 > s2.t2 ? 'team1' : 'team2'
-  if (w1 === w2) return { winner: w1, error: null, needsThirdSet: false, decidedInTwo: true, badSet: null }
-
-  // 1-1: hace falta un tercer set decisivo
-  if (!s3 || s3.t1 === null || s3.t2 === null) {
-    return { ...notDecided, needsThirdSet: true }
-  }
-  if (!isValidSetScore(s3.t1, s3.t2)) {
-    return { ...notDecided, badSet: 2, error: `El set 3 (${s3.t1}-${s3.t2}) no es un resultado válido de pádel: 6-0 a 6-4, 7-5 o 7-6` }
-  }
-  const w3 = s3.t1 > s3.t2 ? 'team1' : 'team2'
-  return { winner: w3, error: null, needsThirdSet: false, decidedInTwo: false, badSet: null }
-}
 
 export default function ResultadoForm({ roundId, roundNumber, mode, matchId: initialMatchId, players: initialRoundPlayers, sets: initialSets, allPlayers, initialBets }: {
   roundId: string
@@ -360,7 +319,7 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
     <div className="space-y-5 pb-4">
       <div className="flex items-center gap-3">
         <button onClick={() => router.back()} className="text-sm" style={{ color: 'var(--text-muted)' }}>← Volver</button>
-        <h1 className="text-xl font-bold">Resolver partido · J{roundNumber}</h1>
+        <h1 className="text-xl font-bold">Anotar resultado · J{roundNumber}</h1>
       </div>
 
       {loadState === 'no-match' && (
@@ -428,6 +387,8 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
 
       {loadState === 'ready' && (
         <div className="space-y-5">
+          <JornadaSteps roundId={roundId} current={!resultSaved ? 2 : betsError || !betsStatus || pendingList.length > 0 ? 3 : alreadySettled ? 5 : 4} />
+
           {alreadySettled && (
             <div className="rounded-xl p-3 text-xs font-semibold" style={{ background: 'var(--orange-bg)', color: 'var(--orange)' }}>
               🔒 Esta jornada ya está liquidada: el resultado y las respuestas no se pueden cambiar. Si hay un error, díselo al administrador.
