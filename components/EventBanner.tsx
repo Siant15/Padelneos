@@ -1,9 +1,11 @@
 import { todayMadrid } from '@/lib/rounds'
-import { EVENT_BANNER_UNTIL } from '@/lib/ads'
+import { EVENT_BANNER_UNTIL, PROFEI_TAGLINE } from '@/lib/ads'
 
-// Banner fijo de Inicio hasta EVENT_BANNER_UNTIL (inclusive).
+// Arriba de Inicio: hasta EVENT_BANNER_UNTIL (inclusive) el banner de la feria;
+// después, el banner fijo de Profei (logo + frase).
 export default function EventBanner() {
-  if (todayMadrid() > EVENT_BANNER_UNTIL) return null
+  if (todayMadrid() > EVENT_BANNER_UNTIL) return <ProfeiBanner />
+
   return (
     <div>
       <p className="text-[11px] font-bold uppercase tracking-wide mb-1" style={{ color: 'var(--text-muted2)' }}>Publicidad</p>
@@ -16,6 +18,26 @@ export default function EventBanner() {
           width={600}
           height={100}
         />
+      </a>
+    </div>
+  )
+}
+
+// El logo de Profei es blanco: va sobre un fondo oscuro.
+function ProfeiBanner() {
+  return (
+    <div>
+      <p className="text-[11px] font-bold uppercase tracking-wide mb-1" style={{ color: 'var(--text-muted2)' }}>Publicidad</p>
+      <a
+        href="https://profei.com/"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex items-center gap-4 rounded-2xl px-4 py-3 min-h-[68px] transition hover:opacity-90"
+        style={{ background: 'oklch(0.3 0.04 250)', boxShadow: '0 3px 10px rgba(0,0,0,0.08)' }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/ads/profei-logo.png" alt="Profei, Promoción de Ferias Internacionales" width={120} height={31} className="block h-auto shrink-0" style={{ width: 120 }} />
+        <span className="text-xs font-semibold" style={{ color: 'rgba(255,255,255,0.9)' }}>{PROFEI_TAGLINE}</span>
       </a>
     </div>
   )
