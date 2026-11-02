@@ -190,11 +190,14 @@ export default async function LigaPage() {
   // Las apuestas propias de jornadas jugadas-sin-liquidar van en la misma
   // tanda en paralelo, no después (no suman latencia).
   const awaitingIds = pendingRoundRefs.filter(r => r.status === 'played').map(r => r.id)
-  const [settledActas, openBetting, myBetsByRound] = await Promise.all([
+  const [settledActas, openBetting, myBetsByRound, awaitingActas] = await Promise.all([
     settledRoundRefs.length ? getCachedSettledActas(settledRoundRefs.map(r => r.id), playerList) : Promise.resolve([]),
     userId && openRoundRefs.length ? getCachedOpenRoundsBetting(seasonId ?? '', openRoundRefs.map(r => r.id), userId) : Promise.resolve(null),
     awaitingIds.length ? getCachedMyBetsForRounds(awaitingIds, userId) : Promise.resolve({} as Awaited<ReturnType<typeof getCachedMyBetsForRounds>>),
+    // Jornada jugada y sin liquidar: el mercado ya cerró, así que se enseñan las apuestas de todos.
+    awaitingIds.length ? getCachedSettledActas(awaitingIds, playerList) : Promise.resolve([]),
   ])
+  const playerNames = Object.fromEntries(playerList.map(p => [p.id, p.name]))
   const settledEntries: ApuestasRoundEntry[] = settledRoundRefs.map((r, i) => ({
     kind: 'settled' as const, roundId: r.id, roundNumber: r.round_number, acta: settledActas[i],
   }))
@@ -217,6 +220,7 @@ export default async function LigaPage() {
       usageByTemplate: openBetting.usageByTemplate,
       bettorsByMarket: openBetting.bettorsByMarket,
       availableTemplates,
+      playerNames,
     }
   }) : []
 
@@ -230,6 +234,7 @@ export default async function LigaPage() {
     club: r.club,
     reason: r.status === 'played' ? 'awaiting_settlement' as const : 'no_questions' as const,
     myBets: myBetsByRound[r.id] ?? [],
+    acta: awaitingIds.includes(r.id) ? (awaitingActas[awaitingIds.indexOf(r.id)] ?? null) : null,
   }))
 
   const apuestasRounds: ApuestasRoundEntry[] = [...settledEntries, ...openEntries, ...pendingEntries]

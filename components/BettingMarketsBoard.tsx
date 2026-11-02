@@ -18,6 +18,8 @@ interface Props {
   round: { scheduled_date: string | null; scheduled_time: string | null; club: string | null }
   jackpotByTemplate: Record<string, number>
   bettorsByMarket: Record<string, number>
+  // id de jugador -> nombre, para listar quién apostó qué cuando el mercado ya cerró.
+  playerNames?: Record<string, string>
 }
 
 const MIN_PAID_QUESTIONS = 6
@@ -25,7 +27,7 @@ const MIN_BET = 10
 const MAX_BET = 50
 const ROUND_TOTAL = 100
 
-export default function BettingMarketsBoard({ roundId, markets, userId, roundStatus, round, jackpotByTemplate, bettorsByMarket }: Props) {
+export default function BettingMarketsBoard({ roundId, markets, userId, roundStatus, round, jackpotByTemplate, bettorsByMarket, playerNames = {} }: Props) {
   const router = useRouter()
   const supabase = createClient()
 
@@ -302,6 +304,8 @@ export default function BettingMarketsBoard({ roundId, markets, userId, roundSta
             return closeTime !== null && new Date(closeTime) > new Date()
           })()}
           userId={userId}
+          closeTime={marketCloseTime(exactScoreMarket, round)}
+          playerNames={playerNames}
           bettors={bettorsByMarket[exactScoreMarket.id] ?? 0}
           draft={exactScoreDraft}
           onDraftChange={d => { exactScoreTouched.current = true; setExactScoreDraft(d) }}
@@ -355,7 +359,7 @@ export default function BettingMarketsBoard({ roundId, markets, userId, roundSta
             </div>
             {!market.resolved && !isClosedByTime && closeTime && (
               <p className="text-[11px] mt-1" style={{ color: 'var(--text-muted2)' }}>
-                Cierra el {new Date(closeTime).toLocaleString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                Cierra el {new Date(closeTime).toLocaleString('es-ES', { timeZone: 'Europe/Madrid', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
               </p>
             )}
             {!market.resolved && !isClosedByTime && !closeTime && (
@@ -438,6 +442,9 @@ export default function BettingMarketsBoard({ roundId, markets, userId, roundSta
                 )
               })}
             </div>
+            {(isClosedByTime || market.resolved) && (
+              <GroupBets market={market} playerNames={playerNames} userId={userId} />
+            )}
           </div>
           </div>
         )
@@ -483,18 +490,20 @@ function describeBetError(message: string): string {
 
 // ─── Marcador exacto: gratis, 2-3 sets con inputs numéricos, igual
 // que en el registro de resultado, en vez de una lista de opciones.
-function ExactScoreCard({ market, canBet, bettors, userId, draft, onDraftChange, onSubmit, saving }: {
+function ExactScoreCard({ market, canBet, bettors, userId, closeTime, playerNames, draft, onDraftChange, onSubmit, saving }: {
   market: BettingMarket
   canBet: boolean
   bettors: number
   userId: string
+  closeTime: string | null
+  playerNames: Record<string, string>
   draft: [string, string][]
   onDraftChange: (d: [string, string][]) => void
   onSubmit: () => void
   saving: boolean
 }) {
   const myBetOptions = (market.options ?? []).filter(o => (market.bets ?? []).some(b => b.option_id === o.id && b.player_id === userId))
-  const closeTime = market.closes_at
+  const isClosed = market.resolved || (closeTime !== null && new Date(closeTime) <= new Date())
   const [infoOpen, setInfoOpen] = useState(false)
 
   const inputRefs = useRef<(HTMLInputElement | null)[]>([])
@@ -555,10 +564,11 @@ function ExactScoreCard({ market, canBet, bettors, userId, draft, onDraftChange,
           </span>
         </div>
         {market.resolved && !market.voided && <span className="text-xs font-bold" style={{ color: 'var(--green)' }}>✓</span>}
+        {!market.resolved && isClosed && <span className="text-xs font-bold" style={{ color: 'var(--red)' }}>🔒 Cerrado</span>}
       </div>
-      {closeTime && (
+      {closeTime && !isClosed && (
         <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted2)' }}>
-          Cierra el {new Date(closeTime).toLocaleString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+          Cierra el {new Date(closeTime).toLocaleString('es-ES', { timeZone: 'Europe/Madrid', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
         </p>
       )}
 
@@ -573,6 +583,8 @@ function ExactScoreCard({ market, canBet, bettors, userId, draft, onDraftChange,
           ))}
         </div>
       )}
+
+      {isClosed && <GroupBets market={market} playerNames={playerNames} userId={userId} />}
 
       {canBet && (
         <div className="flex flex-wrap items-center gap-x-2 gap-y-2 mt-2.5">
@@ -592,6 +604,35 @@ function ExactScoreCard({ market, canBet, bettors, userId, draft, onDraftChange,
           </button>
         </div>
       )}
+    </div>
+  )
+}
+
+// Quién apostó qué: solo se enseña con el mercado ya cerrado (nadie puede
+// cambiar nada) — antes del cierre el servidor ni siquiera manda esos datos.
+function GroupBets({ market, playerNames, userId }: { market: BettingMarket; playerNames: Record<string, string>; userId: string }) {
+  const rows = (market.bets ?? [])
+    .filter(b => b.player_id !== 'hidden')
+    .map(b => ({
+      id: `${b.player_id}-${b.option_id}`,
+      name: playerNames[b.player_id] ?? '?',
+      mine: b.player_id === userId,
+      label: market.options?.find(o => o.id === b.option_id)?.label ?? '?',
+      chips: b.chips,
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name, 'es'))
+  if (!rows.length) return null
+  return (
+    <div className="mt-2.5 pt-2" style={{ borderTop: '1px solid var(--hairline)' }}>
+      <p className="text-[10px] font-bold uppercase tracking-wide mb-1" style={{ color: 'var(--text-muted2)' }}>Apuestas del grupo</p>
+      <ul className="flex flex-col gap-0.5">
+        {rows.map(r => (
+          <li key={r.id} className="flex items-center justify-between gap-2 text-xs" style={{ fontWeight: r.mine ? 800 : 500 }}>
+            <span className="min-w-0 truncate">{r.name}{r.mine && <span style={{ color: 'var(--text-muted2)', fontWeight: 400 }}> · tú</span>}</span>
+            <span className="shrink-0 text-right">{r.label}{r.chips > 0 ? ` · ${r.chips}f` : ''}</span>
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }

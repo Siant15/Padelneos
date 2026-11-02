@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { CHIPS_PER_ROUND, isMarketOpenForBetting } from '@/lib/betting'
+import { CHIPS_PER_ROUND, isMarketOpenForBetting, marketCloseTime } from '@/lib/betting'
 import type { BettingMarket, Match } from '@/lib/types'
 import { getPairName } from '@/lib/types'
 
@@ -41,12 +41,19 @@ export async function getRoundBettingContext(supabase: SupabaseClient, roundId: 
   ])
 
   // Esta lectura va con service role (se salta RLS), así que aquí se
-  // reproduce la regla de la 042: hasta que la pregunta se resuelve, las
-  // apuestas ajenas no revelan quién apostó ni qué marcador. Se conservan
+  // reproduce la regla de la 066: las apuestas ajenas no revelan quién
+  // apostó ni qué marcador hasta que el mercado CIERRA (1 h antes del
+  // partido, o su closes_at) o se resuelve. Antes se conservan
   // anonimizadas (fichas por opción → bote) y, en el marcador exacto, las
   // opciones que solo han elegido otros jugadores se descartan.
+  const isClosed = (m: BettingMarket) => {
+    if (m.resolved || m.voided) return true
+    if (!round) return false
+    const closeTime = marketCloseTime(m, round)
+    return closeTime !== null && new Date(closeTime) <= new Date()
+  }
   const marketList: BettingMarket[] = ((markets as BettingMarket[] | null) ?? []).map(m => {
-    if (m.resolved || m.voided) return m
+    if (isClosed(m)) return m
     const bets = (m.bets ?? []).map(b => b.player_id === userId ? b : { ...b, player_id: 'hidden' })
     const options = m.type === 'exact_score'
       ? (m.options ?? []).filter(o => bets.some(b => b.option_id === o.id && b.player_id === userId))

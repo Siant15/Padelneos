@@ -14,8 +14,8 @@ import AddQuestionPicker from '@/components/AddQuestionPicker'
 type BaseRound = { roundId: string; roundNumber: number; pair1Label: string | null; pair2Label: string | null; scheduledDate: string | null; scheduledTime: string | null; club: string | null }
 
 export type SettledRoundEntry = { kind: 'settled'; roundId: string; roundNumber: number; acta: RoundActa }
-export type OpenRoundEntry = BaseRound & { kind: 'open'; markets: BettingMarket[]; chipsLeft: number; jackpotByTemplate: Record<string, number>; usageByTemplate: Record<string, number>; bettorsByMarket: Record<string, number>; availableTemplates: BettingQuestionTemplate[] }
-export type PendingRoundEntry = BaseRound & { kind: 'pending'; reason: 'awaiting_settlement' | 'no_questions'; myBets: { question: string; answer: string; chips: number; resolved: boolean; voided: boolean; won: boolean }[] }
+export type OpenRoundEntry = BaseRound & { kind: 'open'; markets: BettingMarket[]; chipsLeft: number; jackpotByTemplate: Record<string, number>; usageByTemplate: Record<string, number>; bettorsByMarket: Record<string, number>; availableTemplates: BettingQuestionTemplate[]; playerNames: Record<string, string> }
+export type PendingRoundEntry = BaseRound & { kind: 'pending'; reason: 'awaiting_settlement' | 'no_questions'; acta: RoundActa | null; myBets: { question: string; answer: string; chips: number; resolved: boolean; voided: boolean; won: boolean }[] }
 export type ApuestasRoundEntry = SettledRoundEntry | OpenRoundEntry | PendingRoundEntry
 
 const STATUS_LABEL: Record<ApuestasRoundEntry['kind'], string> = {
@@ -160,6 +160,7 @@ export default function ApuestasTab({ userId, rounds, initialRoundId }: { userId
               round={{ scheduled_date: current.scheduledDate, scheduled_time: current.scheduledTime, club: current.club }}
               jackpotByTemplate={current.jackpotByTemplate}
               bettorsByMarket={current.bettorsByMarket}
+              playerNames={current.playerNames}
             />
           </div>
           {current.availableTemplates.length > 0 && (
@@ -190,7 +191,18 @@ export default function ApuestasTab({ userId, rounds, initialRoundId }: { userId
               ? 'Jornada pendiente de liquidar.'
               : 'Todavía no se han generado las preguntas de apuestas para esta jornada.'}
           </div>
-          {current.reason === 'awaiting_settlement' && current.myBets.length > 0 && (
+          {current.reason === 'awaiting_settlement' && current.acta && (
+            <ApuestasActa
+              markets={current.acta.markets}
+              closure={current.acta.closure}
+              pair1Label={current.acta.pair1Label}
+              pair2Label={current.acta.pair2Label}
+              scoreLabel={current.acta.scoreLabel}
+              setsDetail={current.acta.setsDetail}
+              userId={userId}
+            />
+          )}
+          {current.reason === 'awaiting_settlement' && !current.acta && current.myBets.length > 0 && (
             <div className="rounded-2xl p-3.5 flex flex-col gap-2" style={{ background: 'var(--surface)', boxShadow: '0 3px 10px rgba(0,0,0,0.04)' }}>
               <h3 className="font-heading font-bold text-[13px]">Tus apuestas</h3>
               {current.myBets.map((b, i) => (
