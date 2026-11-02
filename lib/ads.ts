@@ -5,6 +5,15 @@
 export const EVENT_BANNER_UNTIL = '2026-11-09'
 export const WELCOME_POPUP_UNTIL = '2026-11-09'
 
+// Mensaje del popup de bienvenida (debajo de la foto).
+export const WELCOME_MESSAGE = {
+  title: 'Sí, esto es publicidad 📣',
+  text: 'Este mensaje ha sido aprobado por mí!',
+  ctaLabel: 'Ver Creativa Barcelona',
+  ctaHref: 'https://creativabarcelona.com/',
+  closeLabel: '¡Entendido, sigo apostando!',
+}
+
 export type Ad = {
   id: string
   title: string

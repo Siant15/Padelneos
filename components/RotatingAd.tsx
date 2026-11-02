@@ -41,11 +41,18 @@ export default function RotatingAd({ ads }: { ads: Ad[] }) {
         href={ad.href}
         target="_blank"
         rel="noopener noreferrer"
-        className="block rounded-2xl px-4 py-3 min-h-[68px] transition hover:opacity-90"
+        className="flex items-stretch rounded-2xl overflow-hidden min-h-[68px] transition hover:opacity-90"
         style={{ background: 'var(--surface)', boxShadow: '0 3px 10px rgba(0,0,0,0.05)', border: '1px solid var(--hairline)' }}
       >
-        <p className="font-heading font-bold text-sm">{ad.title} <span aria-hidden style={{ color: 'var(--accent)' }}>↗</span></p>
-        <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{ad.subtitle}</p>
+        {/* El logo de Profei es blanco: va sobre un fondo oscuro. */}
+        <span className="flex items-center justify-center shrink-0 px-3" style={{ width: 104, background: 'oklch(0.3 0.04 250)' }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/ads/profei-logo.png" alt="Profei" width={80} height={21} className="block w-full h-auto" />
+        </span>
+        <span className="min-w-0 px-4 py-3">
+          <span className="block font-heading font-bold text-sm">{ad.title} <span aria-hidden style={{ color: 'var(--accent)' }}>↗</span></span>
+          <span className="block text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{ad.subtitle}</span>
+        </span>
       </a>
       {ads.length > 1 && (
         <div className="flex justify-center gap-1.5 mt-2" role="group" aria-label="Elegir anuncio">

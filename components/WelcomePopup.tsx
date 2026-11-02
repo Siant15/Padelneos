@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useSyncExternalStore } from 'react'
+import { WELCOME_MESSAGE } from '@/lib/ads'
 
 const KEY = 'welcome-popup-seen'
 
@@ -41,7 +42,7 @@ export default function WelcomePopup({ active }: { active: boolean }) {
       aria-modal="true"
       aria-label="Bienvenida"
     >
-      <div className="relative w-full max-w-[440px]" onClick={e => e.stopPropagation()}>
+      <div className="relative w-full max-w-[440px] max-h-[92vh]" onClick={e => e.stopPropagation()}>
         <button
           type="button"
           onClick={close}
@@ -51,15 +52,37 @@ export default function WelcomePopup({ active }: { active: boolean }) {
         >
           ✕
         </button>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/ads/bienvenida.png"
-          alt="Imagen de bienvenida"
-          className="block w-full h-auto rounded-2xl"
-          style={{ boxShadow: '0 12px 40px rgba(0,0,0,0.4)' }}
-          width={448}
-          height={330}
-        />
+        <div className="rounded-2xl overflow-hidden overflow-y-auto max-h-[92vh]" style={{ background: 'var(--surface)', boxShadow: '0 12px 40px rgba(0,0,0,0.4)' }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/ads/bienvenida.png"
+            alt="Imagen de bienvenida"
+            className="block w-full h-auto"
+            width={448}
+            height={330}
+          />
+          <div className="p-4 flex flex-col gap-3">
+            <h2 className="font-heading font-extrabold text-base">{WELCOME_MESSAGE.title}</h2>
+            <p className="text-sm leading-relaxed" style={{ color: 'var(--text-muted)' }}>{WELCOME_MESSAGE.text}</p>
+            <button
+              type="button"
+              onClick={close}
+              className="w-full py-3 rounded-xl font-semibold text-sm transition hover:opacity-90"
+              style={{ background: 'var(--accent)', color: '#fff' }}
+            >
+              {WELCOME_MESSAGE.closeLabel}
+            </button>
+            <a
+              href={WELCOME_MESSAGE.ctaHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-center text-sm font-bold min-h-11 flex items-center justify-center"
+              style={{ color: 'var(--accent)' }}
+            >
+              {WELCOME_MESSAGE.ctaLabel} ↗
+            </a>
+          </div>
+        </div>
       </div>
     </div>
   )
