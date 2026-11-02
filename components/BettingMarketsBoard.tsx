@@ -503,17 +503,22 @@ function ExactScoreCard({ market, canBet, bettors, userId, draft, onDraftChange,
   // se queda con el último tecleado y salta a la siguiente casilla.
   function setSet(i: number, side: 0 | 1, raw: string) {
     const value = raw.slice(-1)
-    const next = draft.map(s => [...s]) as [string, string][]
+    let next = draft.map(s => [...s]) as [string, string][]
     next[i][side] = value
+    // El 3.º set solo aparece si los dos primeros están completos y van 1-1.
+    const [a, b] = next
+    const firstTwoDone = [a, b].every(s => s[0] !== '' && s[1] !== '')
+    if (firstTwoDone) {
+      const oneOne = (parseInt(a[0], 10) > parseInt(a[1], 10)) !== (parseInt(b[0], 10) > parseInt(b[1], 10))
+      if (oneOne && next.length === 2) next = [...next, ['', '']]
+      else if (!oneOne && next.length === 3) next = next.slice(0, 2)
+    }
     onDraftChange(next)
     if (value !== '') {
       const nextInput = inputRefs.current[i * 2 + side + 1]
       if (nextInput) { nextInput.focus(); nextInput.select() }
+      else if (next.length === 3 && i === 1 && side === 1) setTimeout(() => inputRefs.current[4]?.focus(), 0)
     }
-  }
-
-  function toggleThirdSet() {
-    onDraftChange(draft.length === 3 ? draft.slice(0, 2) as [string, string][] : [...draft, ['', '']] as [string, string][])
   }
 
   return (
@@ -580,9 +585,6 @@ function ExactScoreCard({ market, canBet, bettors, userId, draft, onDraftChange,
                 className="w-9 text-center text-xs rounded-lg py-1.5 outline-none" style={{ border: '1px solid var(--hairline)' }} />
             </div>
           ))}
-          <button type="button" onClick={toggleThirdSet} className="text-[11px] px-2 py-1.5 rounded-lg whitespace-nowrap" style={{ border: '1px solid var(--hairline)', color: 'var(--text-muted)' }}>
-            {draft.length === 3 ? '−3.º set' : '+3.º set'}
-          </button>
           <button type="button" onClick={onSubmit} disabled={saving}
             className="basis-full text-sm font-bold px-3 py-2 rounded-lg transition hover:opacity-90 disabled:opacity-40"
             style={{ background: 'var(--accent)', color: '#fff' }}>

@@ -1,9 +1,8 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 import { isValidSetScore } from '@/lib/types'
 import { revalidateLigaData } from '@/lib/actions'
 import { friendlyError } from '@/lib/errors'
@@ -15,7 +14,13 @@ type SetScore = { t1: string; t2: string }
 type RoundPlayer = { id: string; name: string; team: 1 | 2 }
 type PlayerLite = { id: string; name: string }
 type PendingOption = { id: string; label: string; is_none: boolean | null }
-type PendingMarket = { id: string; description: string; options: PendingOption[] }
+type BetMarket = {
+  id: string; description: string; options: PendingOption[]
+  resolved: boolean; voided: boolean; winning_option_id: string | null
+  template: { category: string } | null
+}
+type BetsStatus = { markets: BetMarket[]; settled: boolean }
+const BETS_SELECT = 'id, description, resolved, voided, winning_option_id, template:betting_question_templates(category), options:betting_options!market_id(id, label, is_none)'
 
 type MatchStatus = {
   winner: 'team1' | 'team2' | null
@@ -66,7 +71,7 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
   players: RoundPlayer[]
   sets: SetScore[]
   allPlayers: PlayerLite[]
-  initialBets: { pending: PendingMarket[]; settled: boolean } | null
+  initialBets: BetsStatus | null
 }) {
   const supabase = createClient()
   const router = useRouter()
@@ -75,29 +80,28 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
   const [players, setPlayers] = useState<RoundPlayer[]>(initialRoundPlayers)
   const [sets, setSets] = useState<SetScore[]>(initialSets)
   const [loading, setLoading] = useState(false)
-  const [saved, setSaved] = useState(false)
+  const [savedKey, setSavedKey] = useState(() => JSON.stringify(initialSets))
   const [saveError, setSaveError] = useState('')
   const [loadState, setLoadState] = useState<'ready' | 'no-match'>(mode)
   const [pairForm, setPairForm] = useState<PairForm>({ team1_p1_id: '', team1_p2_id: '', team2_p1_id: '', team2_p2_id: '' })
   const [creatingMatch, setCreatingMatch] = useState(false)
   const [pairError, setPairError] = useState('')
-  const [pendingMarkets, setPendingMarkets] = useState<PendingMarket[] | null>(null)
   const [resolvingMarketId, setResolvingMarketId] = useState<string | null>(null)
-  const [pendingSelection, setPendingSelection] = useState<Record<string, string>>({})
-  const [betsStatus, setBetsStatus] = useState<{ pending: PendingMarket[]; settled: boolean } | null>(initialBets)
+  const [editingMarketId, setEditingMarketId] = useState<string | null>(null)
+  const [betsStatus, setBetsStatus] = useState<BetsStatus | null>(initialBets)
   const [settling, setSettling] = useState(false)
   const [settleError, setSettleError] = useState('')
 
   // Estado de las apuestas de la jornada (preguntas sin resolver y si
   // ya está liquidada) para el bloque "Apuestas" de esta pantalla.
   const loadBetsStatus = useCallback(async () => {
-    const [{ data: pending }, { data: settlement }] = await Promise.all([
+    const [{ data: markets }, { data: settlement }] = await Promise.all([
       supabase.from('betting_markets')
-        .select('id, description, options:betting_options!market_id(id, label, is_none)')
-        .eq('round_id', roundId).eq('resolved', false),
+        .select(BETS_SELECT)
+        .eq('round_id', roundId).order('created_at'),
       supabase.from('round_settlements').select('id').eq('round_id', roundId).is('voided_at', null).maybeSingle(),
     ])
-    setBetsStatus({ pending: (pending as PendingMarket[] | null) ?? [], settled: !!settlement })
+    setBetsStatus({ markets: (markets as unknown as BetMarket[] | null) ?? [], settled: !!settlement })
   }, [roundId, supabase])
 
   async function handleSettle() {
@@ -153,6 +157,20 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
   const { winner, error: setsError, needsThirdSet, decidedInTwo, badSet } = evaluateSets(sets)
   const hasThirdSet = sets.length === 3
   const alreadySettled = !!betsStatus?.settled
+  const pendingList = betsStatus?.markets.filter(m => !m.resolved) ?? []
+  const currentKey = JSON.stringify(sets)
+  const resultSaved = !!winner && currentKey === savedKey
+
+  // Autoguardado del marcador: en cuanto hay un resultado válido y distinto
+  // de lo guardado, se guarda tras una breve pausa. Si la jornada ya está
+  // liquidada no se guarda solo (cambiar el resultado mueve la clasificación):
+  // ahí hay un botón explícito.
+  useEffect(() => {
+    if (!matchId || !winner || alreadySettled || loading || currentKey === savedKey) return
+    const t = setTimeout(() => { saveResult() }, 800)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentKey, winner, matchId, alreadySettled])
 
   // Orden natural al teclear un marcador: set 1 (pareja 1, pareja 2), set 2, set 3.
   function nextInputId(setIdx: number, team: 't1' | 't2', total: number) {
@@ -220,13 +238,13 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
     setLoadState('ready')
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
+  async function saveResult(manual = false) {
     if (!matchId || !winner) return
-    if (alreadySettled && !window.confirm('Esta jornada ya está liquidada. Si cambias el resultado, las apuestas automáticas se recalcularán y puede cambiar la clasificación. ¿Guardar igualmente?')) return
+    if (manual && alreadySettled && !window.confirm('Esta jornada ya está liquidada. Si cambias el resultado, las apuestas automáticas se recalcularán y puede cambiar la clasificación. ¿Guardar igualmente?')) return
     setLoading(true)
     setSaveError('')
 
+    const key = JSON.stringify(sets)
     const [s1, s2, s3] = sets
 
     const { error: matchError } = await supabase.from('matches').update({
@@ -245,64 +263,38 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
       setLoading(false)
       return
     }
+    setSavedKey(key)
 
-    // Con el resultado ya guardado, las preguntas de apuestas automáticas
-    // (ganador, resultado por sets, marcador exacto, tie-break...) se
-    // resuelven solas; las anecdóticas se siguen resolviendo a mano, y
-    // la jornada no se marca "jugada" hasta que estén todas resueltas o
-    // anuladas (si no, nunca podría liquidarse — settle_round exige que
-    // no quede ninguna pregunta sin resolver).
+    // Con el resultado guardado, las preguntas automaticas (ganador,
+    // resultado por sets, marcador exacto...) se resuelven solas; las
+    // anecdoticas se resuelven a mano en el bloque de apuestas.
     const { error: autoResolveError } = await supabase.rpc('auto_resolve_round_markets', { p_round_id: roundId })
     if (autoResolveError) {
       setSaveError(friendlyError(autoResolveError.message, 'Resultado guardado, pero fallaron las apuestas automáticas.'))
-      setLoading(false)
-      return
     }
 
+    await loadBetsStatus()
     setLoading(false)
-    await checkPendingMarketsOrFinish()
-  }
-
-  async function checkPendingMarketsOrFinish() {
-    loadBetsStatus()
-    const { data } = await supabase
-      .from('betting_markets')
-      .select('id, description, options:betting_options!market_id(id, label, is_none)')
-      .eq('round_id', roundId)
-      .eq('resolved', false)
-
-    const pending = (data as PendingMarket[] | null) ?? []
-    if (pending.length > 0) {
-      setSaved(true)
-      setPendingMarkets(pending)
-      return
+    if (alreadySettled) {
+      await revalidateLigaData()
+      router.refresh()
     }
-
-    setPendingMarkets(null)
-    const { error: roundError } = await supabase.from('rounds').update({ status: 'played' }).eq('id', roundId)
-    if (roundError) {
-      setSaveError(friendlyError(roundError.message, 'Resultado guardado, pero no se pudo marcar la jornada como jugada.'))
-      return
-    }
-    await rescheduleFollowingRounds(roundId)
-    await revalidateLigaData()
-    setSaved(true)
-    router.refresh()
   }
 
   async function resolvePendingMarket(marketId: string, winningOptionId: string | null, voided: boolean) {
     setResolvingMarketId(marketId)
+    setSaveError('')
     const { error } = await supabase.from('betting_markets').update({
       resolved: true,
       voided,
       winning_option_id: voided ? null : winningOptionId,
     }).eq('id', marketId)
     setResolvingMarketId(null)
+    setEditingMarketId(null)
     if (error) {
       setSaveError(friendlyError(error.message, 'No se pudo resolver la pregunta.'))
       return
     }
-    await checkPendingMarketsOrFinish()
     await loadBetsStatus()
   }
 
@@ -404,13 +396,14 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
       )}
 
       {loadState === 'ready' && (
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <div className="space-y-5">
           {alreadySettled && (
             <div className="rounded-xl p-3 text-xs font-semibold" style={{ background: 'var(--orange-bg)', color: 'var(--orange)' }}>
               🔒 Esta jornada ya está liquidada. Cambiar el resultado recalcula las apuestas automáticas y puede mover la clasificación.
             </div>
           )}
 
+          {/* 1 · Marcador (autoguardado) */}
           {/* Sets */}
           <div className="rounded-xl p-4" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
             <p className="text-sm font-semibold mb-4">Marcador</p>
@@ -486,32 +479,126 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
             )}
           </div>
 
-          {saveError && (
-            <p className="text-sm font-semibold text-center" style={{ color: 'var(--red)' }}>⚠ {saveError}</p>
+
+          <div className="text-xs text-center -mt-2" style={{ color: 'var(--text-muted)' }}>
+            {saveError ? <span style={{ color: 'var(--red)' }}>⚠ {saveError}</span>
+              : loading ? 'Guardando…'
+              : resultSaved ? <span style={{ color: 'var(--green)' }}>✓ Resultado guardado</span>
+              : winner && alreadySettled ? null
+              : winner ? 'Guardando en un momento…'
+              : 'Se guarda solo en cuanto el marcador esté completo.'}
+          </div>
+          {winner && alreadySettled && !resultSaved && (
+            <button type="button" onClick={() => saveResult(true)} disabled={loading}
+              className="w-full py-3 rounded-xl font-semibold transition hover:opacity-90 disabled:opacity-40"
+              style={{ background: 'var(--accent)', color: '#fff' }}>
+              {loading ? 'Guardando...' : 'Guardar cambio de resultado'}
+            </button>
           )}
 
-          {saved ? (
+          {/* 2 · Resolver apuestas (cada respuesta se guarda al elegirla) */}
+          <div className="rounded-xl p-4 space-y-3" style={{ background: 'var(--surface)', border: '1px solid var(--border)', opacity: resultSaved && betsStatus ? 1 : 0.5 }}>
+            <p className="text-sm font-semibold">🎰 Resolver apuestas</p>
+            {!resultSaved || !betsStatus ? (
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Disponible cuando el resultado esté guardado.</p>
+            ) : (
+              <>
+                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                  {pendingList.length > 0
+                    ? <>Quedan <strong>{pendingList.length}</strong> por resolver o anular. Cada respuesta se guarda al elegirla, así que puedes dejarlo a medias.</>
+                    : 'Todas las preguntas están resueltas.'}
+                </p>
+                {betsStatus.markets.map(m => {
+                  const winnerLabel = m.options.find(o => o.id === m.winning_option_id)
+                  const busy = resolvingMarketId === m.id
+                  const canEdit = !betsStatus.settled && m.template?.category !== 'automatic'
+                  return m.resolved && editingMarketId !== m.id ? (
+                    <div key={m.id} className="rounded-xl p-3 flex items-start justify-between gap-2" style={{ border: '1px solid var(--border)', background: 'var(--surface2)' }}>
+                      <p className="text-sm">{m.description}</p>
+                      <div className="shrink-0 text-right">
+                        <span className="text-xs font-semibold" style={{ color: m.voided ? 'var(--text-muted2)' : 'var(--green)' }}>
+                          {m.voided ? 'Anulada' : winnerLabel ? (winnerLabel.is_none ? '✓ Ninguno' : `✓ ${winnerLabel.label}`) : '✓ Resuelta'}
+                        </span>
+                        {canEdit && (
+                          <button type="button" onClick={() => setEditingMarketId(m.id)}
+                            className="block ml-auto mt-1 text-xs font-semibold" style={{ color: 'var(--accent)' }}>
+                            ✏️ Cambiar
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div key={m.id} className="rounded-xl p-3" style={{ border: '1px solid var(--accent)' }}>
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <p className="text-sm font-semibold">{m.description}</p>
+                        {m.resolved && (
+                          <button type="button" onClick={() => setEditingMarketId(null)}
+                            className="shrink-0 text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>
+                            Cancelar
+                          </button>
+                        )}
+                      </div>
+                      <select
+                        value=""
+                        disabled={busy}
+                        onChange={e => { if (e.target.value) resolvePendingMarket(m.id, e.target.value, false) }}
+                        className="w-full text-sm rounded-lg px-3 py-2 outline-none disabled:opacity-40"
+                        style={{ background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)' }}
+                      >
+                        <option value="">{busy ? 'Guardando…' : 'Elegir respuesta...'}</option>
+                        {m.options.filter(o => !o.is_none).map(o => (
+                          <option key={o.id} value={o.id}>{o.label}</option>
+                        ))}
+                      </select>
+                      <div className="flex gap-2 mt-2">
+                        {m.options.some(o => o.is_none) && (
+                          <button type="button" disabled={busy}
+                            onClick={() => resolvePendingMarket(m.id, m.options.find(o => o.is_none)!.id, false)}
+                            className="flex-1 text-xs font-semibold py-2 rounded-lg disabled:opacity-40"
+                            style={{ background: 'var(--surface2)', color: 'var(--text-muted)' }}>
+                            Ninguno ocurrió
+                          </button>
+                        )}
+                        <button type="button" disabled={busy}
+                          onClick={() => resolvePendingMarket(m.id, null, true)}
+                          className="flex-1 text-xs font-semibold py-2 rounded-lg disabled:opacity-40"
+                          style={{ background: 'var(--orange-bg)', color: '#7A5A1E' }}>
+                          Anular (devolver fichas)
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </>
+            )}
+          </div>
+
+          {/* 3 · Liquidar jornada (solo con todo resuelto) */}
+          <div className="rounded-xl p-4 space-y-3" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
+            <p className="text-sm font-semibold">🏆 Liquidar jornada</p>
+            {betsStatus?.settled ? (
+              <p className="text-sm font-semibold" style={{ color: 'var(--green)' }}>✓ Jornada liquidada — fichas repartidas y puntos asignados.</p>
+            ) : (
+              <>
+                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                  Reparte las fichas, asigna los puntos de apuestas y avisa a los jugadores.
+                </p>
+                {settleError && <p className="text-xs" style={{ color: 'var(--red)' }}>⚠ {settleError}</p>}
+                <button type="button" onClick={handleSettle}
+                  disabled={!resultSaved || !betsStatus || pendingList.length > 0 || settling}
+                  className="w-full py-3 rounded-xl font-semibold transition hover:opacity-90 disabled:opacity-40"
+                  style={{ background: 'var(--green)', color: '#fff' }}>
+                  {settling ? 'Liquidando...'
+                    : !resultSaved ? 'Guarda primero el resultado'
+                    : pendingList.length > 0 ? `Faltan ${pendingList.length} preguntas por resolver`
+                    : '🏆 Liquidar jornada'}
+                </button>
+              </>
+            )}
+          </div>
+
+          {resultSaved && (
             <div className="space-y-2">
-              <div className="w-full py-3 rounded-xl font-semibold text-center" style={{ background: 'var(--green)', color: '#fff' }}>
-                ✓ Guardado
-              </div>
-              {/* El resultado ya resuelve solo "Ganador"/"Resultado por
-                  sets"/etc, pero las preguntas anecdóticas (doble falta,
-                  smash al cristal...) no se pueden deducir del marcador —
-                  hay que resolverlas a mano, o la jornada se queda sin
-                  poder liquidarse nunca. */}
-              {betsStatus && betsStatus.pending.length > 0 && (
-                <Link href={`/admin/jornadas/${roundId}/mercados`}
-                  className="block w-full py-3 rounded-xl font-semibold text-center transition hover:opacity-90"
-                  style={{ background: 'var(--orange-bg)', color: 'var(--orange)' }}>
-                  ⚠️ Resolver las {betsStatus.pending.length} preguntas de apuestas pendientes →
-                </Link>
-              )}
-              <button type="button" onClick={() => setSaved(false)}
-                className="w-full py-2 text-sm font-semibold text-center"
-                style={{ color: 'var(--text-muted)' }}>
-                ✏️ Corregir resultado
-              </button>
               <button type="button" onClick={handleShare}
                 className="w-full py-3 rounded-xl font-semibold transition hover:opacity-90"
                 style={{ background: '#25D366', color: '#fff' }}>
@@ -523,123 +610,7 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
                 Volver a la Liga
               </button>
             </div>
-          ) : (
-            <button type="submit" disabled={loading || !winner}
-              className="w-full py-3 rounded-xl font-semibold transition hover:opacity-90 disabled:opacity-40"
-              style={{ background: 'var(--accent)', color: '#fff' }}>
-              {setsError ? 'Revisa el marcador' :
-                needsThirdSet ? 'Falta el 3.º set' :
-                !winner ? 'Completa el marcador primero' :
-                loading ? 'Guardando...' : alreadySettled ? 'Guardar cambio de resultado' : 'Guardar resultado'}
-            </button>
           )}
-        </form>
-      )}
-
-      {loadState === 'ready' && winner && betsStatus && (
-        <div className="rounded-xl p-4 space-y-3" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
-          <p className="text-sm font-semibold">🎰 Apuestas de la jornada</p>
-          {betsStatus.pending.length > 0 ? (
-            <>
-              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                Quedan <strong>{betsStatus.pending.length}</strong> preguntas por resolver. Se guarda el resultado primero y luego las resuelves aquí mismo.
-              </p>
-              <button type="button" onClick={() => setPendingMarkets(betsStatus.pending)}
-                className="w-full py-3 rounded-xl font-semibold transition hover:opacity-90"
-                style={{ background: 'var(--accent)', color: '#fff' }}>
-                🎯 Resolver apuestas
-              </button>
-            </>
-          ) : betsStatus.settled ? (
-            <p className="text-sm font-semibold" style={{ color: 'var(--green)' }}>✓ Jornada liquidada — fichas repartidas y puntos asignados.</p>
-          ) : (
-            <>
-              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Todas las preguntas están resueltas. Falta repartir las fichas y asignar los puntos.</p>
-              {settleError && <p className="text-xs" style={{ color: 'var(--red)' }}>⚠ {settleError}</p>}
-              <button type="button" onClick={handleSettle} disabled={settling}
-                className="w-full py-3 rounded-xl font-semibold transition hover:opacity-90 disabled:opacity-50"
-                style={{ background: 'var(--green)', color: '#fff' }}>
-                {settling ? 'Liquidando...' : '🏆 Liquidar jornada'}
-              </button>
-            </>
-          )}
-        </div>
-      )}
-
-      {pendingMarkets && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" style={{ background: 'rgba(0,0,0,0.5)' }}>
-          <div className="w-full sm:max-w-md max-h-[85vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl p-4" style={{ background: 'var(--surface)' }}>
-            <div className="flex items-start justify-between gap-2 mb-1">
-              <h2 className="font-bold text-base">✓ Resultado guardado · resuelve las preguntas pendientes</h2>
-              <button
-                type="button"
-                onClick={() => setPendingMarkets(null)}
-                aria-label="Cerrar y resolver más tarde"
-                className="shrink-0 text-lg font-bold px-1"
-                style={{ color: 'var(--text-muted2)' }}
-              >
-                ✕
-              </button>
-            </div>
-            <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>
-              Quedan <strong>{pendingMarkets.length}</strong> por resolver o anular. La jornada no queda marcada como jugada hasta hacerlo.
-            </p>
-            <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>
-              Si ahora mismo no te acuerdas de alguna, cierra con la ✕ — el resultado ya está guardado, y puedes terminarlas más tarde desde Mercados.
-            </p>
-            <div className="flex flex-col gap-4">
-              {pendingMarkets.map(m => (
-                <div key={m.id} className="rounded-xl p-3" style={{ border: '1px solid var(--border)' }}>
-                  <p className="text-sm font-semibold mb-2">{m.description}</p>
-                  <div className="flex gap-2">
-                    <select
-                      value={pendingSelection[m.id] ?? ''}
-                      onChange={e => setPendingSelection(s => ({ ...s, [m.id]: e.target.value }))}
-                      className="flex-1 text-sm rounded-lg px-3 py-2 outline-none"
-                      style={{ background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)' }}
-                    >
-                      <option value="">Seleccionar...</option>
-                      {m.options.filter(o => !o.is_none).map(o => (
-                        <option key={o.id} value={o.id}>{o.label}</option>
-                      ))}
-                    </select>
-                    <button
-                      type="button"
-                      disabled={!pendingSelection[m.id] || resolvingMarketId === m.id}
-                      onClick={() => resolvePendingMarket(m.id, pendingSelection[m.id], false)}
-                      className="px-3 py-2 rounded-lg text-sm font-semibold disabled:opacity-40"
-                      style={{ background: 'var(--green)', color: '#fff' }}
-                    >
-                      {resolvingMarketId === m.id ? '...' : 'Resolver'}
-                    </button>
-                  </div>
-                  <div className="flex gap-2 mt-2">
-                    {m.options.some(o => o.is_none) && (
-                      <button
-                        type="button"
-                        disabled={resolvingMarketId === m.id}
-                        onClick={() => resolvePendingMarket(m.id, m.options.find(o => o.is_none)!.id, false)}
-                        className="flex-1 text-xs font-semibold py-2 rounded-lg disabled:opacity-40"
-                        style={{ background: 'var(--surface2)', color: 'var(--text-muted)' }}
-                      >
-                        Ninguno ocurrió
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      disabled={resolvingMarketId === m.id}
-                      onClick={() => resolvePendingMarket(m.id, null, true)}
-                      className="flex-1 text-xs font-semibold py-2 rounded-lg disabled:opacity-40"
-                      style={{ background: 'var(--orange-bg)', color: '#7A5A1E' }}
-                    >
-                      Anular (devolver fichas)
-                    </button>
-                  </div>
-                </div>
-              ))}
-              {saveError && <p className="text-sm text-center" style={{ color: 'var(--red)' }}>⚠ {saveError}</p>}
-            </div>
-          </div>
         </div>
       )}
     </div>
