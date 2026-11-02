@@ -2,7 +2,7 @@ import { sortIndividualStandings } from '@/lib/standings'
 import type { IndividualStanding } from '@/lib/types'
 import { NextResponse } from 'next/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { createPushAdminClient, sendPushToAll, sendPushToPlayers } from '@/lib/push'
+import { createPushAdminClient, sendPushToAll } from '@/lib/push'
 import { madridDateTimeToUtc } from '@/lib/betting'
 import webpush from 'web-push'
 
@@ -40,15 +40,13 @@ export async function GET(request: Request) {
   }
 
   const type = new URL(request.url).searchParams.get('type')
-  if (type !== 'dayBefore' && type !== 'reminder120' && type !== 'betAgainstYou') {
-    return NextResponse.json({ error: 'type debe ser dayBefore, reminder120 o betAgainstYou' }, { status: 400 })
+  // 'reminder120' es el nombre antiguo del aviso previo al partido: se acepta
+  // como alias para no romper el workflow de GitHub mientras se despliega.
+  if (type !== 'dayBefore' && type !== 'reminder' && type !== 'reminder120') {
+    return NextResponse.json({ error: 'type debe ser dayBefore o reminder' }, { status: 400 })
   }
 
   const admin = createPushAdminClient()
-
-  if (type === 'betAgainstYou') {
-    return handleBetAgainstYou(admin)
-  }
 
   // "Hoy" y "mañana" en huso de Barcelona/Madrid (España solo tiene un
   // huso, Europe/Madrid), no en UTC del servidor.
@@ -122,22 +120,25 @@ export async function GET(request: Request) {
     return NextResponse.json(result)
   }
 
-  // "reminder120": se llama cada ~15 min (GitHub Actions, no cron de
-  // Vercel — el plan Hobby no permite crons más frecuentes que 1/día).
-  // Solo manda el aviso si el partido empieza dentro de los próximos
-  // 105-135 min (ventana centrada en 120 y con margen para el propio
-  // intervalo de 15 min entre comprobaciones) y todavía no se avisó.
+  // "reminder": se llama cada ~15 min (GitHub Actions, no cron de Vercel
+  // — el plan Hobby no permite crons más frecuentes que 1/día). Un solo
+  // aviso por partido, a falta de ~1 h: justo cuando el mercado de
+  // apuestas ya cerró (cierra 1 h antes), así que ya se puede decir si
+  // alguien ha apostado en tu contra sin revelar nada a destiempo.
+  // Ventana de 30 a 60 min, con margen para el intervalo entre
+  // comprobaciones. `reminder_120_sent_at` conserva su nombre antiguo
+  // pero marca "ya avisado" para este aviso.
   if (round.reminder_120_sent_at) return NextResponse.json({ sent: 0, reason: 'ya se avisó para esta jornada' })
 
   const matchDateTime = madridDateTimeToUtc(round.scheduled_date!, round.scheduled_time!)
   const minutesUntil = (matchDateTime.getTime() - now.getTime()) / 60000
-  if (minutesUntil < 105 || minutesUntil > 135) {
+  if (minutesUntil < 30 || minutesUntil > 60) {
     return NextResponse.json({ sent: 0, reason: `fuera de ventana (quedan ${Math.round(minutesUntil)} min)` })
   }
 
-  // Mensaje personalizado según la clasificación de cada jugador, así
-  // que no puede ir por sendPushToAll (payload único para todos) — se
-  // manda uno a uno.
+  // Mensaje personalizado según la clasificación de cada jugador (y si
+  // alguien ha apostado en su contra), así que no puede ir por
+  // sendPushToAll (payload único para todos) — se manda uno a uno.
   webpush.setVapidDetails(process.env.VAPID_SUBJECT, process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY, process.env.VAPID_PRIVATE_KEY)
 
   const { data: subs } = await admin.from('push_subscriptions').select('*')
@@ -148,13 +149,19 @@ export async function GET(request: Request) {
     .select('*')
     .eq('season_id', season.id)
   const ranked = sortIndividualStandings((standings ?? []) as IndividualStanding[])
+  const betAgainst = await playersWithBetsAgainst(admin, round.id)
 
   let sent = 0
   const toDelete: string[] = []
   for (const sub of subs) {
     const rank = ranked.findIndex(r => r.player_id === sub.player_id)
     const line = rank === -1 ? 'Esta noche, a por todas 🎾' : pickLine(rank, ranked.length)
-    const payload = { title: '⏰ El partido empieza en 120 min', body: line, url: '/dashboard' }
+    const against = betAgainst.has(sub.player_id)
+    const payload = {
+      title: '⏰ El partido empieza en 1 h',
+      body: against ? `${line}\n🎲 Alguien ha apostado en tu contra` : line,
+      url: against ? '/liga?tab=apuestas' : '/dashboard',
+    }
     try {
       await webpush.sendNotification(
         { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
@@ -172,68 +179,30 @@ export async function GET(request: Request) {
   return NextResponse.json({ sent, removed: toDelete.length })
 }
 
-// Aviso "alguien ha apostado en tu contra" — se comprueba cada ~15 min
-// (mismo workflow de GitHub Actions) y solo avisa una vez por
-// jornada, a los 60 min del partido, y solo si de verdad hay al menos
-// una apuesta hecha sobre la opción de ese jugador en una pregunta de
-// tipo "jugador" (nunca dice quién apostó ni cuántas fichas).
-async function handleBetAgainstYou(admin: SupabaseClient) {
-  const now = new Date()
+// Jugadores sobre los que otro jugador ha apostado EN CONTRA: apuestas de
+// otros a una opción "negativa" de ese jugador (las que no se pueden
+// apostar sobre uno mismo, `is_self_negative`). Nunca dice quién apostó ni
+// cuántas fichas. Se llama con el mercado ya cerrado.
+async function playersWithBetsAgainst(admin: SupabaseClient, roundId: string): Promise<Set<string>> {
+  const { data: markets } = await admin
+    .from('betting_markets')
+    .select('id, options:betting_options!market_id(id, player_id, is_self_negative)')
+    .eq('round_id', roundId)
+    .eq('type', 'player')
 
-  const { data: rounds } = await admin
-    .from('rounds')
-    .select('id, round_number, scheduled_date, scheduled_time, bet_against_notified_at')
-    .eq('status', 'scheduled')
-    .is('bet_against_notified_at', null)
-    .not('scheduled_date', 'is', null)
-    .not('scheduled_time', 'is', null)
-
-  if (!rounds?.length) return NextResponse.json({ sent: 0, reason: 'sin jornadas pendientes de aviso' })
-
-  let totalSent = 0
-  const notifiedRounds: string[] = []
-
-  for (const round of rounds) {
-    const matchDateTime = madridDateTimeToUtc(round.scheduled_date!, round.scheduled_time!)
-    const minutesUntilMatch = (matchDateTime.getTime() - now.getTime()) / 60000
-    // Ventana de aviso: centrada en 60 min antes del partido, con
-    // margen de ±15 min para el propio intervalo entre comprobaciones.
-    if (minutesUntilMatch < 45 || minutesUntilMatch > 75) continue
-
-    const { data: markets } = await admin
-      .from('betting_markets')
-      .select('id, options:betting_options!market_id(id, player_id)')
-      .eq('round_id', round.id)
-      .eq('type', 'player')
-
-    const optionToPlayer = new Map<string, string>()
-    for (const m of markets ?? []) {
-      for (const o of (m.options as { id: string; player_id: string | null }[] | null) ?? []) {
-        if (o.player_id) optionToPlayer.set(o.id, o.player_id)
-      }
+  const optionToPlayer = new Map<string, string>()
+  for (const m of markets ?? []) {
+    for (const o of (m.options as { id: string; player_id: string | null; is_self_negative: boolean }[] | null) ?? []) {
+      if (o.player_id && o.is_self_negative) optionToPlayer.set(o.id, o.player_id)
     }
-
-    const targetPlayerIds = new Set<string>()
-    if (optionToPlayer.size > 0) {
-      const { data: betRows } = await admin.from('bets').select('option_id').in('option_id', [...optionToPlayer.keys()])
-      for (const b of betRows ?? []) {
-        const playerId = optionToPlayer.get(b.option_id)
-        if (playerId) targetPlayerIds.add(playerId)
-      }
-    }
-
-    if (targetPlayerIds.size > 0) {
-      const result = await sendPushToPlayers(admin, [...targetPlayerIds], {
-        title: '🎲 Alguien ha apostado en tu contra',
-        body: `Jornada ${round.round_number} — se ha hecho una apuesta sobre ti antes del partido.`,
-        url: '/liga?tab=apuestas',
-      })
-      totalSent += result.sent
-    }
-
-    await admin.from('rounds').update({ bet_against_notified_at: now.toISOString() }).eq('id', round.id)
-    notifiedRounds.push(round.id)
   }
 
-  return NextResponse.json({ sent: totalSent, rounds: notifiedRounds })
+  const targets = new Set<string>()
+  if (optionToPlayer.size === 0) return targets
+  const { data: betRows } = await admin.from('bets').select('option_id, player_id').in('option_id', [...optionToPlayer.keys()])
+  for (const b of betRows ?? []) {
+    const target = optionToPlayer.get(b.option_id)
+    if (target && b.player_id !== target) targets.add(target)
+  }
+  return targets
 }

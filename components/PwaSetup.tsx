@@ -137,7 +137,7 @@ export default function PwaSetup() {
         <div>
           {!pushOk && (
             <p className="text-xs mb-2" style={{ color: 'var(--text-muted)' }}>
-              Te avisamos el día antes y 2h antes de cada partido, si alguien apuesta en tu contra 1h antes, cuando se abren las apuestas y cuando se liquida tu jornada.
+              Te avisamos cuando se abren las apuestas, el día antes del partido y 1 h antes (con un aviso extra si alguien ha apostado en tu contra).
             </p>
           )}
           <button

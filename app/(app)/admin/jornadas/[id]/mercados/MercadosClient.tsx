@@ -7,7 +7,6 @@ import type { BettingMarket, BettingOption, BettingQuestionTemplate, Profile } f
 import AddQuestionPicker from '@/components/AddQuestionPicker'
 import { revalidateLigaData } from '@/lib/actions'
 import { friendlyError } from '@/lib/errors'
-import { notifySettlementResults } from '@/lib/settlement-actions'
 
 export type MarketWithAll = BettingMarket & {
   options: (BettingOption & { player?: Profile })[]
@@ -191,10 +190,8 @@ export default function MercadosClient({ roundId, initialMarkets, initialCatalog
       setPayoutError(friendlyError(error.message, 'No se pudo liquidar la jornada.'))
       return
     }
-    // Limpieza del catálogo y aviso push (ambos best-effort: si fallan
-    // no bloquean la liquidación, que es lo que de verdad importa aquí).
+    // Limpieza del catálogo (best-effort: si falla no bloquea la liquidación).
     await supabase.rpc('prune_stale_question_templates')
-    await notifySettlementResults(roundId)
     await revalidateLigaData()
     setPayoutsCalculated(true)
     setIsSettled(true)

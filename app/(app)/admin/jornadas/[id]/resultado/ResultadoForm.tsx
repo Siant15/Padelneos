@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation'
 import { isValidSetScore } from '@/lib/types'
 import { revalidateLigaData } from '@/lib/actions'
 import { friendlyError } from '@/lib/errors'
-import { notifySettlementResults } from '@/lib/settlement-actions'
 import { rescheduleFollowingRounds } from '@/lib/schedule-actions'
 
 type PairForm = { team1_p1_id: string; team1_p2_id: string; team2_p1_id: string; team2_p2_id: string }
@@ -108,7 +107,7 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
     const resettle = !!betsStatus?.settled
     if (!window.confirm(resettle
       ? '¿Volver a liquidar? Se deshace el reparto anterior (incluidos los jackpots que tocara) y se recalcula con el resultado y las respuestas actuales.'
-      : '¿Liquidar la jornada? Se repartirán las fichas, se asignarán los puntos de apuestas y se avisará a los jugadores.')) return
+      : '¿Liquidar la jornada? Se repartirán las fichas y se asignarán los puntos de apuestas.')) return
     setSettling(true)
     setSettleError('')
     const { error } = await supabase.rpc('settle_round', { p_round_id: roundId })
@@ -118,9 +117,6 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
       return
     }
     await supabase.rpc('prune_stale_question_templates')
-    if (!resettle) {
-      try { await notifySettlementResults(roundId) } catch { /* el aviso es secundario: la liquidación ya está hecha */ }
-    }
     await revalidateLigaData()
     await loadBetsStatus()
     setSettling(false)
@@ -622,7 +618,7 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
             ) : (
               <>
                 <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                  Reparte las fichas, asigna los puntos de apuestas y avisa a los jugadores.
+                  Reparte las fichas y asigna los puntos de apuestas.
                 </p>
                 {settleError && <p className="text-xs" style={{ color: 'var(--red)' }}>⚠ {settleError}</p>}
                 <button type="button" onClick={handleSettle}
