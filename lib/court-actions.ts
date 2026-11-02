@@ -14,32 +14,49 @@ export async function confirmCourtReservation(roundId: string): Promise<{ error:
   if (!user) return { error: 'No hay sesión' }
 
   const supabase = await createClient()
-  const { error } = await supabase.from('rounds').update({ court_confirmed: true }).eq('id', roundId)
+  const { data: round, error: readError } = await supabase
+    .from('rounds')
+    .select('round_number, scheduled_date, scheduled_time, club, status, court_confirmed')
+    .eq('id', roundId)
+    .maybeSingle()
+  if (readError) return { error: readError.message }
+  if (!round) return { error: 'No se encontró la jornada' }
+  if (round.status !== 'scheduled') return { error: 'Esta jornada ya no está programada' }
+  if (!round.scheduled_date || !round.scheduled_time || !round.club) {
+    return { error: 'Faltan día, hora o club para confirmar la reserva' }
+  }
+  // Ya confirmada: no se vuelve a avisar a nadie.
+  if (round.court_confirmed) return { error: null }
+
+  // El filtro court_confirmed = false hace que, si dos personas confirman a
+  // la vez, solo una cambie la fila (y solo esa manda el aviso).
+  const { data: updated, error } = await supabase
+    .from('rounds')
+    .update({ court_confirmed: true })
+    .eq('id', roundId)
+    .eq('court_confirmed', false)
+    .select('id')
   if (error) return { error: error.message }
 
   updateTag('liga-data')
+  if (!updated?.length) return { error: null }
 
   // El aviso push es "a mejor esfuerzo": si falla, la reserva ya quedó
   // confirmada de todas formas y no queremos que el usuario vea un
   // error por algo que no depende de él.
   try {
     const admin = createPushAdminClient()
-    const { data: round } = await admin.from('rounds').select('round_number, scheduled_date, scheduled_time, club').eq('id', roundId).maybeSingle()
-    if (round) {
-      const dateLabel = round.scheduled_date ? formatDate(round.scheduled_date) : null
-      const timeLabel = round.scheduled_time ? formatTime(round.scheduled_time) : null
-      const body = [
-        [dateLabel, timeLabel].filter(Boolean).join(' · '),
-        round.club ?? null,
-        'Haz tus apuestas',
-      ].filter(Boolean).join('\n')
+    const body = [
+      [formatDate(round.scheduled_date), formatTime(round.scheduled_time)].join(' · '),
+      round.club,
+      'Haz tus apuestas',
+    ].join('\n')
 
-      await sendPushToAll(admin, {
-        title: `💰 Apuestas abiertas · Jornada ${round.round_number}`,
-        body,
-        url: '/liga?tab=apuestas',
-      })
-    }
+    await sendPushToAll(admin, {
+      title: `💰 Apuestas abiertas · Jornada ${round.round_number}`,
+      body,
+      url: '/liga?tab=apuestas',
+    })
   } catch {
     // best-effort, no bloquea la confirmación
   }

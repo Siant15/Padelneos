@@ -2,7 +2,7 @@ import { Suspense } from 'react'
 import { getCachedUser } from '@/lib/supabase/server'
 import type { IndividualStanding, PairStanding } from '@/lib/types'
 import { formatDate, getJornadaReservaStatus } from '@/lib/types'
-import { todayMadrid } from '@/lib/rounds'
+import { todayMadrid, leagueFinished } from '@/lib/rounds'
 import { sortIndividualStandings, sortPairStandings } from '@/lib/standings'
 import { marketCloseTime } from '@/lib/betting'
 import LigaTabs from '@/components/LigaTabs'
@@ -242,8 +242,8 @@ export default async function LigaPage() {
   const activeSeasonForTabs = activeSeasonRow
     ? { id: activeSeasonRow.id, name: activeSeasonRow.name, minMatches: activeSeasonRow.min_matches }
     : null
-  const finalRound = (rounds ?? []).find(r => r.round_number === activeSeasonRow?.min_matches)
-  const isLeagueComplete = !!finalRound && finalRound.status === 'played'
+  // Liga terminada: no queda ninguna jornada programada y hay alguna jugada (mismo criterio que Inicio).
+  const isLeagueComplete = leagueFinished(rounds ?? [])
 
   return (
     <div className="px-5 pt-5 pb-6">

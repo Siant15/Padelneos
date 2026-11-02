@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import FinishSeasonCard from '@/components/FinishSeasonCard'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -63,24 +64,15 @@ export default function CalendarioTab({
 
       {action === null && (
         isLeagueComplete ? (
-          <div className="rounded-2xl p-4 flex flex-col gap-2.5" style={{ background: 'var(--surface2)' }}>
-            <p className="font-heading font-bold text-sm">🏁 Final previsto de la liga — J{activeSeason.minMatches}</p>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setAction('extend')}
-                className="flex-1 text-center text-xs font-bold py-2.5 rounded-xl transition hover:opacity-90"
-                style={{ background: 'var(--tint)', color: '#555' }}
-              >
-                Alargar esta liga
-              </button>
-              <button
-                onClick={() => setAction('new')}
-                className="flex-1 text-center text-xs font-bold py-2.5 rounded-xl transition hover:opacity-90"
-                style={{ background: 'var(--accent)', color: '#fff' }}
-              >
-                Empezar nueva liga
-              </button>
-            </div>
+          <div className="flex flex-col gap-2.5">
+            <FinishSeasonCard seasonId={activeSeason.id} seasonName={activeSeason.name} />
+            <button
+              onClick={() => setAction('extend')}
+              className="w-full text-center text-xs font-bold py-2.5 rounded-xl transition hover:opacity-90"
+              style={{ background: 'var(--tint)', color: '#555' }}
+            >
+              Alargar esta liga
+            </button>
           </div>
         ) : (
           <div className="rounded-2xl px-4 py-3 flex items-center justify-between" style={{ background: 'var(--surface2)' }}>

@@ -1,5 +1,6 @@
 import { createClient, getCachedUser } from '@/lib/supabase/server'
 import EditarJornadaForm from './EditarJornadaForm'
+import { isAdminUser } from '@/lib/admin'
 
 export default async function EditarJornadaPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: roundId } = await params
@@ -30,6 +31,7 @@ export default async function EditarJornadaPage({ params }: { params: Promise<{ 
       players={players ?? []}
       initialHasResult={!!match?.winner}
       isResponsable={!!user && user.id === round?.court_booker_id}
+      isAdmin={isAdminUser(user)}
       initialForm={{
         scheduled_date: round?.scheduled_date ?? '',
         scheduled_time: round?.scheduled_time?.slice(0, 5) ?? '',

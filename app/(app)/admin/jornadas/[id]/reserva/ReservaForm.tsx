@@ -7,7 +7,7 @@ import { revalidateLigaData } from '@/lib/actions'
 import { rescheduleFollowingRounds } from '@/lib/schedule-actions'
 import ClubPicker from '@/components/ClubPicker'
 import { friendlyError } from '@/lib/errors'
-import { RESET_NOTIFICATION_FLAGS, todayMadrid } from '@/lib/rounds'
+import { RESET_NOTIFICATION_FLAGS, todayMadrid, isReservationRegistered } from '@/lib/rounds'
 
 type Form = { scheduled_date: string; scheduled_time: string; club: string; court_cost: string }
 
@@ -18,16 +18,19 @@ const inputStyle: React.CSSProperties = {
 
 // Pantalla corta solo para reservar la pista: día, hora, club y lo que
 // costó. Parejas, estado y responsable siguen en "Editar jornada".
-export default function ReservaForm({ roundId, roundNumber, bookerName, isResponsable, initial }: {
+export default function ReservaForm({ roundId, roundNumber, bookerName, isResponsable, isAdmin, initial }: {
   roundId: string
   roundNumber: number
   bookerName: string | null
   isResponsable: boolean
+  isAdmin: boolean
   initial: Form
 }) {
   const supabase = createClient()
   const router = useRouter()
   const [form, setForm] = useState<Form>(initial)
+  // Con día, hora y club ya registrados, solo el administrador puede cambiarlos.
+  const locked = !isAdmin && isReservationRegistered(initial)
   const [loading, setLoading] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
@@ -43,12 +46,14 @@ export default function ReservaForm({ roundId, roundNumber, bookerName, isRespon
     if (badCost) return
     setLoading(true)
     setError('')
-    const dateOrTimeChanged = form.scheduled_date !== initial.scheduled_date || form.scheduled_time !== initial.scheduled_time
+    const dateOrTimeChanged = !locked && (form.scheduled_date !== initial.scheduled_date || form.scheduled_time !== initial.scheduled_time)
     const { error: updateError } = await supabase.from('rounds').update({
       ...(dateOrTimeChanged ? RESET_NOTIFICATION_FLAGS : {}),
-      scheduled_date: form.scheduled_date || null,
-      scheduled_time: form.scheduled_time || null,
-      club: form.club || null,
+      ...(locked ? {} : {
+        scheduled_date: form.scheduled_date || null,
+        scheduled_time: form.scheduled_time || null,
+        club: form.club || null,
+      }),
       court_cost: isResponsable ? cost : undefined,
     }).eq('id', roundId)
     if (updateError) {
@@ -56,7 +61,7 @@ export default function ReservaForm({ roundId, roundNumber, bookerName, isRespon
       setLoading(false)
       return
     }
-    if (form.scheduled_date !== initial.scheduled_date) await rescheduleFollowingRounds(roundId)
+    if (!locked && form.scheduled_date !== initial.scheduled_date) await rescheduleFollowingRounds(roundId)
     await revalidateLigaData()
     setSaved(true)
     setLoading(false)
@@ -74,7 +79,14 @@ export default function ReservaForm({ roundId, roundNumber, bookerName, isRespon
         Responsable de la reserva: <strong>{bookerName ?? 'sin asignar'}</strong>
       </p>
 
+      {locked && (
+        <p className="rounded-xl p-3 text-xs font-semibold" style={{ background: 'var(--orange-bg)', color: '#7A5A1E' }}>
+          🔒 La reserva ya está registrada (día, hora y club). Solo el administrador puede cambiarla. Aquí solo puedes poner el importe de la pista.
+        </p>
+      )}
+
       <form onSubmit={handleSubmit} className="space-y-4">
+        <fieldset disabled={locked} className="space-y-4 min-w-0 border-0 p-0 m-0">
         <div>
           <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-muted)' }}>📅 Día</label>
           <input type="date" value={form.scheduled_date} onChange={e => setForm(f => ({ ...f, scheduled_date: e.target.value }))} style={inputStyle} />
@@ -94,6 +106,7 @@ export default function ReservaForm({ roundId, roundNumber, bookerName, isRespon
           <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-muted)' }}>📍 Club</label>
           <ClubPicker value={form.club} onChange={v => setForm(f => ({ ...f, club: v }))} />
         </div>
+        </fieldset>
 
         <div className="rounded-xl p-3.5 space-y-2" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
           <label className="block text-sm font-semibold">💸 Importe de la pista (€)</label>
@@ -113,7 +126,7 @@ export default function ReservaForm({ roundId, roundNumber, bookerName, isRespon
           {badCost && <p className="text-xs" style={{ color: 'var(--red)' }}>⚠ El importe no es válido.</p>}
         </div>
 
-        {missing.length > 0 && (
+        {!locked && missing.length > 0 && (
           <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
             Falta: {missing.join(', ')}. Mientras tanto la jornada aparece como «Pendiente de reserva».
           </p>

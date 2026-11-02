@@ -27,6 +27,7 @@ export const getCachedActiveSeason = unstable_cache(
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
+      .throwOnError()
     return data
   },
   ['active-season'],
@@ -35,7 +36,7 @@ export const getCachedActiveSeason = unstable_cache(
 
 export const getCachedPlayers = unstable_cache(
   async () => {
-    const { data } = await serviceClient().from('profiles').select('id, name')
+    const { data } = await serviceClient().from('profiles').select('id, name').throwOnError()
     return data ?? []
   },
   ['players'],
@@ -59,6 +60,7 @@ export const getCachedSeasonRounds = unstable_cache(
       `)
       .eq('season_id', seasonId)
       .order('round_number', { ascending: true })
+      .throwOnError()
     return data ?? []
   },
   ['season-rounds'],
@@ -69,16 +71,16 @@ export const getCachedSeasonAggregates = unstable_cache(
   async (seasonId: string, roundIds: string[]) => {
     const client = serviceClient()
     const [{ data: individual }, { data: pairs }, { data: marketsByRound }, { data: settlements }, { data: allBetResults }] = await Promise.all([
-      client.from('individual_standings').select('*').eq('season_id', seasonId).order('total_points', { ascending: false }).order('sport_points', { ascending: false }),
-      client.from('pair_standings').select('*').eq('season_id', seasonId).order('points', { ascending: false }).order('wins', { ascending: false }),
+      client.from('individual_standings').select('*').eq('season_id', seasonId).order('total_points', { ascending: false }).order('sport_points', { ascending: false }).throwOnError(),
+      client.from('pair_standings').select('*').eq('season_id', seasonId).order('points', { ascending: false }).order('wins', { ascending: false }).throwOnError(),
       roundIds.length
-        ? client.from('betting_markets').select('round_id, resolved').in('round_id', roundIds)
+        ? client.from('betting_markets').select('round_id, resolved').in('round_id', roundIds).throwOnError()
         : Promise.resolve({ data: [] as { round_id: string; resolved: boolean }[] }),
       roundIds.length
-        ? client.from('round_settlements').select('round_id').is('voided_at', null).in('round_id', roundIds)
+        ? client.from('round_settlements').select('round_id').is('voided_at', null).in('round_id', roundIds).throwOnError()
         : Promise.resolve({ data: [] as { round_id: string }[] }),
       roundIds.length
-        ? client.from('betting_round_results').select('round_id, player_id, rank, chips_net, point_bonus, player:profiles(id, name)').in('round_id', roundIds)
+        ? client.from('betting_round_results').select('round_id, player_id, rank, chips_net, point_bonus, player:profiles(id, name)').in('round_id', roundIds).throwOnError()
         : Promise.resolve({ data: [] as { round_id: string; player_id: string; rank: number; chips_net: number; point_bonus: number }[] }),
     ])
     return {
@@ -109,8 +111,8 @@ export const getCachedSeasonCourtExpenses = unstable_cache(
   async (seasonId: string): Promise<SeasonCourtExpenses> => {
     const client = serviceClient()
     const [{ data: players }, { data: rounds }] = await Promise.all([
-      client.from('profiles').select('id, name').order('name'),
-      client.from('rounds').select('court_booker_id, court_cost').eq('season_id', seasonId).not('court_cost', 'is', null),
+      client.from('profiles').select('id, name').order('name').throwOnError(),
+      client.from('rounds').select('court_booker_id, court_cost').eq('season_id', seasonId).not('court_cost', 'is', null).throwOnError(),
     ])
 
     const playerList = players ?? []
@@ -183,8 +185,8 @@ export const getCachedOpenRoundsBetting = unstable_cache(
     const client = serviceClient()
     const [contexts, { data: catalogTemplates }, { data: usageRows }] = await Promise.all([
       Promise.all(roundIds.map(id => getRoundBettingContext(client, id, userId))),
-      client.from('betting_question_templates').select('*').eq('active', true).order('text'),
-      client.from('betting_markets').select('template_id').not('template_id', 'is', null),
+      client.from('betting_question_templates').select('*').eq('active', true).order('text').throwOnError(),
+      client.from('betting_markets').select('template_id').not('template_id', 'is', null).throwOnError(),
     ])
 
     // "+ Añadir más preguntas" ordenada de más a menos usada, en vez de
@@ -207,10 +209,10 @@ export const getCachedOpenRoundsBetting = unstable_cache(
     // del otro, se piden a la vez (no una consulta detrás de otra).
     const [{ data: jackpots }, { data: betRows }] = await Promise.all([
       allTemplateIds.length
-        ? client.from('jackpots').select('template_id, chips').eq('season_id', seasonId).in('template_id', allTemplateIds)
+        ? client.from('jackpots').select('template_id, chips').eq('season_id', seasonId).in('template_id', allTemplateIds).throwOnError()
         : Promise.resolve({ data: [] as { template_id: string; chips: number }[] }),
       marketIds.length
-        ? client.from('bets').select('market_id, player_id').in('market_id', marketIds)
+        ? client.from('bets').select('market_id, player_id').in('market_id', marketIds).throwOnError()
         : Promise.resolve({ data: [] as { market_id: string; player_id: string }[] }),
     ])
     const jackpotByTemplate: Record<string, number> = {}

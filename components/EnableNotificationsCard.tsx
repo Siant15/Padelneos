@@ -67,7 +67,7 @@ export default function EnableNotificationsCard() {
         <>
           <h2 className="font-heading text-sm font-bold">🔔 Activa los avisos</h2>
           <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-            Te avisamos cuando se confirma la reserva, el día antes y 2 h antes del partido, y si alguien apuesta en tu contra.
+            Te avisamos cuando se abren las apuestas, el día antes del partido y 1 h antes (con un aviso extra si alguien ha apostado en tu contra).
           </p>
           <button
             onClick={enable}

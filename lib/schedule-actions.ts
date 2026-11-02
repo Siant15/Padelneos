@@ -3,7 +3,7 @@
 import { createClient, getCachedUser } from '@/lib/supabase/server'
 import { addDays, daysUntilNextRound } from '@/lib/schedule'
 import { updateTag } from 'next/cache'
-import { RESET_NOTIFICATION_FLAGS } from '@/lib/rounds'
+import { RESET_NOTIFICATION_FLAGS, isReservationRegistered } from '@/lib/rounds'
 
 // Recoloca las jornadas pendientes que vienen detrás de `roundId`: cada una
 // va 7 días después de la anterior (14 tras cada 3 partidos). Se llama al
@@ -23,7 +23,7 @@ export async function rescheduleFollowingRounds(roundId: string): Promise<{ erro
 
   const { data: later, error } = await supabase
     .from('rounds')
-    .select('id, round_number, scheduled_date, status, court_confirmed')
+    .select('id, round_number, scheduled_date, scheduled_time, club, status, court_confirmed')
     .eq('season_id', round.season_id)
     .gt('round_number', round.round_number)
     .order('round_number')
@@ -35,7 +35,7 @@ export async function rescheduleFollowingRounds(roundId: string): Promise<{ erro
 
   for (const r of later ?? []) {
     if (r.status === 'cancelled') continue
-    if (r.status === 'played' || r.court_confirmed) {
+    if (r.status === 'played' || r.court_confirmed || isReservationRegistered(r)) {
       prevDate = r.scheduled_date ?? prevDate
       prevNumber = r.round_number
       continue

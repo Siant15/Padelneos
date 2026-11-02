@@ -81,6 +81,9 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
   const [loading, setLoading] = useState(false)
   const [savedKey, setSavedKey] = useState(() => JSON.stringify(initialSets))
   const [saveError, setSaveError] = useState('')
+  // Clave del marcador cuyo guardado falló: no se reintenta solo (evita un bucle de errores), hay botón «Reintentar».
+  const [failedKey, setFailedKey] = useState<string | null>(null)
+  const [betsError, setBetsError] = useState(initialBets === null && mode === 'ready' ? 'No se pudo comprobar el estado de las apuestas. Recarga la página antes de continuar.' : '')
   const [loadState, setLoadState] = useState<'ready' | 'no-match'>(mode)
   const [pairForm, setPairForm] = useState<PairForm>({ team1_p1_id: '', team1_p2_id: '', team2_p1_id: '', team2_p2_id: '' })
   const [creatingMatch, setCreatingMatch] = useState(false)
@@ -94,33 +97,38 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
   // Estado de las apuestas de la jornada (preguntas sin resolver y si
   // ya está liquidada) para el bloque "Apuestas" de esta pantalla.
   const loadBetsStatus = useCallback(async () => {
-    const [{ data: markets }, { data: settlement }] = await Promise.all([
+    const [{ data: markets, error: marketsError }, { data: settlement, error: settlementError }] = await Promise.all([
       supabase.from('betting_markets')
         .select(BETS_SELECT)
         .eq('round_id', roundId).order('created_at'),
       supabase.from('round_settlements').select('id').eq('round_id', roundId).is('voided_at', null).maybeSingle(),
     ])
+    // Un fallo de lectura NO es «no queda nada pendiente»: se avisa y no se deja liquidar.
+    if (marketsError || settlementError) {
+      setBetsError('No se pudo comprobar el estado de las apuestas. Recarga la página antes de continuar.')
+      return
+    }
+    setBetsError('')
     setBetsStatus({ markets: (markets as unknown as BetMarket[] | null) ?? [], settled: !!settlement })
   }, [roundId, supabase])
 
   async function handleSettle() {
-    const resettle = !!betsStatus?.settled
-    if (!window.confirm(resettle
-      ? '¿Volver a liquidar? Se deshace el reparto anterior (incluidos los jackpots que tocara) y se recalcula con el resultado y las respuestas actuales.'
-      : '¿Liquidar la jornada? Se repartirán las fichas y se asignarán los puntos de apuestas.')) return
+    if (!window.confirm('¿Liquidar la jornada? Se repartirán las fichas y se asignarán los puntos de apuestas. Una vez liquidada, ya no se podrá corregir el resultado ni las respuestas.')) return
     setSettling(true)
     setSettleError('')
-    const { error } = await supabase.rpc('settle_round', { p_round_id: roundId })
-    if (error) {
+    try {
+      const { error } = await supabase.rpc('settle_round', { p_round_id: roundId })
+      if (error) {
+        setSettleError(friendlyError(error.message, 'No se pudo liquidar la jornada.'))
+        return
+      }
+      await supabase.rpc('prune_stale_question_templates')
+      await revalidateLigaData()
+      await loadBetsStatus()
+      router.refresh()
+    } finally {
       setSettling(false)
-      setSettleError(friendlyError(error.message, 'No se pudo liquidar la jornada.'))
-      return
     }
-    await supabase.rpc('prune_stale_question_templates')
-    await revalidateLigaData()
-    await loadBetsStatus()
-    setSettling(false)
-    router.refresh()
   }
 
   // Si el Server Component vuelve a renderizar con datos frescos (p.ej.
@@ -157,17 +165,6 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
   const currentKey = JSON.stringify(sets)
   const resultSaved = !!winner && currentKey === savedKey
 
-  // Autoguardado del marcador: en cuanto hay un resultado válido y distinto
-  // de lo guardado, se guarda tras una breve pausa. Si la jornada ya está
-  // liquidada no se guarda solo (cambiar el resultado mueve la clasificación):
-  // ahí hay un botón explícito.
-  useEffect(() => {
-    if (!matchId || !winner || alreadySettled || loading || currentKey === savedKey) return
-    const t = setTimeout(() => { saveResult() }, 800)
-    return () => clearTimeout(t)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentKey, winner, matchId, alreadySettled])
-
   // Orden natural al teclear un marcador: set 1 (pareja 1, pareja 2), set 2, set 3.
   function nextInputId(setIdx: number, team: 't1' | 't2', total: number) {
     if (team === 't1') return `set-${setIdx}-t2`
@@ -175,6 +172,7 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
   }
 
   function setScore(setIdx: number, team: 't1' | 't2', raw: string) {
+    if (alreadySettled) return
     // Un set de pádel nunca pasa de 7 juegos: se aceptan solo cifras 0-7.
     const value = raw.replace(/\D/g, '').slice(-1)
     if (value !== '' && parseInt(value, 10) > 7) return
@@ -234,79 +232,87 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
     setLoadState('ready')
   }
 
-  async function saveResult(manual = false) {
-    if (!matchId || !winner) return
-    if (manual && alreadySettled && !window.confirm('Esta jornada ya está liquidada. Si cambias el resultado, las apuestas automáticas se recalcularán y puede cambiar la clasificación. ¿Guardar igualmente?')) return
+  async function saveResult() {
+    if (!matchId || !winner || alreadySettled) return
     setLoading(true)
     setSaveError('')
 
     const key = JSON.stringify(sets)
-    const [s1, s2, s3] = sets
-
-    const { error: matchError } = await supabase.from('matches').update({
-      set1_t1: parseInt(s1.t1) || 0,
-      set1_t2: parseInt(s1.t2) || 0,
-      set2_t1: parseInt(s2.t1) || 0,
-      set2_t2: parseInt(s2.t2) || 0,
-      set3_t1: s3 ? parseInt(s3.t1) || 0 : null,
-      set3_t2: s3 ? parseInt(s3.t2) || 0 : null,
-      winner,
-      played_at: new Date().toISOString(),
-    }).eq('id', matchId)
-
-    if (matchError) {
-      setSaveError(friendlyError(matchError.message, 'No se pudo guardar el resultado.'))
-      setLoading(false)
-      return
+    const fail = (fallback: string, raw?: string) => {
+      setSaveError(friendlyError(raw, fallback))
+      setFailedKey(key)
     }
-    setSavedKey(key)
 
-    // Si se corrige un marcador ya guardado, las preguntas automáticas
-    // (ganador, sets, marcador exacto...) se reabren para volver a
-    // resolverlas con el marcador nuevo; si no, se pagarían con el viejo.
-    const { data: resolvedRows } = await supabase.from('betting_markets')
-      .select('id, type, template:betting_question_templates(category)')
-      .eq('round_id', roundId).eq('resolved', true)
-    const autoIds = ((resolvedRows ?? []) as unknown as { id: string; type: string; template: { category: string } | null }[])
-      .filter(m => m.type === 'exact_score' || m.template?.category === 'automatic')
-      .map(m => m.id)
-    if (autoIds.length) {
-      const { error: reopenError } = await supabase.from('betting_markets')
-        .update({ resolved: false, voided: false, winning_option_id: null }).in('id', autoIds)
-      if (reopenError) {
-        setSaveError(friendlyError(reopenError.message, 'Resultado guardado, pero no se pudieron recalcular las apuestas automáticas.'))
-        setLoading(false)
-        return
+    try {
+      const [s1, s2, s3] = sets
+
+      const { error: matchError } = await supabase.from('matches').update({
+        set1_t1: parseInt(s1.t1) || 0,
+        set1_t2: parseInt(s1.t2) || 0,
+        set2_t1: parseInt(s2.t1) || 0,
+        set2_t2: parseInt(s2.t2) || 0,
+        set3_t1: s3 ? parseInt(s3.t1) || 0 : null,
+        set3_t2: s3 ? parseInt(s3.t2) || 0 : null,
+        winner,
+        played_at: new Date().toISOString(),
+      }).eq('id', matchId)
+      if (matchError) return fail('No se pudo guardar el resultado.', matchError.message)
+
+      // Si se corrige un marcador ya guardado, las preguntas automáticas
+      // (ganador, sets, marcador exacto...) se reabren para volver a
+      // resolverlas con el marcador nuevo; si no, se pagarían con el viejo.
+      const { data: resolvedRows, error: readError } = await supabase.from('betting_markets')
+        .select('id, type, template:betting_question_templates(category)')
+        .eq('round_id', roundId).eq('resolved', true)
+      if (readError) return fail('Resultado guardado, pero no se pudieron comprobar las apuestas. Pulsa «Reintentar».', readError.message)
+      const autoIds = ((resolvedRows ?? []) as unknown as { id: string; type: string; template: { category: string } | null }[])
+        .filter(m => m.type === 'exact_score' || m.template?.category === 'automatic')
+        .map(m => m.id)
+      if (autoIds.length) {
+        const { error: reopenError } = await supabase.from('betting_markets')
+          .update({ resolved: false, voided: false, winning_option_id: null }).in('id', autoIds)
+        if (reopenError) return fail('Resultado guardado, pero no se pudieron recalcular las apuestas automáticas. Pulsa «Reintentar».', reopenError.message)
       }
-    }
 
-    // Con el resultado guardado la jornada cuenta ya como jugada (así todas
-    // las pantallas coinciden); liquidar las apuestas es un paso aparte.
-    const { data: flipped, error: statusError } = await supabase.from('rounds')
-      .update({ status: 'played' }).eq('id', roundId).eq('status', 'scheduled').select('id')
-    if (statusError) {
-      setSaveError(friendlyError(statusError.message, 'Resultado guardado, pero no se pudo marcar la jornada como jugada.'))
-    } else if (flipped?.length) {
-      await rescheduleFollowingRounds(roundId)
-    }
+      // Con el resultado guardado la jornada cuenta ya como jugada (así todas
+      // las pantallas coinciden); liquidar las apuestas es un paso aparte.
+      const { data: flipped, error: statusError } = await supabase.from('rounds')
+        .update({ status: 'played' }).eq('id', roundId).eq('status', 'scheduled').select('id')
+      if (statusError) return fail('Resultado guardado, pero no se pudo marcar la jornada como jugada. Pulsa «Reintentar».', statusError.message)
+      if (flipped?.length) {
+        const { error: rescheduleError } = await rescheduleFollowingRounds(roundId)
+        if (rescheduleError) setSaveError(friendlyError(rescheduleError, 'Resultado guardado, pero no se pudieron recolocar las fechas de las jornadas siguientes.'))
+      }
 
-    // Con el resultado guardado, las preguntas automaticas (ganador,
-    // resultado por sets, marcador exacto...) se resuelven solas; las
-    // anecdoticas se resuelven a mano en el bloque de apuestas.
-    const { error: autoResolveError } = await supabase.rpc('auto_resolve_round_markets', { p_round_id: roundId })
-    if (autoResolveError) {
-      setSaveError(friendlyError(autoResolveError.message, 'Resultado guardado, pero fallaron las apuestas automáticas.'))
-    }
+      // Las preguntas automáticas (ganador, resultado por sets, marcador
+      // exacto...) se resuelven solas; las de acta se resuelven a mano.
+      const { error: autoResolveError } = await supabase.rpc('auto_resolve_round_markets', { p_round_id: roundId })
+      if (autoResolveError) return fail('Resultado guardado, pero fallaron las apuestas automáticas. Pulsa «Reintentar».', autoResolveError.message)
 
-    await loadBetsStatus()
-    await revalidateLigaData()
-    setLoading(false)
-    // El autoguardado no recarga la pantalla (se perdería lo que se esté
-    // tecleando); solo en el guardado manual de una jornada liquidada.
-    if (alreadySettled) router.refresh()
+      // Solo ahora cuenta como guardado: si algo falló arriba, se puede reintentar.
+      setSavedKey(key)
+      setFailedKey(null)
+      await loadBetsStatus()
+      await revalidateLigaData()
+    } finally {
+      setLoading(false)
+    }
   }
 
+  // Autoguardado del marcador: en cuanto hay un resultado válido y distinto
+  // de lo guardado, se guarda tras una breve pausa. Con la jornada liquidada
+  // el marcador está cerrado: no se guarda nada. Si un guardado falla no se
+  // reintenta solo (botón «Reintentar»); `loading` está en las dependencias
+  // para que un cambio hecho mientras se guardaba se guarde al terminar.
+  useEffect(() => {
+    if (!matchId || !winner || alreadySettled || loading || currentKey === savedKey || currentKey === failedKey) return
+    const t = setTimeout(() => { saveResult() }, 800)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentKey, winner, matchId, alreadySettled, loading, savedKey, failedKey])
+
   async function resolvePendingMarket(marketId: string, winningOptionId: string | null, voided: boolean) {
+    if (alreadySettled) return
     setResolvingMarketId(marketId)
     setSaveError('')
     const { error } = await supabase.from('betting_markets').update({
@@ -424,7 +430,7 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
         <div className="space-y-5">
           {alreadySettled && (
             <div className="rounded-xl p-3 text-xs font-semibold" style={{ background: 'var(--orange-bg)', color: 'var(--orange)' }}>
-              🔒 Esta jornada ya está liquidada. Cambiar el resultado recalcula las apuestas automáticas y puede mover la clasificación.
+              🔒 Esta jornada ya está liquidada: el resultado y las respuestas no se pueden cambiar. Si hay un error, díselo al administrador.
             </div>
           )}
 
@@ -448,6 +454,7 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
               {sets.map((s, i) => (
                 <input key={i} id={`set-${i}-t1`} type="text" inputMode="numeric" maxLength={2} value={s.t1}
                   aria-label={`Set ${i + 1}, juegos de ${team1Players.map(p => p.name).join(' y ')}`}
+                  disabled={alreadySettled}
                   onChange={e => setScore(i, 't1', e.target.value)}
                   onFocus={e => e.target.select()}
                   className="text-center rounded-lg py-2 text-sm font-bold outline-none"
@@ -462,6 +469,7 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
               {sets.map((s, i) => (
                 <input key={i} id={`set-${i}-t2`} type="text" inputMode="numeric" maxLength={2} value={s.t2}
                   aria-label={`Set ${i + 1}, juegos de ${team2Players.map(p => p.name).join(' y ')}`}
+                  disabled={alreadySettled}
                   onChange={e => setScore(i, 't2', e.target.value)}
                   onFocus={e => e.target.select()}
                   className="text-center rounded-lg py-2 text-sm font-bold outline-none"
@@ -469,7 +477,7 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
               ))}
             </div>
 
-            {(hasThirdSet || !decidedInTwo) && (
+            {!alreadySettled && (hasThirdSet || !decidedInTwo) && (
               <button type="button" onClick={toggleThirdSet}
                 className="mt-3 text-xs px-3 py-1.5 rounded-lg transition hover:opacity-80"
                 style={{ border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
@@ -506,25 +514,27 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
 
 
           <div className="text-xs text-center -mt-2" style={{ color: 'var(--text-muted)' }}>
-            {saveError ? <span style={{ color: 'var(--red)' }}>⚠ {saveError}</span>
+            {alreadySettled ? '🔒 Resultado cerrado (jornada liquidada)'
+              : saveError ? <span style={{ color: 'var(--red)' }}>⚠ {saveError}</span>
               : loading ? 'Guardando…'
               : resultSaved ? <span style={{ color: 'var(--green)' }}>✓ Resultado guardado</span>
-              : winner && alreadySettled ? null
               : winner ? 'Guardando en un momento…'
               : 'Se guarda solo en cuanto el marcador esté completo.'}
           </div>
-          {winner && alreadySettled && !resultSaved && (
-            <button type="button" onClick={() => saveResult(true)} disabled={loading}
-              className="w-full py-3 rounded-xl font-semibold transition hover:opacity-90 disabled:opacity-40"
+          {!alreadySettled && failedKey !== null && failedKey === currentKey && !loading && (
+            <button type="button" onClick={() => setFailedKey(null)}
+              className="w-full py-3 rounded-xl font-semibold transition hover:opacity-90"
               style={{ background: 'var(--accent)', color: '#fff' }}>
-              {loading ? 'Guardando...' : 'Guardar cambio de resultado'}
+              Reintentar guardar
             </button>
           )}
 
           {/* 2 · Resolver apuestas (cada respuesta se guarda al elegirla) */}
           <div className="rounded-xl p-4 space-y-3" style={{ background: 'var(--surface)', border: '1px solid var(--border)', opacity: resultSaved && betsStatus ? 1 : 0.5 }}>
             <p className="text-sm font-semibold">🎰 Resolver apuestas</p>
-            {!resultSaved || !betsStatus ? (
+            {betsError ? (
+              <p className="text-xs" style={{ color: 'var(--red)' }}>⚠ {betsError}</p>
+            ) : !resultSaved || !betsStatus ? (
               <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Disponible cuando el resultado esté guardado.</p>
             ) : (
               <>
@@ -605,15 +615,8 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
               <>
                 <p className="text-sm font-semibold" style={{ color: 'var(--green)' }}>✓ Jornada liquidada — fichas repartidas y puntos asignados.</p>
                 <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                  Si has corregido el marcador o una respuesta, vuelve a liquidar para que el reparto use los datos nuevos.
+                  La liquidación es definitiva. Si hay un error, solo el administrador puede corregirlo.
                 </p>
-                {settleError && <p className="text-xs" style={{ color: 'var(--red)' }}>⚠ {settleError}</p>}
-                <button type="button" onClick={handleSettle}
-                  disabled={!resultSaved || pendingList.length > 0 || settling}
-                  className="w-full py-3 rounded-xl font-semibold transition hover:opacity-90 disabled:opacity-40"
-                  style={{ background: 'var(--surface2)', color: 'var(--text)', border: '1px solid var(--border)' }}>
-                  {settling ? 'Liquidando...' : pendingList.length > 0 ? `Faltan ${pendingList.length} preguntas por resolver` : '↻ Volver a liquidar'}
-                </button>
               </>
             ) : (
               <>
@@ -622,7 +625,7 @@ export default function ResultadoForm({ roundId, roundNumber, mode, matchId: ini
                 </p>
                 {settleError && <p className="text-xs" style={{ color: 'var(--red)' }}>⚠ {settleError}</p>}
                 <button type="button" onClick={handleSettle}
-                  disabled={!resultSaved || !betsStatus || pendingList.length > 0 || settling}
+                  disabled={!resultSaved || !betsStatus || !!betsError || pendingList.length > 0 || settling}
                   className="w-full py-3 rounded-xl font-semibold transition hover:opacity-90 disabled:opacity-40"
                   style={{ background: 'var(--green)', color: '#fff' }}>
                   {settling ? 'Liquidando...'

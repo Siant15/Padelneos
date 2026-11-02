@@ -32,12 +32,13 @@ export type RoundBettingContext = {
 
 export async function getRoundBettingContext(supabase: SupabaseClient, roundId: string, userId: string): Promise<RoundBettingContext> {
   const [{ data: round }, { data: markets }, { data: settlement }] = await Promise.all([
-    supabase.from('rounds').select('id, round_number, scheduled_date, scheduled_time, club, status, season_id').eq('id', roundId).maybeSingle(),
+    supabase.from('rounds').select('id, round_number, scheduled_date, scheduled_time, club, status, season_id').eq('id', roundId).maybeSingle().throwOnError(),
     supabase.from('betting_markets')
       .select('*, options:betting_options!market_id(*, player:profiles(id, name)), bets(*)')
       .eq('round_id', roundId)
-      .order('created_at'),
-    supabase.from('round_settlements').select('id').eq('round_id', roundId).is('voided_at', null).maybeSingle(),
+      .order('created_at')
+      .throwOnError(),
+    supabase.from('round_settlements').select('id').eq('round_id', roundId).is('voided_at', null).maybeSingle().throwOnError(),
   ])
 
   // Esta lectura va con service role (se salta RLS), así que aquí se
@@ -105,6 +106,7 @@ export async function getSeasonBettingRanking(supabase: SupabaseClient, seasonId
     .eq('season_id', seasonId)
     .order('points', { ascending: false })
     .order('best_round_chips', { ascending: false })
+    .throwOnError()
 
   return (data ?? []) as SeasonBettingRankingRow[]
 }
@@ -171,15 +173,16 @@ export async function getRoundActa(supabase: SupabaseClient, roundId: string, pr
         team1_p1:profiles!team1_p1_id(id, name), team1_p2:profiles!team1_p2_id(id, name),
         team2_p1:profiles!team2_p1_id(id, name), team2_p2:profiles!team2_p2_id(id, name)
       )`)
-      .eq('id', roundId).maybeSingle(),
+      .eq('id', roundId).maybeSingle().throwOnError(),
     supabase.from('betting_markets')
       .select('*, options:betting_options!market_id(*), bets(*)')
       .eq('round_id', roundId)
-      .order('created_at'),
-    supabase.from('round_settlements').select('id').eq('round_id', roundId).is('voided_at', null).maybeSingle(),
-    supabase.from('market_settlement_entries').select('*').eq('round_id', roundId),
-    supabase.from('betting_round_results').select('*, player:profiles(id, name)').eq('round_id', roundId).order('rank'),
-    preloadedPlayers ? Promise.resolve({ data: preloadedPlayers }) : supabase.from('profiles').select('id, name').order('created_at'),
+      .order('created_at')
+      .throwOnError(),
+    supabase.from('round_settlements').select('id').eq('round_id', roundId).is('voided_at', null).maybeSingle().throwOnError(),
+    supabase.from('market_settlement_entries').select('*').eq('round_id', roundId).throwOnError(),
+    supabase.from('betting_round_results').select('*, player:profiles(id, name)').eq('round_id', roundId).order('rank').throwOnError(),
+    preloadedPlayers ? Promise.resolve({ data: preloadedPlayers }) : supabase.from('profiles').select('id, name').order('created_at').throwOnError(),
   ])
   const players = playersResult.data
 

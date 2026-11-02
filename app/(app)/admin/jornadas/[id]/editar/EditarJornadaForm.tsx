@@ -8,7 +8,7 @@ import { revalidateLigaData } from '@/lib/actions'
 import { rescheduleFollowingRounds } from '@/lib/schedule-actions'
 import ClubPicker from '@/components/ClubPicker'
 import { friendlyError } from '@/lib/errors'
-import { RESET_NOTIFICATION_FLAGS } from '@/lib/rounds'
+import { RESET_NOTIFICATION_FLAGS, isReservationRegistered } from '@/lib/rounds'
 
 type PlayerLite = { id: string; name: string }
 
@@ -26,12 +26,13 @@ type FormState = {
   matchId: string
 }
 
-export default function EditarJornadaForm({ roundId, players, initialForm, initialHasResult, isResponsable }: {
+export default function EditarJornadaForm({ roundId, players, initialForm, initialHasResult, isResponsable, isAdmin }: {
   roundId: string
   players: PlayerLite[]
   initialForm: FormState
   initialHasResult: boolean
   isResponsable: boolean
+  isAdmin: boolean
 }) {
   const supabase = createClient()
   const router = useRouter()
@@ -58,6 +59,11 @@ export default function EditarJornadaForm({ roundId, players, initialForm, initi
   const hasDuplicatePlayers = new Set(pairIds).size !== pairIds.length
   const allPairsSelected = pairIds.length === 4
 
+  // Con día, hora y club registrados, y con las parejas definidas, solo el
+  // administrador puede cambiarlos (triggers 067: la base de datos también lo exige).
+  const reservationLocked = !isAdmin && isReservationRegistered(initialForm)
+  const pairsLocked = !isAdmin && !!(initialForm.matchId && initialForm.team1_p1_id && initialForm.team1_p2_id && initialForm.team2_p1_id && initialForm.team2_p2_id)
+
   const blockedPlayedWithoutResult = form.status === 'played' && !hasResult
   const blockedRevertWithResult = hasResult && form.status !== 'played'
 
@@ -67,16 +73,25 @@ export default function EditarJornadaForm({ roundId, players, initialForm, initi
     setLoading(true)
     setSaveError('')
 
-    const dateOrTimeChanged = form.scheduled_date !== initialForm.scheduled_date || form.scheduled_time !== initialForm.scheduled_time
-    const { error: roundError } = await supabase.from('rounds').update({
-      ...(dateOrTimeChanged ? RESET_NOTIFICATION_FLAGS : {}),
-      scheduled_date: form.scheduled_date || null,
-      scheduled_time: form.scheduled_time || null,
-      club: form.club || null,
-      court_booker_id: form.court_booker_id || null,
-      status: form.status,
-      court_cost: isResponsable ? (form.court_cost ? parseFloat(form.court_cost) : null) : undefined,
-    }).eq('id', roundId)
+    // Solo se envía lo que ha cambiado: así una pantalla abierta con datos
+    // viejos no pisa lo que otro jugador haya guardado entretanto.
+    const dateOrTimeChanged = !reservationLocked && (form.scheduled_date !== initialForm.scheduled_date || form.scheduled_time !== initialForm.scheduled_time)
+    const roundUpdate: Record<string, unknown> = {}
+    if (!reservationLocked) {
+      if (form.scheduled_date !== initialForm.scheduled_date) roundUpdate.scheduled_date = form.scheduled_date || null
+      if (form.scheduled_time !== initialForm.scheduled_time) roundUpdate.scheduled_time = form.scheduled_time || null
+      if (form.club !== initialForm.club) roundUpdate.club = form.club || null
+    }
+    if (dateOrTimeChanged) Object.assign(roundUpdate, RESET_NOTIFICATION_FLAGS)
+    if (form.court_booker_id !== initialForm.court_booker_id) roundUpdate.court_booker_id = form.court_booker_id || null
+    if (form.status !== initialForm.status) roundUpdate.status = form.status
+    if (isResponsable && form.court_cost !== initialForm.court_cost) roundUpdate.court_cost = form.court_cost ? parseFloat(form.court_cost) : null
+
+    let roundError: { message: string } | null = null
+    if (Object.keys(roundUpdate).length) {
+      const res = await supabase.from('rounds').update(roundUpdate).eq('id', roundId)
+      roundError = res.error
+    }
 
     if (roundError) {
       setSaveError(friendlyError(roundError.message, 'No se pudo guardar la jornada. Inténtalo de nuevo.'))
@@ -84,11 +99,13 @@ export default function EditarJornadaForm({ roundId, players, initialForm, initi
       return
     }
 
-    if (form.scheduled_date !== initialForm.scheduled_date || form.status !== initialForm.status) {
+    if ((!reservationLocked && form.scheduled_date !== initialForm.scheduled_date) || form.status !== initialForm.status) {
       await rescheduleFollowingRounds(roundId)
     }
 
-    if (form.matchId) {
+    if (form.matchId && pairsLocked) {
+      // Parejas ya definidas: solo el administrador puede cambiarlas.
+    } else if (form.matchId) {
       const { error: matchError } = await supabase.from('matches').update({
         team1_p1_id: form.team1_p1_id,
         team1_p2_id: form.team1_p2_id,
@@ -148,6 +165,12 @@ export default function EditarJornadaForm({ roundId, players, initialForm, initi
           Mientras falte día, hora o club, esta jornada aparece como &quot;Pendiente de reserva&quot;.
         </p>
 
+        {reservationLocked && (
+          <p className="rounded-xl p-3 text-xs font-semibold" style={{ background: 'var(--orange-bg)', color: '#7A5A1E' }}>
+            🔒 La reserva ya está registrada (día, hora y club). Solo el administrador puede cambiarla.
+          </p>
+        )}
+        <fieldset disabled={reservationLocked} className="space-y-4 min-w-0 border-0 p-0 m-0">
         <Field label="Día">
           <input type="date" value={form.scheduled_date}
             onChange={e => setForm(f => ({ ...f, scheduled_date: e.target.value }))}
@@ -163,6 +186,7 @@ export default function EditarJornadaForm({ roundId, players, initialForm, initi
         <Field label="Club">
           <ClubPicker value={form.club} onChange={v => setForm(f => ({ ...f, club: v }))} />
         </Field>
+        </fieldset>
 
         <Field label="Estado">
           <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} style={inputStyle}>
@@ -212,12 +236,17 @@ export default function EditarJornadaForm({ roundId, players, initialForm, initi
                 Esta jornada todavía no tiene parejas asignadas. Elige los 4 jugadores y guarda para crear el partido.
               </p>
             )}
-            {hasResult && (
+            {pairsLocked && (
+              <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>
+                🔒 Las parejas ya están definidas. Solo el administrador puede cambiarlas.
+              </p>
+            )}
+            {hasResult && !pairsLocked && (
               <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>
                 🔒 Este partido ya tiene un resultado registrado. Para cambiar las parejas, borra antes el resultado.
               </p>
             )}
-            <fieldset disabled={hasResult} className="space-y-4">
+            <fieldset disabled={hasResult || pairsLocked} className="space-y-4">
               <div>
                 <p className="text-xs font-medium mb-2" style={{ color: 'var(--accent)' }}>Pareja 1</p>
                 <div className="grid grid-cols-2 gap-2">

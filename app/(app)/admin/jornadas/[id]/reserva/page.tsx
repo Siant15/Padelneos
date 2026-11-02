@@ -1,5 +1,6 @@
 import { createClient, getCachedUser } from '@/lib/supabase/server'
 import ReservaForm from './ReservaForm'
+import { isAdminUser } from '@/lib/admin'
 
 export default async function ReservaPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: roundId } = await params
@@ -32,6 +33,7 @@ export default async function ReservaPage({ params }: { params: Promise<{ id: st
       roundNumber={round.round_number}
       bookerName={bookerName}
       isResponsable={!!user && user.id === round.court_booker_id}
+      isAdmin={isAdminUser(user)}
       initial={{
         scheduled_date: round.scheduled_date ?? '',
         scheduled_time: round.scheduled_time?.slice(0, 5) ?? '',

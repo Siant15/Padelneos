@@ -6,13 +6,13 @@ import { createPushAdminClient, sendPushToAll } from '@/lib/push'
 import { madridDateTimeToUtc } from '@/lib/betting'
 import webpush from 'web-push'
 
-// Una jornada solo cuenta como "reserva confirmada" cuando tiene las
-// 4 cosas a la vez: fecha, hora, club y precio de la pista. Sin las
-// 4, no se manda ningún aviso de "toca partido" — la fecha sola (la
-// que deja `generate_season_rounds` al crear el calendario) no es
-// suficiente, todavía puede cambiar o cancelarse.
-function isRoundConfirmed(round: { scheduled_date: string | null; scheduled_time: string | null; club: string | null; court_cost: number | null }): boolean {
-  return !!(round.scheduled_date && round.scheduled_time && round.club && round.court_cost != null)
+// Una jornada solo cuenta como "reserva confirmada" cuando tiene día,
+// hora y club (la reserva registrada). La fecha sola (la que deja
+// `generate_season_rounds` al crear el calendario) no es suficiente,
+// todavía puede cambiar. El precio de la pista NO se exige: solo lo puede
+// escribir quien paga y, si no lo pone, no tiene que dejar a todos sin aviso.
+function isRoundConfirmed(round: { scheduled_date: string | null; scheduled_time: string | null; club: string | null }): boolean {
+  return !!(round.scheduled_date && round.scheduled_time && round.club)
 }
 
 // Mensajes "picantes" según la posición en la clasificación, para el
@@ -65,27 +65,8 @@ export async function GET(request: Request) {
 
   if (!season) return NextResponse.json({ sent: 0, reason: 'sin temporada activa' })
 
-  // Si la última jornada no cancelada se jugó hace más de 2 semanas,
-  // la temporada se considera terminada y se cierra sola (sin esperar
-  // a que alguien entre a finalizarla a mano).
-  const { data: lastRound } = await admin
-    .from('rounds')
-    .select('scheduled_date')
-    .eq('season_id', season.id)
-    .neq('status', 'cancelled')
-    .not('scheduled_date', 'is', null)
-    .order('scheduled_date', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-
-  if (lastRound) {
-    const twoWeeksAfter = new Date(lastRound.scheduled_date + 'T12:00:00')
-    twoWeeksAfter.setDate(twoWeeksAfter.getDate() + 14)
-    if (twoWeeksAfter < new Date()) {
-      await admin.from('seasons').update({ status: 'finished' }).eq('id', season.id)
-      return NextResponse.json({ sent: 0, reason: 'temporada cerrada automáticamente (2 semanas sin partidos)' })
-    }
-  }
+  // La temporada ya no se cierra sola: la cierra un jugador cuando termina
+  // (botón «Cerrar la liga», RPC finish_season, migración 067).
 
   const { data: round } = await admin
     .from('rounds')
@@ -101,7 +82,7 @@ export async function GET(request: Request) {
   // no se manda ningún aviso — solo tener la fecha (p. ej. recién
   // generada al crear el calendario) no cuenta como partido confirmado.
   if (!isRoundConfirmed(round)) {
-    return NextResponse.json({ sent: 0, reason: 'la reserva todavía no está confirmada (falta fecha, hora, club o precio de pista)' })
+    return NextResponse.json({ sent: 0, reason: 'la reserva todavía no está confirmada (falta fecha, hora o club)' })
   }
 
   const time = round.scheduled_time!.slice(0, 5)
@@ -125,14 +106,16 @@ export async function GET(request: Request) {
   // aviso por partido, a falta de ~1 h: justo cuando el mercado de
   // apuestas ya cerró (cierra 1 h antes), así que ya se puede decir si
   // alguien ha apostado en tu contra sin revelar nada a destiempo.
-  // Ventana de 30 a 60 min, con margen para el intervalo entre
-  // comprobaciones. `reminder_120_sent_at` conserva su nombre antiguo
+  // Se envía en la primera comprobación que llegue a 60 min o menos antes
+  // del partido (y todavía falten más de 5): el workflow de GitHub corre
+  // cada 15 min y a veces se retrasa, así que no hay una ventana estrecha
+  // que se pueda perder. `reminder_120_sent_at` conserva su nombre antiguo
   // pero marca "ya avisado" para este aviso.
   if (round.reminder_120_sent_at) return NextResponse.json({ sent: 0, reason: 'ya se avisó para esta jornada' })
 
   const matchDateTime = madridDateTimeToUtc(round.scheduled_date!, round.scheduled_time!)
   const minutesUntil = (matchDateTime.getTime() - now.getTime()) / 60000
-  if (minutesUntil < 30 || minutesUntil > 60) {
+  if (minutesUntil <= 5 || minutesUntil > 60) {
     return NextResponse.json({ sent: 0, reason: `fuera de ventana (quedan ${Math.round(minutesUntil)} min)` })
   }
 
@@ -165,7 +148,8 @@ export async function GET(request: Request) {
     try {
       await webpush.sendNotification(
         { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
-        JSON.stringify(payload)
+        JSON.stringify(payload),
+        { TTL: 3600 }
       )
       sent++
     } catch (err) {

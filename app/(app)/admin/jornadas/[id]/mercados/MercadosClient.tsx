@@ -179,23 +179,25 @@ export default function MercadosClient({ roundId, initialMarkets, initialCatalog
   }
 
   async function calcAllPayouts() {
-    if (!confirm(isSettled
-      ? '¿Volver a liquidar? Se deshace el reparto anterior (incluidos los jackpots que tocara) y se recalcula desde cero.'
-      : '¿Calcular premios y puntos ahora? Esto reparte las fichas y asigna los puntos de apuestas de la jornada.')) return
+    if (isSettled) return
+    if (!confirm('¿Calcular premios y puntos ahora? Esto reparte las fichas y asigna los puntos de apuestas de la jornada. Una vez liquidada, ya no se podrá corregir.')) return
     setCalculating(true)
     setPayoutError('')
-    const { error } = await supabase.rpc('settle_round', { p_round_id: roundId })
-    setCalculating(false)
-    if (error) {
-      setPayoutError(friendlyError(error.message, 'No se pudo liquidar la jornada.'))
-      return
+    try {
+      const { error } = await supabase.rpc('settle_round', { p_round_id: roundId })
+      if (error) {
+        setPayoutError(friendlyError(error.message, 'No se pudo liquidar la jornada.'))
+        return
+      }
+      // Limpieza del catálogo (best-effort: si falla no bloquea la liquidación).
+      await supabase.rpc('prune_stale_question_templates')
+      await revalidateLigaData()
+      setPayoutsCalculated(true)
+      setIsSettled(true)
+      setTimeout(() => setPayoutsCalculated(false), 3000)
+    } finally {
+      setCalculating(false)
     }
-    // Limpieza del catálogo (best-effort: si falla no bloquea la liquidación).
-    await supabase.rpc('prune_stale_question_templates')
-    await revalidateLigaData()
-    setPayoutsCalculated(true)
-    setIsSettled(true)
-    setTimeout(() => setPayoutsCalculated(false), 3000)
   }
 
   const automaticMarkets = markets.filter(m => m.template?.category === 'automatic')
@@ -298,17 +300,19 @@ export default function MercadosClient({ roundId, initialMarkets, initialCatalog
           </p>
           <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>
             {isSettled
-              ? 'Si corriges un resultado, vuelve a pulsar aquí: se deshace lo anterior y se liquida de nuevo.'
+              ? 'La liquidación es definitiva. Si hay un error, solo el administrador puede corregirlo.'
               : 'Calcula los premios finales (con jackpot si tocaba) y asigna los puntos de clasificación.'}
           </p>
           {payoutError && <p className="text-xs mb-2" style={{ color: 'var(--red)' }}>⚠ {payoutError}</p>}
-          <button
-            onClick={calcAllPayouts}
-            disabled={calculating}
-            className="w-full py-2.5 rounded-lg font-semibold text-sm transition hover:opacity-90 disabled:opacity-50"
-            style={{ background: payoutsCalculated ? 'var(--green)' : 'var(--accent)', color: '#fff' }}>
-            {calculating ? 'Liquidando...' : payoutsCalculated ? '✓ Liquidada' : isSettled ? '↻ Volver a liquidar' : '🏆 Calcular premios y puntos'}
-          </button>
+          {!isSettled && (
+            <button
+              onClick={calcAllPayouts}
+              disabled={calculating}
+              className="w-full py-2.5 rounded-lg font-semibold text-sm transition hover:opacity-90 disabled:opacity-50"
+              style={{ background: payoutsCalculated ? 'var(--green)' : 'var(--accent)', color: '#fff' }}>
+              {calculating ? 'Liquidando...' : payoutsCalculated ? '✓ Liquidada' : '🏆 Calcular premios y puntos'}
+            </button>
+          )}
         </div>
       )}
     </div>

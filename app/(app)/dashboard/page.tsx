@@ -10,7 +10,8 @@ import DinnerRiskInfo from '@/components/DinnerRiskInfo'
 import PiquesCarousel from '@/components/PiquesCarousel'
 import { getRoundBettingContext } from '@/lib/betting-queries'
 import { isRoundBettable } from '@/lib/betting'
-import { todayMadrid } from '@/lib/rounds'
+import { todayMadrid, leagueFinished } from '@/lib/rounds'
+import FinishSeasonCard from '@/components/FinishSeasonCard'
 import { STREAK_MIN } from '@/lib/piques'
 import { halfSeasonReached } from '@/lib/informe'
 import { getCachedActiveSeason, getCachedSeasonRounds } from '@/lib/supabase/cached'
@@ -102,6 +103,8 @@ export default async function DashboardPage() {
           </span>
         )}
       </div>
+
+      {seasonId && leagueFinished(rounds) && <FinishSeasonCard seasonId={seasonId} seasonName={activeSeasonRow?.name} />}
 
       <EnableNotificationsCard />
 

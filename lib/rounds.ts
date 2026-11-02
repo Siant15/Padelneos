@@ -11,3 +11,17 @@ export const RESET_NOTIFICATION_FLAGS = {
   reminder_120_sent_at: null,
   bet_against_notified_at: null,
 } as const
+
+// Reserva registrada = día, hora y club a la vez. Desde ahí solo el
+// administrador puede cambiarla (trigger 067), y rescheduleFollowingRounds
+// la trata como ancla: no la mueve.
+export function isReservationRegistered(r: { scheduled_date: string | null; scheduled_time: string | null; club: string | null }): boolean {
+  return !!(r.scheduled_date && r.scheduled_time && r.club)
+}
+
+// La liga ha terminado cuando no queda ninguna jornada programada y hay al
+// menos una jugada (las canceladas no cuentan). Un solo criterio para Inicio
+// y Liga; cerrar la liga lo confirma un jugador (RPC finish_season).
+export function leagueFinished(rounds: { status: string }[]): boolean {
+  return rounds.length > 0 && !rounds.some(r => r.status === 'scheduled') && rounds.some(r => r.status === 'played')
+}
